@@ -1,0 +1,116 @@
+{
+    "requestId": {
+        "type": "string",
+        "required": "M",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "regex": "^[a-zA-Z0-9-]+$",
+        "max_length": 36,
+        "min_length": 36,
+        "default_value": "",
+        "enum": [],
+        "condition": null
+    },
+    "customerType": {
+        "type": "string",
+        "required": "M",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "regex": "^(C|R)$",
+        "default_value": "C",
+        "enum": [
+            "C",
+            "R"
+        ],
+        "max_length": 2,
+        "condition": {
+            "depend_on": "requestId",
+            "values": [
+                "req-67890"
+            ]
+        }
+    },
+    "retailNumber": {
+        "type": "string",
+        "required": "C",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "max_length": 10,
+        "regex": "^\\d{10}$",
+        "default_value": "1234567890",
+        "condition": {
+            "depend_on": "customerType",
+            "values": [
+                "R"
+            ]
+        }
+    },
+    "retailType": {
+        "type": "string",
+        "required": "C",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "max_length": 2,
+        "regex": "^\\d{1,3}$",
+        "default_value": "1",
+        "enum": [
+            "1",
+            "2",
+            "3"
+        ],
+        "condition": {
+            "depend_on": "customerType",
+            "values": [
+                "R", "C"
+            ]
+        }
+    },
+    "remarks" : {
+        "type": "string",
+        "required": "O",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "max_length": 255,
+        "regex": "^.{0,255}$",
+        "default_value": "",
+        "condition": null
+    },
+    "status": {
+        "type": "string",
+        "required": "C",
+        "check": {
+            "null": true,
+            "empty": true,
+            "absent": true,
+            "special_characters": true
+        },
+        "max_length": 10,
+        "regex": "^(active|inactive)$",
+        "default_value": "active",
+        "enum": [
+            "active",
+            "inactive"
+        ],
+        "condition": {"depend_on": "customerType", "values": ["R"]}
+    }
+}
