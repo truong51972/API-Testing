@@ -1,0 +1,143 @@
+import logging
+import logging.config
+import os
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import dotenv
+import redis
+from sqlmodel import create_engine
+
+dotenv.load_dotenv()
+
+# Múi giờ Việt Nam - sử dụng zoneinfo (built-in từ Python 3.9+)
+VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+# Custom formatter cho múi giờ Việt Nam theo chuẩn ISO 8601
+class VietnamTimeFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=VN_TIMEZONE)
+        # Luôn trả về định dạng ISO 8601 với milliseconds
+        return dt.isoformat(timespec="milliseconds")
+
+
+POSTGRES_DB = os.getenv("POSTGRES_DB", "backend_database")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "admin")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "admin")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
+
+# Construct DATABASE_URL using .format()
+DATABASE_URL = "postgresql+psycopg2://{}:{}@{}:{}/{}".format(
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+    POSTGRES_HOST,
+    POSTGRES_PORT,
+    POSTGRES_DB,
+)
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
+MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
+MILVUS_TOKEN = os.getenv("MILVUS_TOKEN", "root:Milvus")
+
+MILVUS_URI = "http://{}:{}".format(MILVUS_HOST, MILVUS_PORT)
+
+# Redis configuration
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+
+# Create SQLAlchemy engine
+engine = create_engine(DATABASE_URL)
+
+# Create Redis client
+redis_client = redis.Redis(
+    host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True
+)
+
+
+# Tạo thư mục logs nếu chưa tồn tại
+LOG_DIR = Path(__file__).parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+# Cấu hình logging chi tiết
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "()": VietnamTimeFormatter,
+            "format": "%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s",
+        },
+        "detailed": {
+            "()": VietnamTimeFormatter,
+            "format": "%(asctime)s | %(levelname)-8s | %(name)-5s | %(module)s.%(funcName)s:%(lineno)d | %(message)s",
+        },
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(funcName)s %(lineno)d %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO" if not DEBUG else "DEBUG",
+            "formatter": "standard",
+            "stream": "ext://sys.stdout",
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "INFO",
+            "formatter": "detailed",
+            "filename": str(LOG_DIR / "app.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "encoding": "utf8",
+        },
+        "error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "ERROR",
+            "formatter": "detailed",
+            "filename": str(LOG_DIR / "error.log"),
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "encoding": "utf8",
+        },
+    },
+    "root": {
+        "level": "DEBUG" if DEBUG else "INFO",
+        "handlers": ["console", "file"],
+    },
+    "loggers": {
+        "uvicorn": {
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+        "uvicorn.access": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "uvicorn.error": {
+            "level": "ERROR",
+            "handlers": ["console", "error_file"],
+            "propagate": False,
+        },
+        # "sqlalchemy.engine": {
+        #     "level": "INFO" if DEBUG else "WARNING",
+        #     "handlers": ["console", "file"],
+        #     "propagate": False,
+        # },
+        "redis": {
+            "level": "WARNING",
+            "handlers": ["console", "file"],
+            "propagate": False,
+        },
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
