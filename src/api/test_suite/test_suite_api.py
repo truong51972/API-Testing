@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 
 from src import redis_client
 
-router = APIRouter(prefix="/test_suit", tags=["TestSuit"])
+router = APIRouter(prefix="/test_suite", tags=["TestSuit"])
 
 
 @router.get("/create")

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlmodel import Field
 
-from src.models.test_suit.test_suit_model import TestSuitModel
+from src.models.test_suite.test_suite_model import TestSuitModel
 
 
 class TestSuitRepository(TestSuitModel, table=True):
