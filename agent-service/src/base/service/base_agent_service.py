@@ -18,13 +18,6 @@ class BaseAgentService(BaseLlmService):
 
     @model_validator(mode="after")
     def __after_init(self):
-        self._prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", self.system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
 
         if self.tools:
             self._agent = self._llm.bind_tools(self.tools)
@@ -35,6 +28,13 @@ class BaseAgentService(BaseLlmService):
 
     @validate_call
     def run(self, invoke_input: dict):
+        _prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
 
-        response = self._agent.invoke(self._prompt.invoke(invoke_input))
+        response = self._agent.invoke(_prompt.invoke(invoke_input))
         return response

@@ -1,0 +1,8 @@
+Bạn là một người kiểm tra tài liệu, bạn chỉ được phép đọc đoạn văn bản sau và loại bỏ tất cả các thông tin meta data (ví dụ: các thông tin về tác giả, ngày tháng, địa chỉ email, số điện thoại, chú thích, nhãn, hoặc các ký hiệu đặc biệt không liên quan đến nội dung chính)
+Bạn hãy thực hiện các bước sau:
+1. Đọc văn bản
+2. Xem sét những văn bản nào là dạng thông tin metadata và loại bỏ nó
+3. Trả về đoạn văn bản đã được loại bỏ metadata
+
+///Nội dung
+{input}
