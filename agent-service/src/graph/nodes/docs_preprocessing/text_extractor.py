@@ -1,59 +1,63 @@
 # src.graph.nodes.docs_preprocessing.text_extractor
 import logging
+import sys
 from typing import Any, Dict
 
-from docling.document_converter import DocumentConverter, InputFormat
+from docling.datamodel.accelerator_options import (
+    AcceleratorDevice,
+    AcceleratorOptions,
+)
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+)
+from docling.datamodel.settings import settings
+from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
 from dotenv import load_dotenv
-
-from src.base.service.base_agent_service import BaseAgentService
-
-# prompt_vn = None
-# with open(
-#     "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_vn.txt", "r"
-# ) as f:
-#     prompt_vn = f.read()
-
-# prompt_en = None
-# with open(
-#     "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_en.txt", "r"
-# ) as f:
-#     prompt_en = f.read()
+from pydantic import BaseModel, model_validator, validate_call
 
 
-# class MetaDataRemoval(BaseAgentService):
-#     llm_model: str = "gemini-2.0-flash-lite"
-#     llm_temperature: float = 0.0
-#     llm_top_p: float = 0.1
-#     llm_top_k: int = 3
+class TextExtractor(BaseModel):
+    @model_validator(mode="after")
+    def __after_init__(self):
+        accelerator_options = AcceleratorOptions(
+            num_threads=8, device=AcceleratorDevice.CUDA
+        )
 
-#     def __call__(self, state) -> Dict[str, Any]:
-#         data = state.data
-#         lang = state.lang
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.accelerator_options = accelerator_options
+        pipeline_options.do_ocr = True
+        pipeline_options.do_table_structure = True
+        pipeline_options.table_structure_options.do_cell_matching = True
 
-#         if lang == "vi":
-#             self.system_prompt = prompt_vn
-#         else:
-#             self.system_prompt = prompt_en
+        self.__converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=pipeline_options,
+                )
+            }
+        )
 
-#         invoke_input = {
-#             "input": data,
-#             "chat_history": [],
-#         }
+        return self
 
-#         response = self.run(invoke_input)
+    def __call__(self, state):
+        data = state.data
 
-#         logging.info("MetaDataRemoval node called")
+        conversion_result = self.__converter.convert(data)
+        doc = conversion_result.document
 
-#         return {
-#             "messages": [response],
-#         }
+        text = doc.export_to_text()
+
+        return {
+            "messages": [text],
+        }
 
 
 if __name__ == "__main__":
-    source = "/mnt/Data/API-Testing/agent-service/static/data/hehe.pdf"  # document per local path or URL
-    converter = DocumentConverter()
+    # source = "http://localhost:9000/mybucket/mac-lenin.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20250817%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250817T070349Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=ee175d0a9cd36f6f27e28c900af54ee3061b5045ead25fa4215365d3fdc47a0e"
+    source = "assents/test_extractor/Untitled 1.pdf"
 
-    result = converter.convert(source, max_num_pages=1)
-    print(
-        result.document.export_to_markdown()
-    )  # output: "## Docling Technical Report[...]"
+    extractor = TextExtractor()
+    result = extractor(type("State", (object,), {"data": source, "lang": "vi"})())
+
+    print("Extracted text:", result["messages"][0])

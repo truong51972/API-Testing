@@ -37,6 +37,12 @@ services:
     ports:
       - 3000:3000
 
+  minio:
+    ports:
+      - "9000:9000"
+    volumes:
+      - ${PROJECT_ROOT}/data/minio_data:/minio_data
+      
   database:
     ports:
       - "5432:5432"

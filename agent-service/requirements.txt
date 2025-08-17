@@ -30,4 +30,6 @@ pandas==2.3.1
 
 nltk==3.9.1
 
-docling==2.44.0
+docling==2.44.0 # for extract text
+
+minio==7.2.16

@@ -1,17 +1,18 @@
-import os
-from dotenv import load_dotenv
-from pathlib import Path
 import logging
 import logging.config
+import os
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
-from src.utils.text_preprocessing import initialize_nltk
+
+import nltk
 import redis
+from dotenv import load_dotenv
+from minio import Minio
 from sqlmodel import create_engine
 
 load_dotenv()
 
-initialize_nltk()
 
 # Múi giờ Việt Nam
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -37,6 +38,27 @@ DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POST
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+
+MINIO_URL = os.getenv("MINIO_URL", "localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+
+
+def initialize_nltk():
+    nltk.download("punkt", quiet=True)
+    nltk.download("stopwords", quiet=True)
+
+
+initialize_nltk()
+
+
+def get_minio_client():
+    return Minio(
+        MINIO_URL,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        secure=False,  # True if using HTTPS, False if using HTTP
+    )
 
 
 # --- Hàm khởi tạo ---

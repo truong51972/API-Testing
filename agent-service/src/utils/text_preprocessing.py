@@ -3,13 +3,6 @@ import re
 import string
 import unicodedata
 
-import nltk
-
-
-def initialize_nltk():
-    nltk.download("punkt")
-    nltk.download("stopwords")
-
 
 def remove_stopwords(text, stopwords):
     words = text.split()
