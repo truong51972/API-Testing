@@ -3,6 +3,8 @@ import logging
 from typing import Any, Dict
 
 from dotenv import load_dotenv
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pydantic import model_validator
 
 from src.base.service.base_agent_service import BaseAgentService
 
@@ -20,10 +22,22 @@ with open(
 
 
 class MetaDataRemoval(BaseAgentService):
-    llm_model: str = "gemini-2.0-flash-lite"
+    llm_model: str = "gemini-2.0-flash"
     llm_temperature: float = 0.0
     llm_top_p: float = 0.1
     llm_top_k: int = 3
+
+    chunk_size: int = 1000
+    batch_size: int = 10
+
+    @model_validator(mode="after")
+    def __after_init__(self):
+        self.__text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=0,
+            length_function=len,
+        )
+        return self
 
     def __call__(self, state) -> Dict[str, Any]:
         data = state.data
@@ -34,17 +48,24 @@ class MetaDataRemoval(BaseAgentService):
         else:
             self.system_prompt = prompt_en
 
-        invoke_input = {
-            "input": data,
-            "chat_history": [],
-        }
+        result_text = ""
+        chunks = self.__text_splitter.split_text(data)
 
-        response = self.run(invoke_input)
+        batchs = [
+            {
+                "input": chunk,
+                "chat_history": [],
+            }
+            for chunk in chunks[: self.batch_size]
+        ]
+        responses = self.runs(batchs, batch_size=self.batch_size)
+
+        result_text += "\n".join([response.content for response in responses]) + "\n"
 
         logging.info("MetaDataRemoval node called")
 
         return {
-            "messages": [response],
+            "result": [result_text],
         }
 
 
@@ -68,4 +89,4 @@ if __name__ == "__main__":
 
     response = meta_data_removal(state)
 
-    print(response["messages"][0].content)
+    print(response["result"][0])

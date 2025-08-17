@@ -3,6 +3,8 @@ from typing import List, Optional
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import Field, model_validator, validate_call
 
+from src.utils.common import split_by_size
+
 from .base_llm_service import BaseLlmService
 
 
@@ -40,7 +42,7 @@ class BaseAgentService(BaseLlmService):
         return response
 
     @validate_call
-    def run_in_batch(self, invoke_inputs: list[dict]):
+    def runs(self, invoke_inputs: list[dict], batch_size: int):
         _prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.system_prompt),
@@ -49,8 +51,11 @@ class BaseAgentService(BaseLlmService):
             ]
         )
 
+        batches = split_by_size(invoke_inputs, batch_size)
         chain = _prompt | self._agent
 
-        responses = chain.batch(invoke_inputs)
+        responses = []
+        for batch in batches:
+            responses.extend(chain.batch(batch))
 
         return responses

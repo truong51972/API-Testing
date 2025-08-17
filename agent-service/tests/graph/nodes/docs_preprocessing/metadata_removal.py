@@ -21,7 +21,7 @@ def test_metadata_removal_vn():
     """
     state = type("State", (object,), {"data": string, "lang": "vi"})()
 
-    response = meta_data_removal(state)["messages"][0].content
+    response = meta_data_removal(state)["result"][0]
 
     assert "15/08/2025" not in response
     assert "Nguyễn Văn A" not in response
@@ -48,7 +48,7 @@ def test_metadata_removal_en():
     """
     state = type("State", (object,), {"data": string, "lang": "en"})()
 
-    response = meta_data_removal(state)["messages"][0].content
+    response = meta_data_removal(state)["result"][0]
 
     assert "15/08/2025" not in response
     assert "John Doe" not in response

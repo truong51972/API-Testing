@@ -1,20 +1,13 @@
 # src.graph.nodes.docs_preprocessing.text_extractor
-import logging
-import sys
-from typing import Any, Dict
-
 from docling.datamodel.accelerator_options import (
     AcceleratorDevice,
     AcceleratorOptions,
 )
-from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
 )
-from docling.datamodel.settings import settings
 from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
-from dotenv import load_dotenv
-from pydantic import BaseModel, model_validator, validate_call
+from pydantic import BaseModel, model_validator
 
 
 class TextExtractor(BaseModel):
