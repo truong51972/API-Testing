@@ -1,8 +1,6 @@
 from typing import Optional
 
-from langchain_google_genai import (
-    ChatGoogleGenerativeAI,
-)
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAI
 
 # for validation
 from pydantic import BaseModel, Field, model_validator
@@ -32,10 +30,18 @@ class BaseLlmService(BaseModel):
 
     @model_validator(mode="after")
     def __after_init(self):
-        self._llm = ChatGoogleGenerativeAI(
-            model=self.llm_model,
-            temperature=self.llm_temperature,
-            top_p=self.llm_top_p,
-            top_k=self.llm_top_k,
-        )
+        if self.llm_model.startswith("gemini"):
+            self._llm = ChatGoogleGenerativeAI(
+                model=self.llm_model,
+                temperature=self.llm_temperature,
+                top_p=self.llm_top_p,
+                top_k=self.llm_top_k,
+            )
+        elif self.llm_model.startswith("gemma"):
+            self._llm = GoogleGenerativeAI(
+                model=self.llm_model,
+                temperature=self.llm_temperature,
+                top_p=self.llm_top_p,
+                top_k=self.llm_top_k,
+            )
         return self

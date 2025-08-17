@@ -38,3 +38,19 @@ class BaseAgentService(BaseLlmService):
 
         response = self._agent.invoke(_prompt.invoke(invoke_input))
         return response
+
+    @validate_call
+    def run_in_batch(self, invoke_inputs: list[dict]):
+        _prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+
+        chain = _prompt | self._agent
+
+        responses = chain.batch(invoke_inputs)
+
+        return responses

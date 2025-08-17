@@ -55,9 +55,13 @@ class TextExtractor(BaseModel):
 
 if __name__ == "__main__":
     # source = "http://localhost:9000/mybucket/mac-lenin.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20250817%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250817T070349Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=ee175d0a9cd36f6f27e28c900af54ee3061b5045ead25fa4215365d3fdc47a0e"
-    source = "assents/test_extractor/Untitled 1.pdf"
+    source = "data/uploads/mac-lenin.pdf"
+    dest = "data/uploads/mac-lenin.txt"
 
     extractor = TextExtractor()
     result = extractor(type("State", (object,), {"data": source, "lang": "vi"})())
 
     print("Extracted text:", result["messages"][0])
+
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write(result["messages"][0])
