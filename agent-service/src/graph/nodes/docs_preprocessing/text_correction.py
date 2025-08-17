@@ -27,8 +27,8 @@ class TextCorrection(BaseAgentService):
     llm_top_p: float = 0.1
     llm_top_k: int = 3
 
-    chunk_size: int = 1000
-    batch_size: int = 10
+    chunk_size: int = 1500
+    batch_size: int = 5
 
     @model_validator(mode="after")
     def __after_init__(self):
@@ -52,14 +52,14 @@ class TextCorrection(BaseAgentService):
 
         chunks = self.__text_splitter.split_text(data)
 
-        batchs = [
+        batches = [
             {
                 "input": chunk,
                 "chat_history": [],
             }
-            for chunk in chunks[: self.batch_size]
+            for chunk in chunks
         ]
-        responses = self.runs(batchs, batch_size=self.batch_size)
+        responses = self.runs_parallel(batches, batch_size=self.batch_size)
 
         corrected_text += "\n".join(responses)
 

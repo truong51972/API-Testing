@@ -51,14 +51,14 @@ class MetaDataRemoval(BaseAgentService):
         result_text = ""
         chunks = self.__text_splitter.split_text(data)
 
-        batchs = [
+        batches = [
             {
                 "input": chunk,
                 "chat_history": [],
             }
-            for chunk in chunks[: self.batch_size]
+            for chunk in chunks
         ]
-        responses = self.runs(batchs, batch_size=self.batch_size)
+        responses = self.runs(batches, batch_size=self.batch_size)
 
         result_text += "\n".join([response.content for response in responses]) + "\n"
 

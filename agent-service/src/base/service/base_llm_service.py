@@ -1,9 +1,12 @@
+from random import choice
 from typing import Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAI
 
 # for validation
 from pydantic import BaseModel, Field, model_validator
+
+from src.settings import GOOGLE_API_KEYS
 
 
 class BaseLlmService(BaseModel):
@@ -30,12 +33,15 @@ class BaseLlmService(BaseModel):
 
     @model_validator(mode="after")
     def __after_init(self):
+        random_api_key = choice(GOOGLE_API_KEYS)
+        print(random_api_key)
         if self.llm_model.startswith("gemini"):
             self._llm = ChatGoogleGenerativeAI(
                 model=self.llm_model,
                 temperature=self.llm_temperature,
                 top_p=self.llm_top_p,
                 top_k=self.llm_top_k,
+                google_api_key=random_api_key,
             )
         elif self.llm_model.startswith("gemma"):
             self._llm = GoogleGenerativeAI(
@@ -43,5 +49,6 @@ class BaseLlmService(BaseModel):
                 temperature=self.llm_temperature,
                 top_p=self.llm_top_p,
                 top_k=self.llm_top_k,
+                google_api_key=random_api_key,
             )
         return self

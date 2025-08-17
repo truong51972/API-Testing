@@ -43,6 +43,10 @@ MINIO_URL = os.getenv("MINIO_URL", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 
+GOOGLE_API_KEYS = None
+with open("env/google_api_keys.txt", "r") as f:
+    GOOGLE_API_KEYS = [line.strip() for line in f.readlines() if line.strip()]
+
 
 def initialize_nltk():
     nltk.download("punkt", quiet=True)

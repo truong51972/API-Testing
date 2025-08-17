@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -42,7 +43,9 @@ class BaseAgentService(BaseLlmService):
         return response
 
     @validate_call
-    def runs(self, invoke_inputs: list[dict], batch_size: int):
+    def runs(
+        self, invoke_inputs: list[dict], batch_size: int = -1, api_key_index: int = -1
+    ):
         _prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", self.system_prompt),
@@ -57,5 +60,28 @@ class BaseAgentService(BaseLlmService):
         responses = []
         for batch in batches:
             responses.extend(chain.batch(batch))
+
+        return responses
+
+    def _thread_target_runner(self, batch: list[dict]):
+        current_class = self.__class__
+        config_data = self.model_dump()
+        manual_instance = current_class(**config_data)
+        return manual_instance.runs(batch)
+
+    @validate_call
+    def runs_parallel(
+        self,
+        invoke_inputs: list[dict],
+        batch_size: int,
+        max_workers: int = 3,
+    ):
+        batches = split_by_size(invoke_inputs, batch_size)
+
+        responses = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results_iterator = executor.map(self._thread_target_runner, batches)
+            for result in results_iterator:
+                responses.extend(result)
 
         return responses
