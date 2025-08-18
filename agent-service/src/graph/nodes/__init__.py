@@ -8,4 +8,5 @@ from src.graph.nodes.docs_preprocessing import (
     text_extractor,
     stopword_removal,
     text_normalization,
+    data_store,
 )

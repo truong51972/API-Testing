@@ -63,6 +63,10 @@ class DocsPreprocessingWorkflow(BaseModel):
             "text_extractor",
             NODE_REGISTRY.get("docs_preprocessing.text_extractor")(),
         )
+        self.workflow.add_node(
+            "data_store",
+            NODE_REGISTRY.get("docs_preprocessing.data_store")(),
+        )
 
     def _setup_edges(self):
         """Configure all edges and entry point"""
@@ -72,7 +76,8 @@ class DocsPreprocessingWorkflow(BaseModel):
         self.workflow.add_edge("text_normalization", "text_correction")
         self.workflow.add_edge("text_correction", "metadata_removal")
         self.workflow.add_edge("metadata_removal", "stopword_removal")
-        self.workflow.add_edge("stopword_removal", END)
+        self.workflow.add_edge("stopword_removal", "data_store")
+        self.workflow.add_edge("data_store", END)
 
     def get_graph(self):
         """Get the compiled graph"""

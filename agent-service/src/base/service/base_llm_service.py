@@ -34,7 +34,6 @@ class BaseLlmService(BaseModel):
     @model_validator(mode="after")
     def __after_init(self):
         random_api_key = choice(GOOGLE_API_KEYS)
-        print(random_api_key)
         if self.llm_model.startswith("gemini"):
             self._llm = ChatGoogleGenerativeAI(
                 model=self.llm_model,

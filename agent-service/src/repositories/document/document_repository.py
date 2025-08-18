@@ -5,6 +5,7 @@ from typing import List
 import langchain
 
 # for validation
+from langchain_milvus import Milvus
 from pydantic import model_validator, validate_call
 from pymilvus import (
     Collection,
@@ -21,6 +22,7 @@ from src.utils.generate_milvus_field_schemas_from_pydantic import (
 
 
 class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService):
+    collection_name: str = "document"
 
     @model_validator(mode="after")
     def __after_init(self):
@@ -134,6 +136,34 @@ class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService
         """
         return self._collection.delete(expr=f"id IN {id}")
 
+    def search_by_text(
+        self,
+        query: str,
+        document_amount: int = 1,
+        document_offset: int = 0,
+        doc_name: str = None,
+        annotations: str = None,
+    ):
+        milvus = Milvus(
+            embedding_function=self._embeddings,
+            collection_name=self.collection_name,
+            connection_args={"uri": self.milvus_uri, "token": self.milvus_token},
+        )
+        exprs = []
+
+        if doc_name:
+            exprs.append(f"doc_name == '{doc_name}'")
+        if annotations:
+            exprs.append(f"annotations == '{annotations}'")
+
+        expr = " AND ".join(exprs) if exprs else None
+
+        result = milvus.similarity_search(
+            query=query, k=document_amount + document_offset, expr=expr
+        )
+
+        return result[document_offset : document_offset + document_amount]
+
 
 if __name__ == "__main__":
     langchain.debug = True
@@ -151,6 +181,12 @@ if __name__ == "__main__":
         }
     ]
 
-    document_actions = DocumentRepository(collection_name="test")
+    document_actions = DocumentRepository()
 
-    document_actions.create_records(data)
+    print(
+        document_actions.search_by_text(
+            "Octoparse enables automated price tracking, data collection, and lead generation for e-commerce businesses.",
+            doc_name="e-commerce",
+            # annotations="test",
+        )
+    )

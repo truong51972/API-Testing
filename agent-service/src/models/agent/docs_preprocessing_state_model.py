@@ -26,3 +26,11 @@ class DocsPreProcessingStateModel(BaseModel):
         default_factory=list,
         description="Messages exchanged during the conversation",
     )
+
+    doc_name: str = Field(
+        description="Name of the document",
+    )
+
+    annotation: str = Field(
+        description="Annotation for the document",
+    )

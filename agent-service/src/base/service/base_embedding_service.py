@@ -24,7 +24,7 @@ class BaseEmbeddingService(BaseModel):
     def __after_init(self):
         random_api_key = choice(GOOGLE_API_KEYS)
         self._embeddings = GoogleGenerativeAIEmbeddings(
-            model=self.embedding_model, google_api_key=random_api_key
+            model=self.embedding_model, google_api_key=random_api_key, transport="rest"
         )
 
         if self.embedding_dim is None:
