@@ -3,9 +3,8 @@ from typing import Optional
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
-from src.models.agent.agent_state_model import AgentStateModel
 from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
-from src.registry.nodes import NODE_REGISTRY, scan_and_register_nodes
+from src.registry.nodes import NODE_REGISTRY
 
 
 class DocsPreprocessingWorkflow(BaseModel):
