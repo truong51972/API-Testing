@@ -1,28 +1,42 @@
+from langchain_core.messages import HumanMessage
+
+from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
 from src.registry.nodes import NODE_REGISTRY
 
 
 def test_text_extractor_pdf_vn():
-    source = "assents/test_extractor/test_vn.pdf"
+    data_test = "assents/test_extractor/test_vn.pdf"
+    node = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
+    input_mess = HumanMessage(
+        content=data_test,
+    )
+    state = DocsPreProcessingStateModel(user_input="", messages=[input_mess], lang="vi")
 
-    extractor = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
-    result = extractor(type("State", (object,), {"data": [source], "lang": "vi"})())
-
-    assert "Trường" in result["data"][0]
+    result = node(state)["messages"][-1].content
+    assert "Trường" in result
 
 
 def test_text_extractor_pdf_en():
-    source = "assents/test_extractor/test_en.pdf"
+    data_test = "assents/test_extractor/test_en.pdf"
+    node = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
+    input_mess = HumanMessage(
+        content=data_test,
+    )
+    state = DocsPreProcessingStateModel(user_input="", messages=[input_mess], lang="en")
 
-    extractor = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
-    result = extractor(type("State", (object,), {"data": [source], "lang": "en"})())
+    result = node(state)["messages"][-1].content
 
-    assert "Truong" in result["data"][0]
+    assert "Truong" in result
 
 
 def test_text_extractor_via_link():
-    source = "http://example.com"
-
+    source = "https://www.octoparse.com/use-cases/e-commerce"
     extractor = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
-    result = extractor(type("State", (object,), {"data": [source], "lang": "vi"})())
+    input_mess = HumanMessage(
+        content=source,
+    )
+    state = DocsPreProcessingStateModel(user_input="", messages=[input_mess], lang="vi")
 
-    assert "Example Domain" in result["data"][0]
+    result = extractor(state)["messages"][-1].content
+
+    assert "Web Scraping for E-commerce" in result
