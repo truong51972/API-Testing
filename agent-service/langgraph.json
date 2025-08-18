@@ -1,7 +1,7 @@
 {
-  "dependencies": ["./src/services/ai_agent"],
+  "dependencies": ["./src/graph/workflows/"],
   "graphs": {
-    "agent": "./src/services/ai_agent/agent.py:graph"
+    "docs_preprocessing_workflow": "./src/graph/workflows/.langgraph_dev.py:docs_preprocessing_graph"
   },
   "env": ".env"
 }
