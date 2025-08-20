@@ -10,7 +10,7 @@ import redis
 from dotenv import load_dotenv
 from minio import Minio
 from sqlmodel import create_engine
-
+from src.utils.check_google_api_tokens import check_google_api_tokens
 load_dotenv()
 
 
@@ -52,6 +52,8 @@ MILVUS_URI = "http://{}:{}".format(MILVUS_HOST, MILVUS_PORT)
 GOOGLE_API_KEYS = None
 with open("env/google_api_keys.txt", "r") as f:
     GOOGLE_API_KEYS = [line.strip() for line in f.readlines() if line.strip()]
+
+    check_google_api_tokens(GOOGLE_API_KEYS)
 
 
 def initialize_nltk():
