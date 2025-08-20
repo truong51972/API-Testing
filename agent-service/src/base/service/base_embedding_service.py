@@ -3,7 +3,9 @@ from typing import Optional
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from pydantic import Field, model_validator
+
 from src.base.service.base_multi_api_tokens import BaseMultiApiTokens
+from src.enums.enums import ModelTypeEnum
 from src.settings import GOOGLE_API_KEYS
 
 
@@ -17,6 +19,7 @@ class BaseEmbeddingService(BaseMultiApiTokens):
         ge=1,
         description="The dimension of the embeddings, set after initialization if get_embedding_dim is True.",
     )
+    model_type: str = ModelTypeEnum.embedding
 
     @model_validator(mode="after")
     def __after_init(self):
@@ -33,6 +36,7 @@ class BaseEmbeddingService(BaseMultiApiTokens):
 
             self._embeddings.append(GoogleGenerativeAIEmbeddings(**_model_params))
 
+        self._set_embedding_dim()
         self._reset_round_robin()
         return self
 
@@ -42,6 +46,6 @@ class BaseEmbeddingService(BaseMultiApiTokens):
     def _set_embedding_dim(self):
         if self.embedding_dim is None:
             self.embedding_dim = len(
-                self._embeddings[0].embed_documents(["get embedding dimension"])[0]
+                self.get_embedding().embed_documents(["get embedding dimension"])[0]
             )
             logging.info(f"Embedding dimension: {self.embedding_dim}")
