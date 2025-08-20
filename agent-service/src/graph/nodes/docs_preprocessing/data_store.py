@@ -8,12 +8,14 @@ from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingSta
 from src.models.document.document_model import DocumentModel
 from src.registry.nodes import register_node
 from src.repositories.document.document_repository import DocumentRepository
+from src.utils.common import split_by_size
 
 
 @register_node("docs_preprocessing.data_store")
 class DataStore(DocumentRepository):
     chunk_size: int = 1000
     chunk_overlap: int = 200
+    batch_size: int = 10
 
     @model_validator(mode="after")
     def __after_init__(self):
@@ -40,7 +42,9 @@ class DataStore(DocumentRepository):
             for chunk in chunks
         ]
 
-        self.create_records(docs)
+        batches = split_by_size(docs, self.batch_size)
+        for batch in batches:
+            self.create_records(batch)
 
         return {
             "messages": [],

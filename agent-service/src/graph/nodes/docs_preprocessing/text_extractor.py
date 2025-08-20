@@ -42,11 +42,10 @@ class TextExtractor(BaseModel):
     def __call__(self, state: DocsPreProcessingStateModel):
         data = state.messages[-1].content.strip()
 
-        conversion_result = self.__converter.convert(data, page_range=[1, 20])
+        conversion_result = self.__converter.convert(data)
         doc = conversion_result.document
 
         text = doc.export_to_text()
-
         return {
             "messages": [AIMessage(content=text)],
         }

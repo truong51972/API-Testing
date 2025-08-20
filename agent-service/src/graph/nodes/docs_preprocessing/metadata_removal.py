@@ -27,7 +27,7 @@ with open(
 
 @register_node("docs_preprocessing.metadata_removal")
 class MetaDataRemoval(BaseAgentService):
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemma-3-27b-it"
     llm_temperature: float = 0.0
     llm_top_p: float = 0.1
     llm_top_k: int = 3
