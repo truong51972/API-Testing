@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -6,6 +6,8 @@ from pydantic import (
     BaseModel,
     Field,
 )
+
+from src.enums.enums import LanguageEnum
 
 
 class DocsPreProcessingStateModel(BaseModel):
@@ -17,8 +19,8 @@ class DocsPreProcessingStateModel(BaseModel):
         description="User input text",
     )
 
-    lang: str = Field(
-        default="en",
+    lang: LanguageEnum = Field(
+        default=LanguageEnum.EN,
         description="Language of the document",
     )
 
@@ -27,10 +29,12 @@ class DocsPreProcessingStateModel(BaseModel):
         description="Messages exchanged during the conversation",
     )
 
-    doc_name: str = Field(
+    doc_name: Optional[str] = Field(
+        default_factory=str,
         description="Name of the document",
     )
 
-    annotation: str = Field(
+    annotation: Optional[str] = Field(
+        default_factory=str,
         description="Annotation for the document",
     )
