@@ -1,21 +1,10 @@
 import logging
 import time
-from enum import Enum
 from random import shuffle
-from typing import Optional
 
-from google.api_core import exceptions
-from langchain_google_genai import GoogleGenerativeAI
-
-# for validation
 from pydantic import BaseModel, Field
-
 from src.settings import GOOGLE_API_KEYS, get_redis_client
-
-
-class ModelType(str, Enum):
-    llm = "llm"
-    embedding = "embedding"
+from src.enums.enums import ModelTypeEnum
 
 
 redis_round_robin_key = "round_robin_{model_type}"
@@ -24,8 +13,8 @@ LOCK_TIMEOUT = 5
 
 
 class BaseMultiApiTokens(BaseModel):
-    model_type: ModelType = Field(
-        default=ModelType.llm,
+    model_type: ModelTypeEnum = Field(
+        default=ModelTypeEnum.llm,
         description="Type of model (llm or embedding)",
     )
 

@@ -1,10 +1,7 @@
 from typing import Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAI
-
-# for validation
 from pydantic import Field, model_validator
-
 from src.base.service.base_multi_api_tokens import BaseMultiApiTokens
 from src.settings import GOOGLE_API_KEYS
 

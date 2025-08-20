@@ -10,11 +10,6 @@ from .base_llm_service import BaseLlmService
 
 
 class BaseAgentService(BaseLlmService):
-
-    system_prompt: str = Field(
-        default="",
-        description="Prompt template for the agent. If not provided, a default prompt will be used.",
-    )
     tools: Optional[List[object]] = Field(
         default_factory=list, description="List of tools that the agent can use."
     )
@@ -23,51 +18,46 @@ class BaseAgentService(BaseLlmService):
     def __after_init(self):
 
         if self.tools:
-            self._agent = self._llm.bind_tools(self.tools)
+            self._agents = [llm.bind_tools(self.tools) for llm in self._llms]
         else:
-            self._agent = self._llm
+            self._agents = self._llms
+
+        self._prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", self.__system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
 
         return self
 
+    def _get_agent(self):
+        return self._agents[self._get_next_model_index()]
+
     @validate_call
     def run(self, invoke_input: dict):
-        _prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", self.system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
+        _invoke_input = invoke_input.copy()
+        _invoke_input["system_prompt"] = self.system_prompt
 
-        response = self._agent.invoke(_prompt.invoke(invoke_input))
+        response = self._get_agent().invoke(self._prompt.invoke(_invoke_input))
         return response
 
     @validate_call
-    def runs(
-        self, invoke_inputs: list[dict], batch_size: int = -1, api_key_index: int = -1
-    ):
-        _prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", self.system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
+    def load_system_prompt(self, system_prompt: str):
+        self.__system_prompt = system_prompt
 
+    @validate_call
+    def runs(self, invoke_inputs: list[dict], batch_size: int = -1):
         batches = split_by_size(invoke_inputs, batch_size)
-        chain = _prompt | self._agent
+        chain = self._prompt | self._get_agent()
 
         responses = []
         for batch in batches:
-            responses.extend(chain.batch(batch))
+            _responses = chain.batch(batch)
+            responses.extend(_responses)
 
         return responses
-
-    def _thread_target_runner(self, batch: list[dict]):
-        current_class = self.__class__
-        config_data = self.model_dump()
-        manual_instance = current_class(**config_data)
-        return manual_instance.runs(batch)
 
     @validate_call
     def runs_parallel(
@@ -80,7 +70,7 @@ class BaseAgentService(BaseLlmService):
 
         responses = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results_iterator = executor.map(self._thread_target_runner, batches)
+            results_iterator = executor.map(self.runs, batches)
             for result in results_iterator:
                 responses.extend(result)
 
