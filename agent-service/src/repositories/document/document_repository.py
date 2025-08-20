@@ -3,15 +3,12 @@ import logging
 from typing import List
 
 import langchain
-
-# for validation
 from langchain_milvus import Milvus
 from pydantic import model_validator, validate_call
 from pymilvus import (
     Collection,
     CollectionSchema,
 )
-
 from src.base.service.base_embedding_service import BaseEmbeddingService
 from src.base.service.base_llm_service import BaseLlmService
 from src.base.service.base_milvus_service import BaseMilvusService

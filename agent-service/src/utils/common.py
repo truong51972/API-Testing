@@ -1,6 +1,5 @@
 import hashlib
 
-# for validation
 from pydantic import (
     Field,
     validate_call,

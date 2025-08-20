@@ -1,7 +1,6 @@
 import hashlib
 from typing import List, Optional
 
-# for validation
 from pydantic import ConfigDict
 
 #     BaseModel,

@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-# for validation
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -8,7 +7,6 @@ from pydantic import (
     model_validator,
 )
 from pymilvus import DataType
-
 from src.utils.common import create_unique_id
 
 

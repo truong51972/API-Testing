@@ -2,10 +2,7 @@ from typing import Annotated, List, Optional
 
 from langgraph.graph.message import add_messages
 from pydantic import Field
-
 from src.base.model.base_agent_mess_model import BaseAgentMessModel
-
-# for validation
 
 
 class AgentStateModel(BaseAgentMessModel):
