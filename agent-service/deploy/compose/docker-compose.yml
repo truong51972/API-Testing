@@ -1,13 +1,13 @@
 services:
   nginx:
     build: 
-      context: ./docker/nginx
+      context: ${PROJECT_ROOT}/docker/nginx
     restart: on-failure:5
     depends_on:
       - backend
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/SSL:/etc/nginx/SSL
+      - ${PROJECT_ROOT}/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ${PROJECT_ROOT}/nginx/SSL:/etc/nginx/SSL
       - backend_data:/backend_data
     deploy:
       resources:
@@ -20,10 +20,11 @@ services:
 
   backend:
     build: 
-      context: ./docker/backend 
+      context: ${PROJECT_ROOT}/
+      dockerfile: ${PROJECT_ROOT}/docker/Dockerfile 
     restart: on-failure:5
     volumes:
-      - ./backend:/app
+      - ${PROJECT_ROOT}/:/app
       - backend_data:/backend_data
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-backend_database}
@@ -110,7 +111,7 @@ services:
 
   cloudflare_tunnel:
     build: 
-      context: ./docker/cloudflare_tunnel
+      context: ${PROJECT_ROOT}/docker/cloudflare_tunnel
     restart: on-failure:5
     environment:
       - TUNNEL_TOKEN
