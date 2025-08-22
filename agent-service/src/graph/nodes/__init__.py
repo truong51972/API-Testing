@@ -10,3 +10,5 @@ from src.graph.nodes.docs_preprocessing import (
     text_normalization,
     data_store,
 )
+
+from src.graph.nodes.simple_qa import simple_qa
