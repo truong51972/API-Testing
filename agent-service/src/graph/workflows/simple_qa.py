@@ -1,22 +1,18 @@
 from typing import Optional
 
 from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
+from src.registry.actions import ACTION_REGISTRY
 from src.registry.nodes import NODE_REGISTRY
+from src.registry.tools import TOOL_REGISTRY
 from src.registry.workflows import register_workflow
 
 
-@register_workflow("docs_preprocessing")
-class DocsPreprocessingWorkflow(BaseModel):
-    collection_name: str = Field(
-        default="e_commerce_ai", description="Collection name for vector database"
-    )
-    llm_temperature: float = Field(
-        default=0.1, ge=0.0, le=2.0, description="Temperature for LLM generation"
-    )
-
+@register_workflow("simple_qa")
+class SimpleQAWorkflow(BaseModel):
     agent_state: BaseModel = Field(
         default=DocsPreProcessingStateModel,
         description="State of the AI agent, including user input and intent",
@@ -43,43 +39,36 @@ class DocsPreprocessingWorkflow(BaseModel):
     def _add_nodes(self):
         """Add all nodes to the workflow"""
         # Add basic nodes
+
         self.workflow.add_node("entry", NODE_REGISTRY.get("conversation.entry")())
 
+        document_tool = TOOL_REGISTRY.get("document.document_tool")()
+        print(f"Document Tool: {document_tool}")
+        simple_qa_node = NODE_REGISTRY.get("simple_qa.simple_qa")(tools=[document_tool])
+        print(f"Simple QA Node: {simple_qa_node}")
         self.workflow.add_node(
-            "stopword_removal",
-            NODE_REGISTRY.get("docs_preprocessing.stopword_removal")(),
+            "simple_qa",
+            simple_qa_node,
         )
+
         self.workflow.add_node(
-            "text_normalization",
-            NODE_REGISTRY.get("docs_preprocessing.text_normalization")(),
-        )
-        self.workflow.add_node(
-            "metadata_removal",
-            NODE_REGISTRY.get("docs_preprocessing.metadata_removal")(),
-        )
-        self.workflow.add_node(
-            "text_correction",
-            NODE_REGISTRY.get("docs_preprocessing.text_correction")(),
-        )
-        self.workflow.add_node(
-            "text_extractor",
-            NODE_REGISTRY.get("docs_preprocessing.text_extractor")(),
-        )
-        self.workflow.add_node(
-            "data_store",
-            NODE_REGISTRY.get("docs_preprocessing.data_store")(),
+            "document_tool",
+            ToolNode([document_tool]),
         )
 
     def _setup_edges(self):
         """Configure all edges and entry point"""
         self.workflow.set_entry_point("entry")
-        self.workflow.add_edge("entry", "text_extractor")
-        self.workflow.add_edge("text_extractor", "text_normalization")
-        self.workflow.add_edge("text_normalization", "text_correction")
-        self.workflow.add_edge("text_correction", "metadata_removal")
-        self.workflow.add_edge("metadata_removal", "stopword_removal")
-        self.workflow.add_edge("stopword_removal", "data_store")
-        self.workflow.add_edge("data_store", END)
+        self.workflow.add_edge("entry", "simple_qa")
+        self.workflow.add_conditional_edges(
+            "simple_qa",
+            ACTION_REGISTRY.get("should_continue"),
+            {
+                "continue": "document_tool",
+                "end": END,
+            },
+        )
+        self.workflow.add_edge("document_tool", "simple_qa")
 
     def get_graph(self):
         """Get the compiled graph"""
