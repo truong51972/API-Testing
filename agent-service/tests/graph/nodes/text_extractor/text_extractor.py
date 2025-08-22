@@ -6,7 +6,7 @@ from src.registry.nodes import NODE_REGISTRY
 
 def test_text_extractor_pdf_vn():
     data_test = "assents/test_extractor/test_vn.pdf"
-    node = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
+    node = NODE_REGISTRY.get("text_extractor.text_extractor")()
     input_mess = HumanMessage(
         content=data_test,
     )
@@ -18,7 +18,7 @@ def test_text_extractor_pdf_vn():
 
 def test_text_extractor_pdf_en():
     data_test = "assents/test_extractor/test_en.pdf"
-    node = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
+    node = NODE_REGISTRY.get("text_extractor.text_extractor")()
     input_mess = HumanMessage(
         content=data_test,
     )
@@ -31,12 +31,24 @@ def test_text_extractor_pdf_en():
 
 def test_text_extractor_via_link():
     source = "https://www.octoparse.com/use-cases/e-commerce"
-    extractor = NODE_REGISTRY.get("docs_preprocessing.text_extractor")()
+    node = NODE_REGISTRY.get("text_extractor.text_extractor")()
     input_mess = HumanMessage(
         content=source,
     )
     state = DocsPreProcessingStateModel(user_input="", messages=[input_mess], lang="vi")
 
-    result = extractor(state)["messages"][-1].content
+    result = node(state)["messages"][-1].content
 
     assert "Web Scraping for E-commerce" in result
+
+
+def test_text_extractor_with_split_text():
+    data_test = "assents/test_extractor/test_split_text.pdf"
+    node = NODE_REGISTRY.get("text_extractor.text_extractor")()
+    input_mess = HumanMessage(
+        content=data_test,
+    )
+    state = DocsPreProcessingStateModel(user_input="", messages=[input_mess], lang="vi")
+
+    result = node(state)["messages"][-1].content
+    assert result == "this is a split text"

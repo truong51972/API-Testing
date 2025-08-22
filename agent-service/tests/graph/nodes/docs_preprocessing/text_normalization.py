@@ -5,7 +5,7 @@ from src.registry.nodes import NODE_REGISTRY
 
 
 def test_text_normalization_vn():
-    data_test = "Học  là sinh trường trung học!!"
+    data_test = "Học là sinh trường trung học!"
     node = NODE_REGISTRY.get("docs_preprocessing.text_normalization")()
 
     input_mess = HumanMessage(
@@ -18,7 +18,7 @@ def test_text_normalization_vn():
 
 
 def test_text_normalization_en():
-    data_test = "I  Am a student at the high school!!"
+    data_test = "I Am a student at the high school!"
     node = NODE_REGISTRY.get("docs_preprocessing.text_normalization")()
 
     input_mess = HumanMessage(

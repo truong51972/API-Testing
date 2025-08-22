@@ -61,7 +61,7 @@ class MetaDataRemoval(BaseAgentService):
         ]
         responses = self.runs_parallel(batches, batch_size=self.batch_size)
 
-        result_text += "\n".join([response.content for response in responses]) + "\n"
+        result_text += "\n".join(responses) + "\n"
 
         logging.info("MetaDataRemoval node called")
 

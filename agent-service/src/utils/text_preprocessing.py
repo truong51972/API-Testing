@@ -5,8 +5,12 @@ import unicodedata
 
 
 def remove_stopwords(text, stopwords):
-    words = text.split()
-    return " ".join([w for w in words if w not in stopwords])
+    lines = text.splitlines()
+    result = []
+    for line in lines:
+        words = line.split()
+        result.append(" ".join([w for w in words if w not in stopwords]))
+    return "\n".join(result)
 
 
 def remove_punctuation(text):

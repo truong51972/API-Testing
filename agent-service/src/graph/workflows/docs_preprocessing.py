@@ -58,12 +58,8 @@ class DocsPreprocessingWorkflow(BaseModel):
             NODE_REGISTRY.get("docs_preprocessing.metadata_removal")(),
         )
         self.workflow.add_node(
-            "text_correction",
-            NODE_REGISTRY.get("docs_preprocessing.text_correction")(),
-        )
-        self.workflow.add_node(
             "text_extractor",
-            NODE_REGISTRY.get("docs_preprocessing.text_extractor")(),
+            NODE_REGISTRY.get("text_extractor.text_extractor")(),
         )
         self.workflow.add_node(
             "data_store",
@@ -75,8 +71,7 @@ class DocsPreprocessingWorkflow(BaseModel):
         self.workflow.set_entry_point("entry")
         self.workflow.add_edge("entry", "text_extractor")
         self.workflow.add_edge("text_extractor", "text_normalization")
-        self.workflow.add_edge("text_normalization", "text_correction")
-        self.workflow.add_edge("text_correction", "metadata_removal")
+        self.workflow.add_edge("text_normalization", "metadata_removal")
         self.workflow.add_edge("metadata_removal", "stopword_removal")
         self.workflow.add_edge("stopword_removal", "data_store")
         self.workflow.add_edge("data_store", END)
