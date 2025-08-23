@@ -9,7 +9,7 @@ from pydantic import validate_call
 from src.enums.enums import LanguageEnum
 from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
 from src.registry.nodes import register_node
-from src.utils.text_preprocessing import (
+from src.utils.preprocessing.text_preprocessing import (
     remove_stopwords,
 )
 
