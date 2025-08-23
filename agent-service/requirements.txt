@@ -17,8 +17,8 @@ langchain-community==0.3.27
 langchain-milvus==0.2.1
 langchain-google-genai==2.1.9
 
-langgraph==0.6.5
-langgraph-cli[inmem]==0.3.6
+langgraph==0.6.6
+langgraph-cli[inmem]==0.3.8
 
 unstructured==0.18.13
 networkx==3.5
@@ -26,10 +26,10 @@ openpyxl==3.1.5
 
 beautifulsoup4==4.13.4
 
-pandas==2.3.1
+pandas==2.3.2
 
 nltk==3.9.1
 
-docling==2.45.0
+docling==2.47.0
 
 minio==7.2.16
