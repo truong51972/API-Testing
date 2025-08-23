@@ -60,3 +60,17 @@ def is_section_heading(line):
         or bool(re.match(roman_pattern, line))
         or bool(re.match(uppercase_pattern, line))
     )
+
+
+def get_all_section_headings(text):
+    """
+    Extract all section headings from the given text.
+
+    Args:
+        text (str): The input text to search for section headings.
+
+    Returns:
+        list: A list of all section headings found in the text.
+    """
+    lines = text.splitlines()
+    return [line for line in lines if is_section_heading(line)]

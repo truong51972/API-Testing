@@ -1,4 +1,6 @@
+# tests.utils.common
 from src.utils.common import (
+    get_all_section_headings,
     get_percent_space,
     is_section_heading,
     merge_chunks,
@@ -18,6 +20,11 @@ def test_merge_chunks():
     assert merge_chunks([[1, 2, 3], [4, 5]]) == [1, 2, 3, 4, 5]
     assert merge_chunks([[1], [2], [3], [4], [5]]) == [1, 2, 3, 4, 5]
     assert merge_chunks([]) == []
+
+
+def test_get_percent_space():
+    assert get_percent_space("This is a test.") <= 35
+    assert get_percent_space("t h i s i s a s p l i t t e x t") >= 35
 
 
 def test_is_section_heading():
@@ -51,6 +58,33 @@ def test_is_section_heading():
     assert not is_section_heading("section header but not valid")
 
 
-def test_get_percent_space():
-    assert get_percent_space("This is a test.") <= 35
-    assert get_percent_space("t h i s i s a s p l i t t e x t") >= 35
+def test_get_all_section_headings():
+    text = """
+    1. Introduction
+    Content
+    2.1 Background
+    Content
+    Content
+    Content
+    II. Related Work
+    Content
+    III) Methodology
+    Content
+    Content
+    KẾT LUẬN
+    Content
+    Content
+    Content
+    """
+    expected = [
+        "1. Introduction",
+        "2.1 Background",
+        "II. Related Work",
+        "III) Methodology",
+        "KẾT LUẬN",
+    ]
+
+    all_section_headings = get_all_section_headings(text)
+
+    for i, expected_heading in enumerate(expected):
+        assert expected_heading in all_section_headings[i]
