@@ -39,9 +39,9 @@ class SimpleQAWorkflow(BaseModel):
         self.workflow.add_node("entry", nodes.EntryNode())
 
         document_tool = tools.DocumentTool()
-        print(f"Document Tool: {document_tool}")
+
         simple_qa_node = nodes.SimpleQANode(tools=[document_tool])
-        print(f"Simple QA Node: {simple_qa_node}")
+
         self.workflow.add_node(
             "simple_qa",
             simple_qa_node,
