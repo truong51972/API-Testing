@@ -136,7 +136,6 @@ def create_hierarchical_section_blocks(text: str) -> list[str]:
 
     # Filter blocks that have parent-child relationships (more than 1 section)
     parent_child_blocks = [block for block in parent_child_blocks if len(block) > 1]
-    print(parent_child_blocks)
 
     # Generate text blocks with parent and child content
     hierarchical_text_blocks = []

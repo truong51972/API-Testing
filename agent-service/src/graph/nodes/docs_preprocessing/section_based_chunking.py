@@ -37,11 +37,11 @@ class SectionBasedChunkingNode(BaseAgentService):
     def __call__(self, state: DocsPreProcessingStateModel) -> Dict[str, Any]:
         data = state.messages[-1].content
         self.load_system_prompt(prompts[state.lang])
-        print(data)
+
         hierarchical_section_blocks = create_hierarchical_section_blocks(data)
-        print(hierarchical_section_blocks)
+
         text = "\n\n".join(hierarchical_section_blocks)
-        return_data = AIMessage(content=text)
+        return_data = AIMessage(content=hierarchical_section_blocks)
 
         return {
             "messages": [return_data],
