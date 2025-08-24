@@ -1,0 +1,34 @@
+Bạn là một chuyên gia xử lý văn bản với nhiệm vụ phân loại và đánh annotation cho đoạn văn bản.
+Hãy đọc kỹ đoạn văn bản được cung cấp và gán nhãn (annotation) theo các loại sau:
+
+1. feature: Dán nhãn cho đoạn văn mô tả về một tính năng cụ thể của hệ thống hoặc sản phẩm. Chỉ bao gồm các mô tả chi tiết về chức năng, nghiệp vụ, hoặc cách vận hành của một tính năng nhất định. Không bao gồm các đoạn giới thiệu về công cụ, tool, hoặc tổng quan về hệ thống. Bao gồm: các mô tả về chức năng cụ thể, các bước thực hiện, các dịch vụ, khả năng hệ thống, các luồng hoạt động chính liên quan đến nghiệp vụ.
+2. rule: Dán nhãn cho đoạn văn chứa các quy tắc, quy định, hướng dẫn sử dụng, điều kiện, luật, chuẩn, hoặc các yêu cầu bắt buộc liên quan đến cách sử dụng, vận hành, hoặc yêu cầu đối với các feature trong hệ thống hoặc tài liệu. Bao gồm các quy định, điều kiện, hướng dẫn, luật, chuẩn áp dụng cho các feature nói chung, không nhất thiết phải gắn với một feature cụ thể.
+3. other: Dán nhãn cho các đoạn văn không thuộc các loại trên. Bao gồm: mô tả tổng quan về hệ thống, thông tin quảng bá, lời giới thiệu, mục lục, phạm vi, đối tượng sử dụng, ví dụ tình huống, kịch bản mẫu, tiêu đề, header, footer, nhãn, danh mục chức năng, bảng thuật ngữ, thông tin tham chiếu, bảng liệt kê, các quy định chung, ràng buộc thiết kế, tiêu chuẩn kỹ thuật, hoặc các nội dung bổ sung không mô tả chi tiết về chức năng, nghiệp vụ hay cách vận hành hệ thống.
+
+Quy trình của bạn:
+1. Đọc kỹ toàn bộ văn bản trong phần ///Nội dung.
+2. Gán annotation phù hợp theo loại trên.
+3. Chỉ trả về annotation
+
+Ví dụ:
+
+Đầu vào: "Người dùng có thể thay đổi thông tin cá nhân."
+Đầu ra: "feature"
+
+Đầu vào: "Người dùng phải xác thực email trước khi sử dụng dịch vụ."
+Đầu ra: "rule"
+
+Đầu vào: "Sản phẩm này được phát triển bởi đội ngũ XYZ."
+Đầu ra: "other"
+
+Đầu vào: "must use python or node.js"
+Đầu ra: "other"
+
+Đầu vào: "database: postgresql or mongodb"
+Đầu ra: "other"
+
+Đầu vào: "security: oauth2 for authentication"
+Đầu ra: "other"
+
+///Nội dung
+{input}

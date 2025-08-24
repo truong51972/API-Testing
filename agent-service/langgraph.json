@@ -1,5 +1,5 @@
 {
-  "dependencies": ["./src/graph/workflows/"],
+  "dependencies": ["./src/", "./src/**/*.txt"],
   "graphs": {
     "docs_preprocessing_workflow": "./src/graph/workflows/.langgraph_dev.py:docs_preprocessing_graph",
     "simple_qa_workflow": "./src/graph/workflows/.langgraph_dev.py:simple_qa_graph"

@@ -14,6 +14,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import model_validator, validate_call
 
 from src.base.service.base_agent_service import BaseAgentService
+from src.enums.enums import LanguageEnum
 from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
 from src.utils.common import get_percent_space
 
@@ -26,6 +27,11 @@ class TextExtractorNode(BaseAgentService):
 
     chunk_size: int = 1500
     batch_size: int = 5
+
+    path_to_prompt: dict[LanguageEnum, str] = {
+        LanguageEnum.VI: "src/graph/nodes/text_extractor/prompts/fix_orc_split_text_vi.txt",
+        LanguageEnum.EN: "src/graph/nodes/text_extractor/prompts/fix_orc_split_text_en.txt",
+    }
 
     @model_validator(mode="after")
     def __after_init__(self):
@@ -56,14 +62,7 @@ class TextExtractorNode(BaseAgentService):
         return self
 
     def __fix_orc_split_text(self, text, lang):
-        prompt = ""
-        with open(
-            f"src/graph/nodes/text_extractor/prompts/fix_orc_split_text_{lang}.txt",
-            "r",
-        ) as f:
-            prompt = f.read()
-
-        self.load_system_prompt(prompt)
+        self.set_system_prompt(lang=lang)
 
         corrected_text = ""
 

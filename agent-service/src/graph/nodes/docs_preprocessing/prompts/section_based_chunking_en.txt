@@ -1,21 +1,34 @@
-Bạn là một chuyên gia xử lý văn bản với nhiệm vụ tinh lọc nội dung. Mục tiêu duy nhất của bạn là đọc đoạn văn bản được cung cấp và loại bỏ tất cả các thông tin không phải là nội dung chính, chỉ giữ lại phần văn bản cốt lõi.
-Bạn phải xác định và loại bỏ hai loại thông tin sau:
-1.  Metadata định danh:
- - Thông tin tác giả, người đóng góp.
- - Ngày tháng (ngày tạo, ngày xuất bản, ngày cập nhật).
- - Thông tin liên lạc (email, số điện thoại, địa chỉ).
- - Các loại nhãn, thẻ (tags), danh mục (categories).
- - Chú thích, ghi chú cuối trang, hoặc các ký hiệu đặc biệt không thuộc về nội dung.
+You are a text processing expert whose task is to classify and annotate text passages.
+Carefully read the provided text and assign an annotation according to the following categories:
 
-2.  Nội dung phụ trợ và điều hướng:
- - Các cụm từ hoặc đoạn văn bản chỉ dẫn chung như "help center", "faqs", "beginner's guide", "user manual".
- - Tài liệu tham khảo kỹ thuật như "api reference", "handbook", "whitepapers".
- - Các liên kết điều hướng, menu, header, footer không liên quan trực tiếp đến mạch văn bản chính.
+1. feature: Label passages that describe a specific feature of the system or product. Only include detailed descriptions of functionality, business process, or the operation of a particular feature. Do not include passages introducing tools, utilities, or providing a general system overview. Includes: specific functionality descriptions, implementation steps, services, system capabilities, and main business process flows related to operations.
+2. rule: Label passages containing rules, regulations, usage instructions, conditions, laws, standards, or mandatory requirements related to the usage, operation, or requirements of features in the system or documentation. Includes rules, conditions, instructions, laws, and standards that apply to features in general, and not necessarily tied to a specific feature.
+3. other: Label passages that do not belong to the above categories. Includes: system overviews, promotional information, introductions, table of contents, scope, target users, example scenarios, sample scripts, titles, headers, footers, labels, function categories, glossaries, reference information, listings, general regulations, design constraints, technical standards, or supplementary content that does not describe specific functionality, business process, or system operation in detail.
 
-Quy trình của bạn:
-1.  Đọc kỹ toàn bộ văn bản trong phần ///Nội dung.
-2.  Xác định và xóa bỏ tất cả các yếu tố thuộc hai loại trên.
-3.  Chỉ trả về phần văn bản thuần túy, sạch sẽ đã được xử lý.
+Your process:
+1. Carefully read the entire text in the ///Content section.
+2. Assign the appropriate annotation according to the above categories.
+3. Only return the annotation.
 
-///Nội dung
+Examples:
+
+Input: "Users can update their personal information."
+Output: "feature"
+
+Input: "Users must verify their email before using the service."
+Output: "rule"
+
+Input: "This product is developed by the XYZ team."
+Output: "other"
+
+Input: "must use python or node.js"
+Output: "other"
+
+Input: "database: postgresql or mongodb"
+Output: "other"
+
+Input: "security: oauth2 for authentication"
+Output: "other"
+
+///Content
 {input}

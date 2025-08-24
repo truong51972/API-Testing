@@ -11,18 +11,6 @@ from src.base.service.base_agent_service import BaseAgentService
 from src.enums.enums import LanguageEnum
 from src.models.agent.docs_preprocessing_state_model import DocsPreProcessingStateModel
 
-prompts = {}
-
-with open(
-    "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_vn.txt", "r"
-) as f:
-    prompts[LanguageEnum.VI] = f.read()
-
-with open(
-    "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_en.txt", "r"
-) as f:
-    prompts[LanguageEnum.EN] = f.read()
-
 
 class MetaDataRemovalNode(BaseAgentService):
     llm_model: str = "gemma-3-27b-it"
@@ -32,9 +20,15 @@ class MetaDataRemovalNode(BaseAgentService):
 
     chunk_size: int = 1000
     batch_size: int = 10
+    max_workers: int = 5
+
+    path_to_prompt: dict[LanguageEnum, str] = {
+        LanguageEnum.VI: "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_vi.txt",
+        LanguageEnum.EN: "src/graph/nodes/docs_preprocessing/prompts/metadata_removal_en.txt",
+    }
 
     @model_validator(mode="after")
-    def __after_init__(self):
+    def __after_init(self):
         self.__text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=0,
@@ -45,7 +39,7 @@ class MetaDataRemovalNode(BaseAgentService):
     @validate_call
     def __call__(self, state: DocsPreProcessingStateModel) -> Dict[str, Any]:
         data = state.messages[-1].content
-        self.load_system_prompt(prompts[state.lang])
+        self.set_system_prompt(state.lang)
 
         result_text = ""
         chunks = self.__text_splitter.split_text(data)
@@ -57,7 +51,9 @@ class MetaDataRemovalNode(BaseAgentService):
             }
             for chunk in chunks
         ]
-        responses = self.runs_parallel(batches, batch_size=self.batch_size)
+        responses = self.runs_parallel(
+            batches, batch_size=self.batch_size, max_workers=self.max_workers
+        )
 
         result_text += "\n".join(responses) + "\n"
 

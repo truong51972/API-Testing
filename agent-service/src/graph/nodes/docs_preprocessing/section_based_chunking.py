@@ -14,18 +14,6 @@ from src.utils.preprocessing.section_preprocessing import (
     create_hierarchical_section_blocks,
 )
 
-prompts = {}
-
-with open(
-    "src/graph/nodes/docs_preprocessing/prompts/section_based_chunking_vn.txt", "r"
-) as f:
-    prompts[LanguageEnum.VI] = f.read()
-
-with open(
-    "src/graph/nodes/docs_preprocessing/prompts/section_based_chunking_en.txt", "r"
-) as f:
-    prompts[LanguageEnum.EN] = f.read()
-
 
 class SectionBasedChunkingNode(BaseAgentService):
     llm_model: str = "gemma-3-27b-it"
@@ -33,15 +21,43 @@ class SectionBasedChunkingNode(BaseAgentService):
     llm_top_p: float = 0.1
     llm_top_k: int = 3
 
+    batch_size: int = 10
+    max_workers: int = 2
+
+    path_to_prompt: dict[LanguageEnum, str] = {
+        LanguageEnum.VI: "src/graph/nodes/docs_preprocessing/prompts/section_based_chunking_vi.txt",
+        LanguageEnum.EN: "src/graph/nodes/docs_preprocessing/prompts/section_based_chunking_en.txt",
+    }
+
     @validate_call
     def __call__(self, state: DocsPreProcessingStateModel) -> Dict[str, Any]:
         data = state.messages[-1].content
-        self.load_system_prompt(prompts[state.lang])
+        self.set_system_prompt(lang=state.lang)
 
         hierarchical_section_blocks = create_hierarchical_section_blocks(data)
 
-        text = "\n\n".join(hierarchical_section_blocks)
-        return_data = AIMessage(content=hierarchical_section_blocks)
+        batches = [
+            {
+                "input": chunk,
+                "chat_history": [],
+            }
+            for chunk in hierarchical_section_blocks
+        ]
+        annotations = self.runs_parallel(
+            batches, batch_size=self.batch_size, max_workers=self.max_workers
+        )
+
+        result = []
+
+        for i in range(len(hierarchical_section_blocks)):
+            result.append(
+                {
+                    "content": hierarchical_section_blocks[i],
+                    "annotation": annotations[i],
+                }
+            )
+
+        return_data = AIMessage(content=result)
 
         return {
             "messages": [return_data],
