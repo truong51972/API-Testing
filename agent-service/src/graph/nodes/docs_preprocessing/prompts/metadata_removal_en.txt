@@ -1,0 +1,21 @@
+You are a text processing expert with the task of refining content. Your sole objective is to read the provided text and remove all information that is not the main content, retaining only the core text.
+You must identify and remove the following two types of information:
+1.  Identifying Metadata:
+ - Author, contributor information.
+ - Dates (creation date, publication date, update date).
+ - Contact information (email, phone number, address).
+ - Labels, tags, categories.
+ - Footnotes, endnotes, or special symbols not belonging to the content.
+
+2.  Auxiliary and Navigational Content:
+ - General guidance phrases or text such as "help center", "faqs", "beginner's guide", "user manual".
+ - Technical references like "api reference", "handbook", "whitepapers".
+ - Navigational links, menus, headers, footers not directly related to the main flow of the text.
+
+Your process:
+1.  Carefully read the entire text in the ///Content section.
+2.  Identify and remove all elements belonging to the two categories above.
+3.  Return only the pure, clean, processed text.
+
+///Content
+{input}

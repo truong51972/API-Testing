@@ -1,15 +1,21 @@
-import os
-from dotenv import load_dotenv
-from pathlib import Path
 import logging
 import logging.config
+import os
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import nltk
 import redis
+from dotenv import load_dotenv
+from minio import Minio
 from sqlmodel import create_engine
 
+from src.utils.check_google_api_tokens import check_google_api_tokens
+
 load_dotenv()
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 
 # Múi giờ Việt Nam
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -36,6 +42,42 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
+MINIO_URL = os.getenv("MINIO_URL", "localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
+MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
+MILVUS_TOKEN = os.getenv("MILVUS_TOKEN", "root:Milvus")
+
+MILVUS_URI = "http://{}:{}".format(MILVUS_HOST, MILVUS_PORT)
+
+GOOGLE_API_KEYS = None
+
+
+with open("env/google_api_keys.txt", "r") as f:
+    GOOGLE_API_KEYS = [line.strip() for line in f.readlines() if line.strip()]
+
+    if ENVIRONMENT != "dev":
+        check_google_api_tokens(GOOGLE_API_KEYS)
+
+
+def initialize_nltk():
+    nltk.download("punkt", quiet=True)
+    nltk.download("stopwords", quiet=True)
+
+
+initialize_nltk()
+
+
+def get_minio_client():
+    return Minio(
+        MINIO_URL,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        secure=False,  # True if using HTTPS, False if using HTTP
+    )
+
 
 # --- Hàm khởi tạo ---
 def get_engine():
@@ -43,9 +85,7 @@ def get_engine():
 
 
 def get_redis_client():
-    return redis.Redis(
-        host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True
-    )
+    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
 
 
 # --- Logging ---

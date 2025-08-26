@@ -1,29 +1,35 @@
-fastapi==0.115.13
+fastapi==0.116.1
 sqlmodel==0.0.24
 gunicorn==23.0.0
-redis==6.2.0
+redis==6.4.0
 # For running Postgres Database
-psycopg2-binary==2.9.10 
+psycopg2-binary==2.9.10
 
-python-dotenv==1.0.1
+python-dotenv==1.1.1
 python-json-logger==3.3.0
 
-pytest==8.3.5
+pytest==8.4.1
 
 # Langchain
-langchain==0.3.25
+langchain==0.3.27
 # langchain-ollama==0.3.3
-langchain-community==0.3.24
-langchain-milvus==0.1.10
-langchain-google-genai==2.1.5
+langchain-community==0.3.27
+langchain-milvus==0.2.1
+langchain-google-genai==2.1.9
 
-langgraph==0.4.8
-langgraph-cli[inmem]==0.2.12
+langgraph==0.6.6
+langgraph-cli[inmem]==0.3.8
 
-unstructured==0.16.21
-networkx==3.4.2
+unstructured==0.18.13
+networkx==3.5
 openpyxl==3.1.5
 
-beautifulsoup4==4.13.3
+beautifulsoup4==4.13.4
 
-pandas==2.3.1
+pandas==2.3.2
+
+nltk==3.9.1
+
+docling==2.47.0
+
+minio==7.2.16

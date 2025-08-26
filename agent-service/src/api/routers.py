@@ -4,6 +4,6 @@ from src.api.test_suite.test_suite_api import router as test_suite_router
 
 all_routers = [
     common_router,
-    # agent_router,
+    agent_router,
     test_suite_router,
 ]

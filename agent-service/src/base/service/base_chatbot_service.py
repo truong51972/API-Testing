@@ -11,7 +11,7 @@ from .base_llm_service import BaseLlmService
 
 class BaseChatbotService(BaseLlmService):
 
-    agent_prompt: str = Field(
+    system_prompt: str = Field(
         default="",
         description="Prompt template for the agent. If not provided, a default prompt will be used.",
     )
@@ -32,7 +32,7 @@ class BaseChatbotService(BaseLlmService):
     def __after_init(self):
         self._prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", self.agent_prompt),
+                ("system", self.system_prompt),
                 MessagesPlaceholder(
                     variable_name="chat_history"
                 ),  # Để duy trì lịch sử trò chuyện

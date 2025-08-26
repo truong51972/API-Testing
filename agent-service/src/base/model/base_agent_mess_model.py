@@ -1,7 +1,6 @@
 import uuid
 from typing import Optional
 
-# for validation
 from pydantic import (
     BaseModel,
     Field,

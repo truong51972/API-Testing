@@ -1,9 +1,6 @@
-# for validation
 from typing import Optional
 
-# for validation
 from pydantic import Field
-
 from src.base.model.base_agent_mess_model import BaseAgentMessModel
 
 
