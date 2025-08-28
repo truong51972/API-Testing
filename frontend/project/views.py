@@ -7,7 +7,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from main.decorators import set_test_suites_show
 from .forms import ProjectDocumentForm  
-from .models import ProjectDocument    
+from .models import ProjectDocument
+
+def my_view(request):
+    usernames = User.objects.values_list('username', flat=True)
+    return render(request, 'home.html', {'usernames': usernames})
+
 
 @login_required
 def project_list(request):
@@ -97,7 +102,6 @@ def project_edit(request, project_uuid):
         'test_suites': test_suites,
     }
 
-
     if request.method == 'POST':
         project_name = request.POST.get('project_name')
         description = request.POST.get('description', '')
@@ -184,3 +188,9 @@ def delete_document(request, doc_id):
     doc.delete()
     messages.success(request, "Tài liệu đã được xoá.")
     return redirect(reverse('project_detail_by_uuid', kwargs={'project_uuid': project_uuid}))
+
+@set_test_suites_show(True)
+@login_required
+def dashboard(request):
+    current_username = request.user.username
+    return render(request, 'main/home.html', {'current_username': current_username})
