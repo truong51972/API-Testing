@@ -1,0 +1,13 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body > .d-flex {
+    min-height: 100vh; /* full height của màn hình */
+}
+
+main {
+    overflow-y: auto; /* cho cuộn nếu nội dung dài */
+    height: 100vh;    /* luôn full chiều cao */
+}

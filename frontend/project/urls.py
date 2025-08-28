@@ -7,4 +7,5 @@ urlpatterns = [
     path('edit/<uuid:project_uuid>/', views.project_edit, name='project_edit'),
     path('delete/<uuid:project_uuid>/', views.project_delete, name='project_delete'),
     path('<uuid:project_uuid>/', views.project_detail_by_uuid, name='project_detail_by_uuid'),
+    path('document/<int:doc_id>/delete/', views.delete_document, name="delete_document"),
 ]

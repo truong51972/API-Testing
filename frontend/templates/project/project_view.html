@@ -2,6 +2,11 @@
 
 {% load static %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/process_bar.css' %}">
+<link rel="stylesheet" href="{% static 'css/upload.css' %}">
+{% endblock %}
+
 {% block title %}Project Details{% endblock %}
 
 {% block content %}
@@ -15,7 +20,162 @@
         <a href="{% url 'project_list' %}" class="btn btn-primary">Back to Project List</a>
     </div>
 
-    <h2 class="mt-5">Test Suites</h2>
+    <!-- Step Wizard -->
+    <div class="container">
+        <div class="steps-container mb-5">
+            <ul class="steps">
+                <li class="step active" id="step1">
+                <div class="step-icon">1</div>
+                <p>Upload / Review</p>
+                </li>
+                <li class="step" id="step2">
+                <div class="step-icon">2</div>
+                <p>AI Extract</p>
+                </li>
+                <li class="step" id="step3">
+                <div class="step-icon">3</div>
+                <p>Choose Sections</p>
+                </li>
+                <li class="step" id="step4">
+                <div class="step-icon">4</div>
+                <p>AI Test Case</p>
+                </li>
+                <li class="step" id="step5">
+                <div class="step-icon">5</div>
+                <p>Report</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+    function setStep(n) {
+    const steps = document.querySelectorAll('.step');
+    steps.forEach((s, i) => {
+        s.classList.remove('active', 'completed');
+        if (i < n-1) s.classList.add('completed');
+        if (i === n-1) s.classList.add('active');
+    });
+
+    currentStep = n;
+
+    // tính % width của line
+    const percent = ((n-1) / (totalSteps-1)) * 100;
+    document.querySelector('.progress-line').style.width = percent + "%";
+    }
+    </script>
+
+
+    <div class="card mt-4 shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">📂 Upload Documents</h5>
+    </div>
+    <div class="card-body">
+
+        <!-- Form Upload File -->
+        <form id="uploadForm" method="post" enctype="multipart/form-data" style="display:none;">
+        {% csrf_token %}
+        <input type="file" id="fileInput" name="file" accept=".docx,.pdf">
+        </form>
+
+        <div class="upload-box" onclick="document.getElementById('fileInput').click();">
+        <i class="bi bi-cloud-arrow-up" style="font-size: 2rem;"></i>
+        <p class="mt-2">Drag & Drop or Click to Upload</p>
+        <small class="text-muted">Chỉ hỗ trợ: .docx, .pdf</small>
+        </div>
+
+        <!-- Form Nhập Link -->
+        <form method="post" class="mt-3">
+        {% csrf_token %}
+        <div class="text-center my-2">
+            <span class="text-muted">— Hoặc —</span>
+        </div>
+        <div class="mb-3">
+            <label for="docLink" class="form-label">Nhập đường dẫn tài liệu</label>
+            <input type="url" class="form-control" id="docLink" name="link" placeholder="https://...">
+        </div>
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-upload"></i> Xác nhận
+        </button>
+        </form>
+
+        <hr>
+        <h4>📑 Uploaded Documents</h4>
+        <ul class="list-group mt-3">
+        {% for doc in documents %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+            {% if doc.file %}
+            <a href="{{ doc.file.url }}" target="_blank">{{ doc.file.name }}</a>
+            {% elif doc.link %}
+            <a href="{{ doc.link }}" target="_blank">{{ doc.link }}</a>
+            {% endif %}
+            <small class="text-muted ms-2">{{ doc.uploaded_at|date:"d/m/Y H:i" }}</small>
+        </div>
+        <a href="{% url 'delete_document' doc.id %}" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash"></i> Xoá
+        </a>
+        </li>
+        {% empty %}
+            <li class="list-group-item text-muted">Chưa có tài liệu nào được upload.</li>
+        {% endfor %}
+        </ul>
+    </div>
+    </div>
+
+    <div class="phase-controls text-center mt-4">
+    <button class="btn btn-secondary me-2" onclick="prevStep()">← Back</button>
+    <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+
+    <script>
+    document.getElementById('fileInput').addEventListener('change', function() {
+        if (this.files.length > 0) {
+            document.getElementById('uploadForm').submit();
+        }
+    });
+    </script>
+
+    <script>
+    let currentStep = 1;
+    let totalSteps = 5;
+
+    function setStep(n) {
+    const steps = document.querySelectorAll('.step');
+    steps.forEach((s, i) => {
+        s.classList.remove('active', 'completed');
+        if (i < n-1) s.classList.add('completed'); // bước đã qua
+        if (i === n-1) s.classList.add('active');  // bước hiện tại
+    });
+    currentStep = n;
+
+    // Ẩn/hiện nội dung theo step
+    document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
+    const currentPhase = document.getElementById('phase' + n);
+    if (currentPhase) currentPhase.classList.remove('d-none');
+    }
+
+    function nextStep() {
+    if (currentStep < totalSteps) {
+        setStep(currentStep + 1);
+    }
+    }
+
+    function prevStep() {
+    if (currentStep > 1) {
+        setStep(currentStep - 1);
+    }
+    }
+
+    // init: mở bước 1
+    document.addEventListener("DOMContentLoaded", function() {
+    setStep(1);
+    });
+    </script>
+
+
+
+    <!-- <h2 class="mt-5">Test Suites</h2>
     <table class="table table-hover mt-3">
         <thead>
             <tr>
@@ -40,5 +200,5 @@
             {% endfor %}
         </tbody>
     </table>
-    <a href="{% url 'test_suite_add' project_uuid=project.uuid %}" class="btn btn-primary mt-3">Add New Test Suite</a>
+    <a href="{% url 'test_suite_add' project_uuid=project.uuid %}" class="btn btn-primary mt-3">Add New Test Suite</a> -->
 {% endblock %}

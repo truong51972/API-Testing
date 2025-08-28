@@ -6,6 +6,8 @@ from test_suite.models import ProjectTestSuite
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from main.decorators import set_test_suites_show
+from .forms import ProjectDocumentForm  
+from .models import ProjectDocument    
 
 @login_required
 def project_list(request):
@@ -132,3 +134,53 @@ def project_delete(request, project_uuid):
         messages.success(request, "Project deleted successfully.")
         return redirect('project_list')
     return render(request, 'project/project_delete.html', context)
+
+@set_test_suites_show(True)
+@login_required
+def project_detail_by_uuid(request, project_uuid):
+    project = get_object_or_404(UserProject, uuid=project_uuid)
+    if project.user != request.user:
+        messages.error(request, "You do not have permission to view this project.")
+        return redirect('project_list')
+
+    test_suites = ProjectTestSuite.objects.filter(project=project)
+
+    # Lấy list tài liệu đã upload
+    documents = project.documents.all() if hasattr(project, "documents") else []
+
+    # Xử lý form upload
+    if request.method == "POST":
+        form = ProjectDocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            doc = form.save(commit=False)
+            doc.project = project
+            doc.save()
+            messages.success(request, "Tài liệu đã được thêm thành công.")
+            return redirect(reverse('project_detail_by_uuid', kwargs={'project_uuid': project.uuid}))
+        else:
+            messages.error(request, "Có lỗi khi upload/nhập tài liệu.")
+    else:
+        form = ProjectDocumentForm()
+
+    context = {
+        'project': project,
+        'test_suites': [{
+            'uuid': test_suite.uuid,
+            'test_suite_name': test_suite.test_suite_name,
+            'description': test_suite.description,
+            'created_at': test_suite.created_at,
+            'test_cases_count': TestCaseHistory.objects.filter(test_suite=test_suite).count()
+        } for test_suite in test_suites],
+        'form': form,
+        'documents': documents,
+    }
+    return render(request, 'project/project_view.html', context)
+
+@set_test_suites_show(True)
+@login_required
+def delete_document(request, doc_id):
+    doc = get_object_or_404(ProjectDocument, id=doc_id, project__user=request.user)
+    project_uuid = doc.project.uuid
+    doc.delete()
+    messages.success(request, "Tài liệu đã được xoá.")
+    return redirect(reverse('project_detail_by_uuid', kwargs={'project_uuid': project_uuid}))
