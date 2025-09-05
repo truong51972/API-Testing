@@ -1,0 +1,6 @@
+unsloth==2025.8.10
+unsloth_zoo==2025.8.9
+transformers==4.56.0
+
+notebook
+ipywidgets
