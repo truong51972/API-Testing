@@ -1,0 +1,54 @@
+services:
+  nginx:
+    build: 
+      context: ${PROJECT_ROOT}/docker/nginx
+    restart: on-failure:5
+    depends_on:
+      - backend
+    volumes:
+      - ${PROJECT_ROOT}/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ${PROJECT_ROOT}/nginx/SSL:/etc/nginx/SSL
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 1GB
+        reservations:
+          cpus: '0.50'
+          memory: 512MB
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    volumes:
+      - ollama:/root/.ollama
+      - ${PROJECT_ROOT}/models:/models
+      - ${PROJECT_ROOT}/modelfile:/modelfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  cloudflare_tunnel:
+    build: 
+      context: ${PROJECT_ROOT}/docker/cloudflare_tunnel
+    restart: on-failure:5
+    environment:
+      - TUNNEL_TOKEN
+      - NO_AUTOUPDATE
+      - TUNNEL_ORIGIN_KEEPALIVE_TIMEOUT=30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512MB
+        reservations:
+          cpus: '0.25'
+          memory: 256MB
+
+volumes:
+  backend_data:
+  ollama:

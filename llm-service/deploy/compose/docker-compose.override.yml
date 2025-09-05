@@ -1,0 +1,17 @@
+services:
+  nginx:
+    ports:
+      - "80:80"
+      # - "8000:8000"
+    # volumes:
+    #   - ./.backend_data:/backend_data
+    profiles:
+      - disabled
+
+  ollama:
+    ports:
+      - "11434:11434"
+      
+  cloudflare_tunnel:
+    profiles:
+      - disabled
