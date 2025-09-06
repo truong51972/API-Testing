@@ -1,6 +1,14 @@
 #!/bin/bash
-export COMPOSE_PROJECT_NAME="agent-service"
+
+
+# export COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME
 export PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+COMPOSE_PROJECT_NAME=$(basename "$PROJECT_ROOT")
+
+# load env file and export variables if it exists
+if [ -f "$PROJECT_ROOT/.env" ]; then
+    export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+fi
 
 # Xác định file compose
 COMPOSE_FILE="$PROJECT_ROOT/deploy/compose/docker-compose.yml"

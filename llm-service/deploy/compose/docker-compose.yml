@@ -19,7 +19,7 @@ services:
 
   ollama:
     image: ollama/ollama
-    container_name: ollama
+    container_name: ${COMPOSE_PROJECT_NAME}_ollama
     volumes:
       - ollama:/root/.ollama
       - ${PROJECT_ROOT}/models:/models
