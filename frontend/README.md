@@ -4,6 +4,9 @@ Table of contents
 1. [Project Overview](#project-overview)
 2. [Project Progress](#project-progress)
 3. [Usage](#usage)
+4. [Miscellaneous](#miscellaneous)
+
+
 ## Project Overview
 
 
@@ -20,21 +23,26 @@ Table of contents
 
 ## Usage
 ### Local Machine
-#### 1. Create Virtual Environment:
+#### 1. Create Virtual Environment (for pip method):
 
 Windows
 ```bat
-python venv venv
-venv\Scripts\activate
+python venv .venv
+.venv\Scripts\activate
 ```
 Linux
 ```bat
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
 #### 2. Install Dependencies
-
+##### 2.1 Using uv (Recommended method)
+With the below command line, uv will automatically create a virtual environment for you and install the dependencies. See more [here](https://github.com/astral-sh/uv) or for my brief tutorial [here](#how-to-use-uv-for-better-dependency-management).
+```bat
+uv sync --locked
+```
+##### 2.2 Using pip (Old method)
 Windows
 ```bat
 pip install -r requirements.txt
@@ -143,4 +151,17 @@ docker compose exec django-web python manage.py migrate
 #### 4. Run Server
 Simply run `docker compose up -d --build` and access the web using https://localhost:8000 or https://127.0.0.1:8000.
 
+## Miscellaneous
+### How to use uv for better dependency management
+#### Installation
+See more [here](https://docs.astral.sh/uv/getting-started/installation/).
+Linux
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Window
+```bat
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+#### 
 
