@@ -4,6 +4,10 @@ CURRENT_PATH=$(pwd)
 
 # Get the model name from the first argument
 MODEL_NAME="$1"
+# Remove './models/' prefix if present
+MODEL_NAME="${MODEL_NAME#./models/}"
+MODEL_NAME="${MODEL_NAME#/models/}"
+
 shift
 
 VOLUME_MOUNT="$CURRENT_PATH/models/"
@@ -53,4 +57,4 @@ docker run --rm -v $VOLUME_MOUNT:/models \
     ghcr.io/ggml-org/llama.cpp:full \
     --convert /models/$MODEL_NAME \
     --outfile /models/$MODEL_NAME/model.gguf \
-    --outtype $OUT_TYPE \
+    --outtype $OUT_TYPE
