@@ -10,12 +10,23 @@
         <form method="post">
             {% csrf_token %}
             <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
+                <label for="username" class="form-label">Username <span style="color: red;">*</span></label>
                 <input type="text" class="form-control" id="username" name="username" required>
             </div>
             <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
+                <label for="email" class="form-label">Email <span style="color: red;">*</span></label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password <span style="color: red;">*</span></label>
                 <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <div class="mb-3">
+                <label for="confirm_password" class="form-label">Confirm Password <span style="color: red;">*</span></label>
+                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+            </div>
+            <div class="mb-3">
+                <span style="color: red;">*</span> Required fields.
             </div>
             <button type="submit" class="btn btn-primary">Register</button>
         </form>

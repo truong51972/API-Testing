@@ -26,12 +26,12 @@ Table of contents
 #### 1. Create Virtual Environment (for pip method):
 
 Windows
-```bat
+```sh
 python venv .venv
 .venv\Scripts\activate
 ```
 Linux
-```bat
+```sh
 python3 -m venv .venv
 source .venv/bin/activate
 ```
@@ -39,23 +39,31 @@ source .venv/bin/activate
 #### 2. Install Dependencies
 ##### 2.1 Using uv (Recommended method)
 With the below command line, uv will automatically create a virtual environment for you and install the dependencies. See more [here](https://github.com/astral-sh/uv) or for my brief tutorial [here](#how-to-use-uv-for-better-dependency-management).
-```bat
+```sh
 uv sync --locked
 ```
 ##### 2.2 Using pip (Old method)
 Windows
-```bat
+```sh
 pip install -r requirements.txt
 ```
 Linux
-```
+```sh
 pip3 install -r requirements.txt
 ```
 
 #### 3. Create .env File
-```
+```sh
 # Environment Variables
 PRODUCTION_ENVIRONMENT=False
+
+# Email Settings
+EMAIL_HOST=YOUR_EMAIL_HOST
+EMAIL_HOST_USER=YOUR_EMAIL_HOST_USER
+EMAIL_HOST_PASSWORD=YOUR_EMAIL_HOST_PASSWORD
+EMAIL_PORT=YOUR_EMAIL_PORT
+EMAIL_FROM=YOUR_EMAIL_FROM
+EMAIL_USE_TLS=True
 
 # Django Settings
 DEBUG=True
@@ -79,30 +87,30 @@ POSTGRES_PASSWORD=YOUR_DATABASE_PASSWORD
 #### 4. Make Database Migration
 ##### makemigrations
 Windows
-```bat
+```sh
 python manage.py makemigrations
 ```
 Linux
-```bat
+```sh
 python3 manage.py makemigrations
 ```
 ##### migrate
 Windows
-```bat
+```sh
 python manage.py migrate
 ```
 Linux
-```bat
+```sh
 python3 manage.py migrate
 ```
 
 #### 5. Run Serverpython manage.py runserver
 Windows
-```bat
+```sh
 python manage.py runserver
 ```
 Linux
-```bat
+```sh
 python3 manage.py runserver
 ```
 
@@ -111,6 +119,14 @@ python3 manage.py runserver
 ```
 # Environment Variables
 PRODUCTION_ENVIRONMENT=True
+
+# Email Settings
+EMAIL_HOST=YOUR_EMAIL_HOST
+EMAIL_HOST_USER=YOUR_EMAIL_HOST_USER
+EMAIL_HOST_PASSWORD=YOUR_EMAIL_HOST_PASSWORD
+EMAIL_PORT=YOUR_EMAIL_PORT
+EMAIL_FROM=YOUR_EMAIL_FROM
+EMAIL_USE_TLS=True
 
 # Django Settings
 DEBUG=False
@@ -132,18 +148,18 @@ POSTGRES_PASSWORD=YOUR_DATABASE_PASSWORD
 ```
 
 #### 2. Docker Compose
-```bat
+```sh
 docker compose up -d --build
 ```
 
 #### 3. Making Database Migration
 
 ##### makemigrations
-```bat
+```sh
 docker compose exec django-web python manage.py makemigrations
 ```
 ##### migrate
-```bat
+```sh
 docker compose exec django-web python manage.py migrate
 ```
 
