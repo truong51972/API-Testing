@@ -13,5 +13,3 @@ COPY requirements.txt /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/utils/load_and_merge_model.py /app
-
-ENTRYPOINT [ "python", "load_and_merge_model.py" ]

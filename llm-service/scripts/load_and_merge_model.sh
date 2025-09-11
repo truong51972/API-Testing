@@ -7,6 +7,7 @@ MODEL_NAME="$1"
 # Remove './models/' prefix if present
 MODEL_NAME="${MODEL_NAME#./models/}"
 MODEL_NAME="${MODEL_NAME#/models/}"
+MODEL_NAME="${MODEL_NAME#models/}"
 
 shift
 
@@ -25,5 +26,5 @@ MODEL_PATH="models/$MODEL_NAME"
 docker run --rm --gpus all \
     -v $VOLUME_MOUNT_MODELS:/app/models \
     -v $VOLUME_MOUNT_MODELFILES:/app/modelfiles \
-    load_and_merge_model \
-    "$MODEL_PATH"
+    llm-service \
+    python load_and_merge_model.py "$MODEL_PATH"
