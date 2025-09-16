@@ -100,6 +100,14 @@
         </button>
         </form>
 
+        <!-- Test API Button -->
+        <div class="mt-3">
+            <button type="button" class="btn btn-outline-info" onclick="testApiIntegration()">
+                <i class="bi bi-gear"></i> Test API Integration
+            </button>
+            <small class="text-muted d-block mt-1">Test kết nối với AI processing API</small>
+        </div>
+
         <hr>
         <h4>📑 Uploaded Documents</h4>
         <ul class="list-group mt-3">
@@ -197,6 +205,37 @@
                 <p class="text-muted">Please wait while we load the extracted sections.</p>
             </div>
         </div>
+        
+        <!-- Save Selection Button -->
+        <div class="mt-3 text-center" id="saveSelectionContainer" style="display: none;">
+            <button class="btn btn-success" onclick="saveSectionSelection()">
+                <i class="bi bi-check-circle"></i> Save Selection
+            </button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Step 4: AI Test Case Generation -->
+    <div class="card mt-4 shadow-sm phase d-none" id="phase4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">🤖 AI Test Case Generation</h5>
+    </div>
+    <div class="card-body text-center">
+        <div class="mb-3">
+            <i class="bi bi-robot" style="font-size: 3rem; color: #0dcaf0;"></i>
+        </div>
+        <h4>Generate Test Cases from Selected Sections</h4>
+        <p class="text-muted">AI will create comprehensive test cases based on your selected sections.</p>
+        
+        <div class="mt-4">
+            <button class="btn btn-info btn-lg" onclick="generateTestSuite()" id="generateTestSuiteBtn">
+                <i class="bi bi-gear-fill"></i> Generate Test Suite
+            </button>
+        </div>
+        
+        <div id="testSuiteResult" class="mt-4" style="display: none;">
+            <!-- Test suite generation result will be shown here -->
+        </div>
     </div>
     </div>
 
@@ -248,6 +287,14 @@
                 loadSections();
             } else {
                 alert('Please wait for AI processing to complete.');
+            }
+        } else if (currentStep === 3) {
+            // Check if sections are selected and saved
+            const saveButton = document.querySelector('button[onclick="saveSectionSelection()"]');
+            if (saveButton && saveButton.style.display !== 'none') {
+                alert('Please save your section selection first.');
+            } else {
+                setStep(4);
             }
         } else if (currentStep < totalSteps) {
             setStep(currentStep + 1);
@@ -382,6 +429,9 @@
                     const sectionCard = createSectionCard(section);
                     row.appendChild(sectionCard);
                 });
+                
+                // Show save button after loading sections
+                document.getElementById('saveSelectionContainer').style.display = 'block';
             } else {
                 document.getElementById('sectionsContainer').innerHTML = `
                     <div class="text-center py-5">
@@ -482,6 +532,218 @@
         document.querySelectorAll('.section-checkbox').forEach(checkbox => {
             checkbox.checked = false;
         });
+    }
+
+    // Save Section Selection
+    function saveSectionSelection() {
+        const selectedSections = Array.from(document.querySelectorAll('.section-checkbox:checked'))
+            .map(checkbox => parseInt(checkbox.value));
+        
+        if (selectedSections.length === 0) {
+            alert('Vui lòng chọn ít nhất một section');
+            return;
+        }
+        
+        const button = document.querySelector('button[onclick="saveSectionSelection()"]');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+        button.disabled = true;
+        
+        fetch(`/project/{{ project.uuid }}/sections/update/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                selected_sections: selectedSections
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', 'Success!', data.message);
+                // Hide save button and show next step option
+                document.getElementById('saveSelectionContainer').style.display = 'none';
+                // Enable next button
+                document.getElementById('nextButton').disabled = false;
+            } else {
+                showAlert('danger', 'Error!', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', 'Error!', 'Network error: ' + error.message);
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+
+    // Generate Test Suite
+    function generateTestSuite() {
+        const button = document.getElementById('generateTestSuiteBtn');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
+        button.disabled = true;
+        
+        fetch(`/project/{{ project.uuid }}/test-suite/create/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showTestSuiteResult(true, data.message, data);
+            } else {
+                showTestSuiteResult(false, data.message, null);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showTestSuiteResult(false, 'Network error: ' + error.message, null);
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+
+    function showTestSuiteResult(success, message, data) {
+        const resultContainer = document.getElementById('testSuiteResult');
+        const alertClass = success ? 'alert-success' : 'alert-danger';
+        const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+        
+        let resultHtml = `
+            <div class="alert ${alertClass}">
+                <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
+            </div>
+        `;
+        
+        if (success && data) {
+            resultHtml += `
+                <div class="mt-3">
+                    <h6>Test Suite Created:</h6>
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">${data.test_suite_name}</h6>
+                            <p class="card-text">${data.message}</p>
+                            <a href="/project/{{ project.uuid }}/" class="btn btn-primary btn-sm">View Project</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        resultContainer.innerHTML = resultHtml;
+        resultContainer.style.display = 'block';
+    }
+
+    function showAlert(type, title, message) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> 
+                <strong>${title}</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        // Insert alert at the top of the current phase
+        const currentPhase = document.querySelector('.phase:not(.d-none)');
+        if (currentPhase) {
+            const cardBody = currentPhase.querySelector('.card-body');
+            if (cardBody) {
+                cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+                
+                // Auto dismiss after 5 seconds
+                setTimeout(() => {
+                    const alert = cardBody.querySelector('.alert');
+                    if (alert) {
+                        alert.remove();
+                    }
+                }, 5000);
+            }
+        }
+    }
+
+    // Test API Integration Function
+    function testApiIntegration() {
+        const button = document.querySelector('button[onclick="testApiIntegration()"]');
+        const originalText = button.innerHTML;
+        
+        // Show loading state
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing API...';
+        button.disabled = true;
+        
+        fetch(`/project/{{ project.uuid }}/ai/test/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                showApiTestResult(true, data.message, data.api_response);
+            } else {
+                // Show error message
+                showApiTestResult(false, data.message, null);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showApiTestResult(false, 'Network error: ' + error.message, null);
+        })
+        .finally(() => {
+            // Reset button state
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+
+    function showApiTestResult(success, message, apiResponse) {
+        // Create modal or alert to show result
+        const alertClass = success ? 'alert-success' : 'alert-danger';
+        const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+        
+        let responseHtml = '';
+        if (apiResponse && success) {
+            responseHtml = `
+                <div class="mt-3">
+                    <h6>API Response:</h6>
+                    <pre class="bg-light p-2 rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">
+${JSON.stringify(apiResponse, null, 2)}
+                    </pre>
+                </div>
+            `;
+        }
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
+                ${responseHtml}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        // Insert alert before the test button
+        const testButtonContainer = document.querySelector('button[onclick="testApiIntegration()"]').parentElement;
+        testButtonContainer.insertAdjacentHTML('beforebegin', alertHtml);
+        
+        // Auto dismiss after 10 seconds
+        setTimeout(() => {
+            const alert = testButtonContainer.previousElementSibling;
+            if (alert && alert.classList.contains('alert')) {
+                alert.remove();
+            }
+        }, 10000);
     }
     </script>
 

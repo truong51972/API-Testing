@@ -42,6 +42,10 @@ class ProjectDocument(models.Model):
     )
     ai_processed_at = models.DateTimeField(blank=True, null=True)
     ai_error_message = models.TextField(blank=True, null=True)
+    
+    # API Integration fields
+    api_collection = models.CharField(max_length=255, blank=True, null=True, help_text="Collection name used in API")
+    api_response = models.JSONField(blank=True, null=True, help_text="Full API response data")
 
     def __str__(self):
         return self.file.name if self.file else self.link

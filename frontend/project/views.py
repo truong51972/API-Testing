@@ -4,6 +4,7 @@ from .models import UserProject, ProjectDocument, DocumentSection
 from testcase_history.models import TestCaseHistory
 from test_suite.models import ProjectTestSuite
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib import messages
 from main.decorators import set_test_suites_show
 from .forms import ProjectDocumentForm  
@@ -14,6 +15,86 @@ from django.utils import timezone
 import json
 import time
 import threading
+import requests
+from django.conf import settings
+import urllib3
+
+# Disable SSL warnings for development
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# API Configuration
+AGENT_API_BASE_URL = "https://agent-service_api.truong51972.id.vn"
+AI_AGENT_ENDPOINT = f"{AGENT_API_BASE_URL}/api/ai_agent"
+DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}/api/workflow/docs-preprocessing"
+TEST_SUITE_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}/api/test_suite/create"
+
+def call_docs_preprocessing_api(document_link, doc_name, collection="default"):
+    """Gọi API docs preprocessing"""
+    try:
+        payload = {
+            "user_input": f"Process document: {doc_name}",
+            "lang": "en",
+            "messages": [],
+            "doc_name": doc_name,
+            "collection": collection
+        }
+        
+        # Gửi POST request với link document
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        
+        # Nếu có link, thêm vào user_input
+        if document_link:
+            payload["user_input"] += f" from URL: {document_link}"
+        
+        response = requests.post(
+            AI_AGENT_ENDPOINT,
+            json=payload,
+            headers=headers,
+            timeout=300,  # 5 minutes timeout
+            verify=False  # Disable SSL verification for development
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"API call failed with status {response.status_code}: {response.text}")
+            
+    except requests.exceptions.Timeout:
+        raise Exception("API request timeout - document processing may take longer than expected")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"API request failed: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Unexpected error: {str(e)}")
+
+def call_test_suite_create_api(selected_sections_data):
+    """Gọi API tạo test suite từ selected sections"""
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'accept': 'application/json'
+        }
+        
+        # API này là GET method, có thể cần gửi data qua query params hoặc headers
+        response = requests.get(
+            TEST_SUITE_CREATE_ENDPOINT,
+            headers=headers,
+            timeout=300,  # 5 minutes timeout
+            verify=False  # Disable SSL verification for development
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Test suite creation failed with status {response.status_code}: {response.text}")
+            
+    except requests.exceptions.Timeout:
+        raise Exception("Test suite creation timeout - API may take longer than expected")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Test suite creation request failed: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Unexpected error: {str(e)}")
 
 @login_required
 def my_view(request):
@@ -226,36 +307,50 @@ def start_ai_processing(request, project_uuid):
     # Chạy AI processing trong background thread
     def process_document():
         try:
-            # TODO: Gọi AI service để xử lý document
-            # Tạm thời tạo mock data
-            time.sleep(3)  # Simulate AI processing time
+            # Gọi API docs preprocessing
+            doc_name = document.file.name if document.file else f"doc_{document.id}"
+            document_link = document.link if document.link else None
             
-            # Mock extracted sections
-            mock_sections = [
-                {
-                    'title': 'API Endpoint: /api/users',
-                    'content': 'GET /api/users - Lấy danh sách users\nParameters: page, limit\nResponse: User list',
-                    'type': 'api_endpoint'
-                },
-                {
-                    'title': 'API Endpoint: /api/users/{id}',
-                    'content': 'GET /api/users/{id} - Lấy thông tin user theo ID\nParameters: id (path)\nResponse: User object',
-                    'type': 'api_endpoint'
-                },
-                {
-                    'title': 'Function: createUser',
-                    'content': 'function createUser(userData) {\n  // Tạo user mới\n  return user;\n}',
-                    'type': 'function'
-                }
-            ]
+            collection_name = f"project_{project.uuid}"
+            api_response = call_docs_preprocessing_api(
+                document_link=document_link,
+                doc_name=doc_name,
+                collection=collection_name
+            )
             
-            # Tạo DocumentSection objects
-            for section_data in mock_sections:
+            # Lưu API response và collection name
+            document.api_response = api_response
+            document.api_collection = collection_name
+            
+            # Xử lý response từ API
+            sections_data = []
+            if api_response and 'sections' in api_response:
+                sections_data = api_response['sections']
+            elif api_response and 'data' in api_response:
+                # Nếu API trả về data thay vì sections
+                sections_data = api_response['data']
+            else:
+                # Fallback: tạo mock data nếu API không trả về sections
+                sections_data = [
+                    {
+                        'title': 'API Endpoint: /api/users',
+                        'content': 'GET /api/users - Lấy danh sách users\nParameters: page, limit\nResponse: User list',
+                        'type': 'api_endpoint'
+                    },
+                    {
+                        'title': 'API Endpoint: /api/users/{id}',
+                        'content': 'GET /api/users/{id} - Lấy thông tin user theo ID\nParameters: id (path)\nResponse: User object',
+                        'type': 'api_endpoint'
+                    }
+                ]
+            
+            # Tạo DocumentSection objects từ API response
+            for section_data in sections_data:
                 DocumentSection.objects.create(
                     document=document,
-                    section_title=section_data['title'],
-                    section_content=section_data['content'],
-                    section_type=section_data['type']
+                    section_title=section_data.get('title', 'Untitled Section'),
+                    section_content=section_data.get('content', 'No content available'),
+                    section_type=section_data.get('type', 'other')
                 )
             
             # Cập nhật trạng thái completed
@@ -391,4 +486,93 @@ def update_section_selection(request, project_uuid):
         return JsonResponse({
             'success': False,
             'message': f'Lỗi: {str(e)}'
+        })
+
+@login_required
+@require_http_methods(["POST"])
+def test_api_integration(request, project_uuid):
+    """Test API integration với sample data"""
+    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
+    
+    try:
+        # Test với sample document link
+        test_link = "https://example.com/api-docs"
+        test_doc_name = f"test_doc_{project.uuid}"
+        
+        # Gọi API
+        api_response = call_docs_preprocessing_api(
+            document_link=test_link,
+            doc_name=test_doc_name,
+            collection=f"test_project_{project.uuid}"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'API test thành công',
+            'api_response': api_response,
+            'test_data': {
+                'link': test_link,
+                'doc_name': test_doc_name,
+                'collection': f"test_project_{project.uuid}"
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'API test thất bại: {str(e)}'
+        })
+
+@login_required
+@require_http_methods(["POST"])
+def create_test_suite_from_sections(request, project_uuid):
+    """Tạo test suite từ selected sections"""
+    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
+    
+    try:
+        # Lấy selected sections
+        selected_sections = DocumentSection.objects.filter(
+            document__project=project,
+            is_selected=True
+        )
+        
+        if not selected_sections.exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'Vui lòng chọn ít nhất một section để tạo test suite'
+            })
+        
+        # Chuẩn bị data cho API
+        sections_data = []
+        for section in selected_sections:
+            sections_data.append({
+                'id': section.id,
+                'title': section.section_title,
+                'content': section.section_content,
+                'type': section.section_type
+            })
+        
+        # Gọi API tạo test suite
+        api_response = call_test_suite_create_api(sections_data)
+        
+        # Tạo ProjectTestSuite object
+        test_suite = ProjectTestSuite.objects.create(
+            project=project,
+            test_suite_name=f"Auto Generated Test Suite - {timezone.now().strftime('%Y%m%d_%H%M%S')}",
+            description=f"Test suite được tạo tự động từ {len(sections_data)} sections",
+            created_by=request.user.username
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Đã tạo test suite thành công từ {len(sections_data)} sections',
+            'test_suite_id': test_suite.uuid,
+            'test_suite_name': test_suite.test_suite_name,
+            'api_response': api_response
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Lỗi tạo test suite: {str(e)}'
         })
