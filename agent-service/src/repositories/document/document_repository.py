@@ -10,6 +10,7 @@ from pymilvus import (
     CollectionSchema,
 )
 
+from src import cache
 from src.base.service.base_embedding_service import BaseEmbeddingService
 from src.base.service.base_llm_service import BaseLlmService
 from src.base.service.base_milvus_service import BaseMilvusService
@@ -58,6 +59,7 @@ class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService
 
         return self
 
+    @cache.cache_func_wrapper
     @validate_call
     def embed_data(self, data: List[DocumentModel]) -> List[DocumentModel]:
         """Embed data using the configured embeddings model."""
@@ -76,10 +78,10 @@ class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService
         return len(results) > 0
 
     @validate_call
-    def create_records(self, data: List[DocumentModel]):
+    def create_records(self, data: List[DocumentModel], overwrite: bool = False):
         """Add records to the collection."""
 
-        if self.is_ids_exists([item.id for item in data]):
+        if not overwrite and self.is_ids_exists([item.id for item in data]):
             raise ValueError("Contains existing ids.")
 
         # Embed data
@@ -162,6 +164,36 @@ class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService
 
         return result[document_offset : document_offset + document_amount]
 
+    def get_all_features(self, doc_id):
+        results = self._collection.query(
+            expr=f"doc_id LIKE '{doc_id}' and annotations LIKE 'feature'",
+            output_fields=["id", "text", "selected"],
+        )
+
+        return results
+
+    def set_selected_feature(self, record_id: int, selected: bool = True):
+        """Set the 'selected' field of a feature record by its ID.
+
+        Args:
+            record_id (int): The ID of the record to update.
+            selected (bool): The value to set for the 'selected' field.
+
+        Returns:
+            None
+        """
+        # Update the record in the collection
+        results = self._collection.query(
+            expr=f"id LIKE '{record_id}'",
+            output_fields=["*"],
+        )
+
+        record_1 = results[0]
+        record_1["selected"] = selected
+
+        self._collection.upsert(data=[record_1])
+        return results
+
 
 if __name__ == "__main__":
     langchain.debug = True
@@ -181,10 +213,17 @@ if __name__ == "__main__":
 
     document_actions = DocumentRepository()
 
-    print(
-        document_actions.search_by_text(
-            "Octoparse enables automated price tracking, data collection, and lead generation for e-commerce businesses.",
-            doc_name="e-commerce",
-            # annotations="test",
-        )
+    # print(
+    #     document_actions.search_by_text(
+    #         ".",
+    #         doc_name="srs",
+    #         annotations="feature",
+    #     )
+    # )
+
+    all_features = document_actions.get_all_features(
+        doc_id="272dab27-6901-4e41-b455-a2e05dc38294"
     )
+
+    # print(all_features)
+    document_actions.set_selected_feature(all_features[0].id, selected=False)
