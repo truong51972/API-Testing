@@ -7,21 +7,43 @@ from pydantic import (
     model_validator,
 )
 from pymilvus import DataType
+
 from src.utils.common import create_unique_id
 
 
 class DocumentModel(BaseModel):
     """Document model"""
 
-    id: int = Field(
+    id: str = Field(
         default=None,
         description="document ID, must be unique.",
         json_schema_extra={
             "milvus_config": {
-                "dtype": DataType.INT64,
+                "dtype": DataType.VARCHAR,
                 "is_primary": True,
                 "auto_id": False,
             },
+        },
+    )
+
+    doc_id: str = Field(
+        description="document external ID, must be unique.",
+        max_length=64,
+        json_schema_extra={
+            "milvus_config": {
+                "dtype": DataType.VARCHAR,
+                "max_length": 64,  # Milvus VARCHAR max_length
+            }
+        },
+    )
+
+    selected: bool = Field(
+        default=False,
+        description="whether the document is selected or not.",
+        json_schema_extra={
+            "milvus_config": {
+                "dtype": DataType.BOOL,
+            }
         },
     )
 
