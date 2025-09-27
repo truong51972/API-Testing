@@ -21,7 +21,7 @@ class TextNormalizationNode:
         data = state.messages[-1].content
 
         cleaned_data = normalize_unicode(data)
-        cleaned_data = lowercase_text(cleaned_data)
+        # cleaned_data = lowercase_text(cleaned_data)
         cleaned_data = remove_extra_whitespace(cleaned_data, ignore_code_blocks=True)
         cleaned_data = remove_repeated_punctuation(
             cleaned_data, ignore_code_blocks=True
