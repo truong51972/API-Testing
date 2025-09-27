@@ -9,13 +9,13 @@ import nltk
 import redis
 from dotenv import load_dotenv
 from minio import Minio
-from sqlmodel import create_engine
+from sqlmodel import SQLModel, create_engine
 
 from src.utils.check_google_api_tokens import check_google_api_tokens
 
 load_dotenv()
 
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 
 # Múi giờ Việt Nam
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -84,9 +84,20 @@ def get_engine():
     return create_engine(DATABASE_URL)
 
 
+# initialize database
+def init_db():
+    from src import repositories  # noqa: F401
+
+    SQLModel.metadata.create_all(get_engine())
+
+
 def get_redis_client():
     return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
 
+
+# Runtime data
+RUNTIME_DATA_DIR = Path(__file__).parent.parent / "data"
+RUNTIME_DATA_DIR.mkdir(exist_ok=True)
 
 # --- Logging ---
 LOG_DIR = Path(__file__).parent.parent / "logs"
