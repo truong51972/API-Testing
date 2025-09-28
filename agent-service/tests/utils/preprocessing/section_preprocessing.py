@@ -2,45 +2,47 @@
 from src.utils.preprocessing.section_preprocessing import (
     create_hierarchical_section_blocks,
     extract_section_content,
-    get_all_section_headings,
+    extract_section_identifier_title,
+    get_identifier_to_title,
     is_a_child_of,
-    is_section_heading,
 )
 
 
-def test_is_section_heading():
+def test_extract_section_identifier_title():
     # Numbered section headings
-    assert is_section_heading("1. This is a valid section header")
-    assert is_section_heading("2.1: Another valid section header")
-    assert is_section_heading("2.1 Another valid section header")
-    assert is_section_heading("2.1) Another valid section header")
-    assert is_section_heading("2.1 ) Another valid section header")
-    assert is_section_heading("    2.1: Another valid section header")
-    assert is_section_heading("    2 Another valid section header")
-    assert is_section_heading("# 3.4 safety and security requirements")
+    assert extract_section_identifier_title("1. This is a valid section header")
+    assert extract_section_identifier_title("2.1: Another valid section header")
+    assert extract_section_identifier_title("2.1 Another valid section header")
+    assert extract_section_identifier_title("2.1) Another valid section header")
+    assert extract_section_identifier_title("2.1 ) Another valid section header")
+    assert extract_section_identifier_title("    2.1: Another valid section header")
+    assert extract_section_identifier_title("    2 Another valid section header")
+    assert extract_section_identifier_title("# 3.4 safety and security requirements")
 
     # Roman numeral section headings
-    assert is_section_heading("II. Introduction")
-    assert is_section_heading("III) Results")
-    assert is_section_heading("IV: Discussion")
-    assert is_section_heading("V- Analysis")
-    assert is_section_heading("    IX. Appendix")
+    assert extract_section_identifier_title("II. Introduction")
+    assert extract_section_identifier_title("III) Results")
+    assert extract_section_identifier_title("IV: Discussion")
+    assert extract_section_identifier_title("V- Analysis")
+    assert extract_section_identifier_title("    IX. Appendix")
 
     # Uppercase headings
-    assert is_section_heading("KẾT LUẬN")
-    assert is_section_heading("GIỚI THIỆU")
-    assert is_section_heading("PHÂN TÍCH")
-    assert is_section_heading("RESULTS")
-    assert is_section_heading("CONCLUSION")
+    assert extract_section_identifier_title("KẾT LUẬN")
+    assert extract_section_identifier_title("GIỚI THIỆU")
+    assert extract_section_identifier_title("PHÂN TÍCH")
+    assert extract_section_identifier_title("RESULTS")
+    assert extract_section_identifier_title("CONCLUSION")
 
     # Negative cases (not section headings)
-    assert not is_section_heading("This is not a valid section header")
-    assert not is_section_heading("Section 2.1 Another invalid section header")
-    assert not is_section_heading("This should not match")
-    assert not is_section_heading("section header but not valid")
+    assert not extract_section_identifier_title("This is not a valid section header")
+    assert not extract_section_identifier_title(
+        "Section 2.1 Another invalid section header"
+    )
+    assert not extract_section_identifier_title("This should not match")
+    assert not extract_section_identifier_title("section header but not valid")
 
 
-def test_get_all_section_headings():
+def test_get_identifier_to_title():
     text = """
     1. Introduction
     Content
@@ -66,7 +68,7 @@ def test_get_all_section_headings():
         "KẾT LUẬN",
     ]
 
-    all_section_headings = get_all_section_headings(text)
+    all_section_headings = get_identifier_to_title(text)
 
     for i, expected_heading in enumerate(expected):
         assert expected_heading in all_section_headings[i]
