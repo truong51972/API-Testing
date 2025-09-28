@@ -21,6 +21,10 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
+def get_now_vn():
+    return datetime.now(VN_TIMEZONE).isoformat(timespec="milliseconds")
+
+
 # Custom formatter cho múi giờ Việt Nam
 class VietnamTimeFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):

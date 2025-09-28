@@ -6,7 +6,7 @@ from pydantic import (
 )
 from sqlmodel import Field, Session, SQLModel, select
 
-from src.settings import get_engine
+from src.settings import get_engine, get_now_vn
 
 
 class ProjectRepository(SQLModel, table=True):
@@ -34,12 +34,12 @@ class ProjectRepository(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default=datetime.now(),
+        default_factory=get_now_vn,
         description="Creation timestamp",
     )
 
     updated_at: datetime = Field(
-        default=datetime.now(),
+        default_factory=get_now_vn,
         description="Last update timestamp",
     )
 

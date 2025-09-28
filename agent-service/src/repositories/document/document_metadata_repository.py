@@ -5,6 +5,7 @@ from pydantic import (
     ConfigDict,
 )
 from sqlmodel import Field, SQLModel
+from src.settings import get_now_vn
 
 
 class DocumentMetadataRepository(SQLModel, table=True):
@@ -44,7 +45,7 @@ class DocumentMetadataRepository(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default=datetime.now(),
+        default_factory=get_now_vn,
         description="Creation timestamp",
     )
 
