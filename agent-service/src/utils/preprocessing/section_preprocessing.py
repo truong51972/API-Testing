@@ -6,44 +6,49 @@ from src.utils.common import is_number
 from src.utils.preprocessing.text_preprocessing import remove_extra_whitespace
 
 
-def is_section_heading(line, extra_patterns: Optional[list[str]] = None) -> bool:
+def extract_section_identifier_title(
+    line,
+    extra_patterns: Optional[list[str]] = None,
+    heading_annotation: str = "<heading>",
+) -> bool:
     """
-    Check if a line is a valid section heading in a technical document.
+    Extract the identifier of a section heading from a line if it matches common heading patterns.
 
-    Section headings can be:
-    - Numbered headings: e.g., "1. Title", "1.2) Subtitle", "3.1: Details", "2.1- Section"
-    - Roman numeral headings: e.g., "II. Introduction", "IV) Results", "V: Discussion", "III- Analysis"
-    - Uppercase headings: e.g., "KẾT LUẬN", "GIỚI THIỆU"
+    Supports:
+    - Numbered headings (e.g., "1. Title", "1.2) Subtitle")
+    - Roman numeral headings (e.g., "II. Introduction", "IV) Results")
+    - Uppercase headings (e.g., "KẾT LUẬN", "GIỚI THIỆU")
+    - Custom patterns via extra_patterns
+
+    Returns:
+        str or None: The extracted identifier if the line is a section heading, otherwise None.
     """
 
     # Remove leading '#' characters and surrounding whitespace
     removed_sharp = re.sub(r"^\s*#+\s*", "", line)
 
+    section_identifier = None
+    section_title = None
+
     # Pattern for numbered section headings
-    numbered_pattern = r"^\s*\d+(\.\d+)*[.\):\-]?\s+.+"
-    is_matched_numbered = bool(re.match(numbered_pattern, removed_sharp))
-
+    numbered_pattern = rf"^\s*(\d+(\.\d+)*)[.\):\-]?\s+(.+)({heading_annotation})?"
     # Pattern for Roman numeral section headings, with ) or : or - after numerals
-    roman_pattern = r"^\s*[IVXLCDM]+[.\):\-]?\s+.+"
-    is_matched_roman = bool(re.match(roman_pattern, removed_sharp))
-    # Pattern for uppercase headings (at least 5 letters and mostly uppercase)
+    roman_pattern = rf"^\s*([IVXLCDM]+)[.\):\-]?\s+(.+)({heading_annotation})?"
 
-    uppercase_pattern = r"^[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯẠ-ỹ ]{5,}$"
-    is_matched_uppercase = bool(re.match(uppercase_pattern, removed_sharp))
+    if matched := re.match(numbered_pattern, removed_sharp):
+        section_identifier = matched.group(1)
+        section_title = matched.group(3).strip()
+    elif matched := re.match(roman_pattern, removed_sharp):
+        section_identifier = matched.group(1)
+        section_title = matched.group(2).strip()
 
-    is_extra_pattern_matched = False
-    if extra_patterns:
+    elif extra_patterns:
         for pattern in extra_patterns:
-            if re.match(pattern, line):
-                is_extra_pattern_matched = True
+            if matched := re.match(pattern, line):
+                section_identifier = pattern
                 break
 
-    return (
-        is_matched_numbered
-        or is_matched_roman
-        or is_matched_uppercase
-        or is_extra_pattern_matched
-    )
+    return section_identifier, section_title
 
 
 def pattern_mining(text, min_occurrences=3) -> dict:
@@ -80,175 +85,55 @@ def pattern_mining(text, min_occurrences=3) -> dict:
     return prefix_counts
 
 
-def get_all_section_headings(text: str, mine_pattern: bool = False) -> list[str]:
+def normalize_section_headings(text: str, heading_annotation: str = "<heading>") -> str:
     """
-    Extract all section headings from the given text.
+    Normalize section headings in the text by ensuring consistent formatting.
+
+    Args:
+        text (str): The input text containing section headings.
+    Returns:
+        str: The text with normalized section headings.
+    """
+
+    for line in text.splitlines():
+        if line.strip().endswith(heading_annotation):
+            continue
+
+        section_identifier, section_title = extract_section_identifier_title(
+            line=line, heading_annotation=heading_annotation
+        )
+
+        if section_identifier and section_title:
+            # Normalize the heading format (e.g., "1. Title")
+            normalized_heading = (
+                f"{heading_annotation}{section_identifier} - {section_title}"
+            )
+            text = text.replace(line, normalized_heading)
+
+    return text
+
+
+def get_table_and_contents(
+    text: str, heading_annotation: str = "<heading>"
+) -> tuple[str, dict]:
+    """
+    Generate a table of contents from the identifier-to-title mapping.
 
     Args:
         text (str): The input text to search for section headings.
+        heading_annotation (str): The annotation used to mark headings.
 
     Returns:
-        list: A list of all section headings found in the text.
+        tuple[str, dict]: A tuple containing the table of contents and a mapping of headings to their contents.
     """
 
-    mined_patterns = list(pattern_mining(text).keys()) if mine_pattern else []
+    pattern = rf"^{re.escape(heading_annotation)}\s*(.+?)\s*\n(.*?)(?=^\s*{re.escape(heading_annotation)}|\Z)"
 
-    lines = text.splitlines()
+    matches = re.findall(pattern, text, re.DOTALL | re.MULTILINE)
+    heading_to_contents = {m[0]: m[1] for m in matches}
 
-    section_headings = []
-    for line in lines:
-        if is_section_heading(line, extra_patterns=mined_patterns):
-            pattern = r"\s*#*\s*(.*)\s*"
-            match = re.match(pattern, line)
-            section_heading = None
-            if match:
-                section_heading = match.group(1)
-            else:
-                section_heading = line.strip()
+    toc = ""
+    for heading, content in heading_to_contents.items():
+        toc += f"{heading}{'' if content else '<no_content>'}\n"
 
-            section_headings.append(section_heading)
-
-    return section_headings
-
-
-def is_a_child_of(current_section: str, parent_section: str) -> bool:
-    # Implement logic to determine if current_section is a child of parent_section
-    curr_heading = re.sub(r"^\s*#+\s*", "", current_section)
-    parent_heading = re.sub(r"^\s*#+\s*", "", parent_section)
-
-    curr_heading = curr_heading.strip().split(" ")[0]
-    parent_heading = parent_heading.strip().split(" ")[0]
-
-    return curr_heading.startswith(parent_heading) and curr_heading != parent_heading
-
-
-def extract_section_content(
-    text: str, curr_section_heading: str, next_section_heading: Optional[str] = None
-) -> str:
-    """
-    Extract the content of a section from the text.
-
-    Args:
-        text (str): The input text to search within.
-        curr_section_heading (str): The heading of the current section.
-        next_section_heading (str): The heading of the next section.
-
-    Returns:
-        str: The content of the current section.
-    """
-
-    # Check if current section heading exists in text
-    if curr_section_heading not in text:
-        return ""
-
-    # Check if next section heading exists in text (if provided)
-    if next_section_heading and next_section_heading in text:
-        pattern = (
-            rf"^\s*#*\s*{re.escape(curr_section_heading)}\s*\n(.*?)"
-            rf"(?=^\s*#*\s*{re.escape(next_section_heading)}|\Z)"
-        )
-    else:
-        pattern = rf"^\s*#*\s*{re.escape(curr_section_heading)}\s*\n(.*)"
-
-    match = re.search(pattern, text, re.DOTALL | re.MULTILINE)
-    if match:
-        return remove_extra_whitespace(text=match.group(1), ignore_code_blocks=True)
-
-    return ""
-
-
-def extract_section_contents(text: str, section_headings: list[str]) -> dict[str, str]:
-    """
-    Extract contents for multiple sections based on their headings.
-    Args:
-        text (str): The input text to search within.
-        section_headings (list[str]): List of section headings to extract content for.
-    Returns:
-        dict[str, str]: A dictionary mapping section headings to their extracted content.
-    """
-
-    section_to_content = {}
-
-    # Extract content for each section
-    for i, current_heading in enumerate(section_headings):
-        next_heading = (
-            section_headings[i + 1] if i + 1 < len(section_headings) else None
-        )
-        section_to_content[current_heading.strip()] = extract_section_content(
-            text, current_heading, next_heading
-        )
-
-    return section_to_content
-
-
-def create_parent_child_blocks(section_headings: list[str]) -> list[list[str]]:
-    """
-    Create blocks of parent-child section headings.
-
-    Each block contains a parent section and one of its child sections.
-    For example, "1. ABC" with subsections "1.1 ABC" and "1.2 ABC" will be split into
-    separate blocks: [["1. ABC", "1.1 ABC"], ["1. ABC", "1.2 ABC"]]
-
-    Args:
-        section_headings (list[str]): List of section headings.
-
-    Returns:
-        list[list[str]]: List of blocks, each containing a parent section with one child section.
-    """
-
-    parent_child_blocks: list[list[str]] = []
-    current_parent_child_group: list[str] = []
-
-    for i, current_heading in enumerate(section_headings):
-        current_parent_child_group.append(current_heading)
-        # Find parent sections for current heading
-        for previous_heading in section_headings[i::-1]:
-            if is_a_child_of(current_heading, previous_heading):
-                current_parent_child_group.append(previous_heading)
-
-        parent_child_blocks.append(current_parent_child_group)
-        current_parent_child_group = []
-
-    # Filter blocks that have parent-child relationships (more than 1 section)
-    parent_child_blocks = [block for block in parent_child_blocks if len(block) > 1]
-
-    return parent_child_blocks
-
-
-def create_hierarchical_section_blocks(
-    section_to_content: dict[str, str], parent_child_blocks: list[list[str]]
-) -> list[str]:
-    """
-    Create hierarchical section blocks containing parent-child relationships.
-
-    Each block contains a parent section and one of its child sections with their content.
-    For example, "1. ABC" with subsections "1.1 ABC" and "1.2 ABC" will be split into
-    separate blocks: ["1. ABC\n1.1 ABC\n..."] and ["1. ABC\n1.2 ABC\n..."]
-
-    Args:
-        section_to_content (dict[str, str]): A dictionary mapping section headings to their content.
-        parent_child_blocks (list[list[str]]): List of blocks, each containing a parent section with one child section.
-
-    Returns:
-        list[str]: List of text blocks, each containing a parent section with one child section.
-    """
-
-    # Generate text blocks with parent and child content
-    hierarchical_text_blocks = []
-
-    for parent_child_group in parent_child_blocks:
-        combined_block_text = ""
-        # Reverse to put parent first, then child
-        for section_heading in parent_child_group[:2][::-1]:
-            # Remove leading '#' if present
-            clean_heading = section_heading
-            combined_block_text += f"{clean_heading}"
-            content = section_to_content[section_heading.strip()]
-            if content:
-                combined_block_text += f"\n{content}\n"
-            else:
-                combined_block_text += "\n"
-
-        hierarchical_text_blocks.append(combined_block_text)
-
-    return hierarchical_text_blocks
+    return toc.strip(), heading_to_contents
