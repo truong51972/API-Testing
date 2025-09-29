@@ -12,7 +12,6 @@ from pymilvus import (
 
 from src import cache
 from src.base.service.base_embedding_service import BaseEmbeddingService
-from src.base.service.base_llm_service import BaseLlmService
 from src.base.service.base_milvus_service import BaseMilvusService
 from src.models.document.document_model import DocumentModel
 from src.utils.generate_milvus_field_schemas_from_pydantic import (
@@ -20,7 +19,7 @@ from src.utils.generate_milvus_field_schemas_from_pydantic import (
 )
 
 
-class DocumentRepository(BaseLlmService, BaseEmbeddingService, BaseMilvusService):
+class DocumentRepository(BaseEmbeddingService, BaseMilvusService):
     collection_name: str = "document"
 
     @model_validator(mode="after")
