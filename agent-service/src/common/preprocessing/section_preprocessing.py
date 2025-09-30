@@ -118,6 +118,7 @@ def get_table_and_contents(
 ) -> tuple[str, dict]:
     """
     Generate a table of contents from the identifier-to-title mapping.
+    Also include the initial content before the first heading as 'Title' in toc.
 
     Args:
         text (str): The input text to search for section headings.
@@ -127,12 +128,21 @@ def get_table_and_contents(
         tuple[str, dict]: A tuple containing the table of contents and a mapping of headings to their contents.
     """
 
+    toc = ""
+
+    first_heading_idx = text.find(heading_annotation)
+    if first_heading_idx > 0:
+        title_content = text[:first_heading_idx].strip()
+        # Remove leading '#' characters and surrounding whitespace from title_content
+        title_content = re.sub(r"^\s*#+\s*", "", title_content)
+        if title_content:
+            toc += title_content + "\n"
+
     pattern = rf"^{re.escape(heading_annotation)}\s*(.+?)\s*\n(.*?)(?=^\s*{re.escape(heading_annotation)}|\Z)"
 
     matches = re.findall(pattern, text, re.DOTALL | re.MULTILINE)
     heading_to_contents = {m[0]: m[1] for m in matches}
 
-    toc = ""
     for heading, content in heading_to_contents.items():
         toc += f"{heading}{'' if content else '<no_content>'}\n"
 
