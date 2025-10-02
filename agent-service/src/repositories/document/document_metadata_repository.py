@@ -4,9 +4,10 @@ from datetime import datetime
 from pydantic import (
     ConfigDict,
 )
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Session, SQLModel, select
 
-from src.settings import get_now_vn
+from src import repositories
+from src.settings import get_engine, get_now_vn
 
 
 class DocumentMetadataRepository(SQLModel, table=True):
@@ -69,3 +70,34 @@ class DocumentMetadataRepository(SQLModel, table=True):
             }
         }
     )
+
+    @classmethod
+    def get_by_project_id(cls, project_id: str) -> list["DocumentMetadataRepository"]:
+        documents = []
+        with Session(get_engine()) as session:
+            documents = session.exec(
+                select(repositories.DocumentMetadataRepository).where(
+                    repositories.DocumentMetadataRepository.project_id == project_id
+                )
+            ).all()
+        return documents
+
+    @classmethod
+    def delete_by_id(cls, doc_id: str) -> bool:
+        with Session(get_engine()) as session:
+            document = session.get(repositories.DocumentMetadataRepository, doc_id)
+            document_contents = session.exec(
+                select(repositories.DocumentContentRepository).where(
+                    repositories.DocumentContentRepository.doc_id == doc_id
+                )
+            ).all()
+            for content in document_contents:
+                session.delete(content)
+                session.commit()
+
+            if document:
+                session.delete(document)
+                session.commit()
+                return True
+            else:
+                return False
