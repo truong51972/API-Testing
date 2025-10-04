@@ -28,28 +28,35 @@ def __make_cache_key(func, args, kwargs):
     return key_hash
 
 
-def cache_func_wrapper(func):
+def cache_func_wrapper(func=None, *, ex=300):
     """
     Decorator to cache function results in Redis using a key generated from function source and arguments.
+    ex: expiration time in seconds (default 300s = 5 minutes)
     """
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # Get Redis client instance
-        redis_client = get_redis_client()
-        # Generate cache key for current function and arguments
-        cache_key = __make_cache_key(func, args, kwargs)
-        # Try to get cached result from Redis
-        cached_result = redis_client.get(cache_key)
-        if cached_result is not None:
-            # Return cached result if available
-            return pickle.loads(cached_result)
+    def decorator(inner_func):
+        @wraps(inner_func)
+        def wrapper(*args, **kwargs):
+            # Get Redis client instance
+            redis_client = get_redis_client()
+            # Generate cache key for current function and arguments
+            cache_key = __make_cache_key(inner_func, args, kwargs)
+            # Try to get cached result from Redis
+            cached_result = redis_client.get(cache_key)
+            if cached_result is not None:
+                # Return cached result if available
+                return pickle.loads(cached_result)
 
-        # Call the original function if cache miss
-        result = func(*args, **kwargs)
+            # Call the original function if cache miss
+            result = inner_func(*args, **kwargs)
 
-        # Store result in Redis with 1 hour expiration
-        redis_client.set(cache_key, pickle.dumps(result), ex=3600)
-        return result
+            # Store result in Redis with expiration time
+            redis_client.set(cache_key, pickle.dumps(result), ex=ex)
+            return result
 
-    return wrapper
+        return wrapper
+
+    if func is None:
+        return decorator
+    else:
+        return decorator(func)
