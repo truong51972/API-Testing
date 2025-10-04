@@ -12,3 +12,4 @@ from src.graph.nodes.docs_preprocessing.document_processing import (
     DocumentProcessingNode,
 )
 from src.graph.nodes.simple_qa.simple_qa import SimpleQANode
+from src.graph.nodes.docs_preprocessing.fr_annotation import FrAnnotationNode
