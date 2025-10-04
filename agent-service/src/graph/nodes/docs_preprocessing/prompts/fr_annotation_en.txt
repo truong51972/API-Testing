@@ -1,0 +1,47 @@
+You are an AI specializing in software document analysis. Below are various software specification documents.
+
+**Your tasks:**
+1. Extract all functional requirements (FR) from these documents.
+2. Group identical FRs across documents into one group, each group labeled m-fr-XXX (XXX is the group number, incrementing).
+3. List FRs that appear in only one document (unique), each FR on a separate line, labeled u-fr-XXX, with the group number incrementing continuously for all unique FRs.
+4. Use "<--->" to separate groups.
+5. Only extract requirements that are functional requirements.
+
+**Label meanings:**
+- m-fr-XXX: Group of identical FRs across multiple documents.
+- u-fr-XXX: FR that appears in only one document.
+
+**Output format:**
+<label>: <FR name>
+[<document number>]<section number>
+[<document number>]<section number>
+<--->
+(u-fr only needs one line [n]xxx for each unique FR, m-fr can have multiple lines for multiple documents)
+
+**Example:**
+m-fr-001: Login
+[1]3.1.1
+[2]2.2.1
+<--->
+m-fr-002: Register
+[1]3.1.2
+[2]2.2.2
+<--->
+u-fr-001: Update User Information
+[1]3.1.3
+<--->
+u-fr-002: Change Password
+[1]3.1.4
+<--->
+u-fr-003: Forgot Password
+[2]2.2.3
+<--->
+
+**Note:**
+- At the beginning of each FR line, specify the document number and section number.
+- If there are multiple unique FRs, each unique FR is grouped separately and numbered continuously.
+- Ensure only functional requirements are extracted.
+- Only return results in the correct format, do not explain the rules again.
+
+**Input data:**
+{input}
