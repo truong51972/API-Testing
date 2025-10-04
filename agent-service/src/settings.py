@@ -71,6 +71,7 @@ initialize_nltk()
 
 
 def get_minio_client():
+    logging.info(f"Connecting to MinIO at '{MINIO_URL}'")
     return Minio(
         MINIO_URL,
         access_key=MINIO_ACCESS_KEY,
@@ -81,6 +82,7 @@ def get_minio_client():
 
 # --- Hàm khởi tạo ---
 def get_engine():
+    logging.info(f"Connecting to database at '{DATABASE_URL}'")
     return create_engine(DATABASE_URL)
 
 
