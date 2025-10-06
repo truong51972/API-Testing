@@ -4,6 +4,9 @@ Table of contents
 1. [Project Overview](#project-overview)
 2. [Project Progress](#project-progress)
 3. [Usage](#usage)
+4. [Miscellaneous](#miscellaneous)
+
+
 ## Project Overview
 
 
@@ -20,40 +23,53 @@ Table of contents
 
 ## Usage
 ### Local Machine
-#### 1. Create Virtual Environment:
+#### 1. Create Virtual Environment (for pip method):
 
 Windows
-```bat
-python venv venv
-venv\Scripts\activate
+```sh
+python venv .venv
+.venv\Scripts\activate
 ```
 Linux
-```bat
-python3 -m venv venv
-source venv/bin/activate
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
 #### 2. Install Dependencies
-
+##### 2.1 Using uv (Recommended method)
+With the below command line, uv will automatically create a virtual environment for you and install the dependencies. See more [here](https://github.com/astral-sh/uv) or for my brief tutorial [here](#how-to-use-uv-for-better-dependency-management).
+```sh
+uv sync --locked
+```
+##### 2.2 Using pip (Old method)
 Windows
-```bat
+```sh
 pip install -r requirements.txt
 ```
 Linux
-```
+```sh
 pip3 install -r requirements.txt
 ```
 
 #### 3. Create .env File
-```
+```sh
 # Environment Variables
 PRODUCTION_ENVIRONMENT=False
+
+# Email Settings
+EMAIL_HOST=YOUR_EMAIL_HOST
+EMAIL_HOST_USER=YOUR_EMAIL_HOST_USER
+EMAIL_HOST_PASSWORD=YOUR_EMAIL_HOST_PASSWORD
+EMAIL_PORT=YOUR_EMAIL_PORT
+EMAIL_FROM=YOUR_EMAIL_FROM
+EMAIL_USE_TLS=True
 
 # Django Settings
 DEBUG=True
 DJANGO_SECRET_KEY=YOUR_DJANGO_SECRET_KEY
-DJANGO_ALLOWED_HOSTS=localhost
-DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8001
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8000
 
 # Database Settings
 DATABASE_ENGINE=postgresql_psycopg2
@@ -71,31 +87,31 @@ POSTGRES_PASSWORD=YOUR_DATABASE_PASSWORD
 #### 4. Make Database Migration
 ##### makemigrations
 Windows
-```bat
+```sh
 python manage.py makemigrations
 ```
 Linux
-```bat
+```sh
 python3 manage.py makemigrations
 ```
 ##### migrate
 Windows
-```bat
+```sh
 python manage.py migrate
 ```
 Linux
-```bat
+```sh
 python3 manage.py migrate
 ```
 
 #### 5. Run Serverpython manage.py runserver
 Windows
-```bat
-python manage.py runserver localhost:8001
+```sh
+python manage.py runserver
 ```
 Linux
-```bat
-python3 manage.py runserver localhost:8001
+```sh
+python3 manage.py runserver
 ```
 
 ### Production Machine
@@ -104,11 +120,19 @@ python3 manage.py runserver localhost:8001
 # Environment Variables
 PRODUCTION_ENVIRONMENT=True
 
+# Email Settings
+EMAIL_HOST=YOUR_EMAIL_HOST
+EMAIL_HOST_USER=YOUR_EMAIL_HOST_USER
+EMAIL_HOST_PASSWORD=YOUR_EMAIL_HOST_PASSWORD
+EMAIL_PORT=YOUR_EMAIL_PORT
+EMAIL_FROM=YOUR_EMAIL_FROM
+EMAIL_USE_TLS=True
+
 # Django Settings
 DEBUG=False
 DJANGO_SECRET_KEY=YOUR_DJANGO_SECRET_KEY
-DJANGO_ALLOWED_HOSTS=localhost
-DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8001
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_CSRF_TRUSTED_ORIGINS=http://localhost:8000
 
 # Database Settings
 DATABASE_ENGINE=postgresql_psycopg2
@@ -124,25 +148,36 @@ POSTGRES_PASSWORD=YOUR_DATABASE_PASSWORD
 ```
 
 #### 2. Docker Compose
-```bat
-docker-compose up -d --build
+```sh
+docker compose up -d --build
 ```
 
-#### 3. Make Database Migration
-Remember to shut down containers before making migrations.
-```bat
-docker-compose down --rmi all
-```
+#### 3. Making Database Migration
+
 ##### makemigrations
-```bat
-docker-compose exec django-web python manage.py makemigrations
+```sh
+docker compose exec django-web python manage.py makemigrations
 ```
 ##### migrate
-```bat
-docker-compose exec django-web python manage.py migrate
+```sh
+docker compose exec django-web python manage.py migrate
 ```
 
-#### 4. Run Server
-Simply run `docker-compose up -d --build` and access the web using https://localhost:8001.
 
+#### 4. Run Server
+Simply run `docker compose up -d --build` and access the web using https://localhost:8000 or https://127.0.0.1:8000.
+
+## Miscellaneous
+### How to use uv for better dependency management
+#### Installation
+See more [here](https://docs.astral.sh/uv/getting-started/installation/).
+Linux
+```sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Window
+```bat
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+#### 
 

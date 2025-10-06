@@ -135,7 +135,23 @@ USE_I18N = True
 
 USE_TZ = True
 
-
+# Emailing settings
+if os.getenv('PRODUCTION_ENVIRONMENT', 'False') == 'True':
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('EMAIL_HOST')
+    EMAIL_FROM = os.getenv('EMAIL_FROM')
+    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_FROM = 'ec2003alternative@gmail.com'
+    EMAIL_HOST_USER = 'ec2003alternative@gmail.com'
+    EMAIL_HOST_PASSWORD = 'rxjyrwyjnwpftlqa'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
