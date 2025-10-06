@@ -1,0 +1,51 @@
+<!-- Compact Project Header -->
+<div class="project-header card border-0 shadow-sm mb-3">
+<div class="card-body py-2 px-3">
+    <div class="d-flex align-items-center justify-content-between gap-2">
+
+    <!-- Left: Title + meta -->
+    <div class="min-w-0">
+        <div class="d-flex align-items-center gap-2 min-w-0">
+        <span class="project-label">Project</span>
+        <h2 class="h5 mb-0 text-truncate" title="{{ project.project_name }}">
+            {{ project.project_name }}
+        </h2>
+        </div>
+        <!-- <div class="text-muted small text-truncate mt-1" title="{{ project.description|default:'(No description)'}}">
+        {{ project.description|default:"(No description)" }}
+        </div> -->
+        <div class="text-muted x-small mt-1">
+        Created: {{ project.created_at|date:"M d, Y, H:i" }}
+        </div>
+    </div>
+
+    <!-- Right: Actions -->
+    <div class="d-flex align-items-center gap-1 flex-shrink-0">
+        <a href="{% url 'project_list' %}" class="btn btn-light btn-sm" data-bs-toggle="tooltip" title="Back">
+        <i class="bi bi-arrow-left"></i>
+        </a>
+        <a href="{% url 'project_edit' project_uuid=project.uuid %}" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" title="Edit">
+        <i class="bi bi-pencil-square"></i>
+        </a>
+        <a href="{% url 'project_delete' project_uuid=project.uuid %}" class="btn btn-outline-danger btn-sm" data-bs-toggle="tooltip" title="Delete">
+        <i class="bi bi-trash"></i>
+        </a>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#projectMeta"
+                aria-expanded="false" aria-controls="projectMeta" title="More info">
+        <i class="bi bi-info-circle"></i>
+        </button>
+    </div>
+    </div>
+
+    <!-- Collapsible meta (ẩn mặc định) -->
+    <div class="collapse mt-2" id="projectMeta">
+    <div class="row g-2 small text-muted">
+        <div class="col-auto"><strong>ID:</strong> {{ project.uuid }}</div>
+        <div class="col-auto"><strong>Created:</strong> {{ project.created_at }}</div>
+        {% if project.owner %}
+        <div class="col-auto"><strong>Owner:</strong> {{ project.owner }}</div>
+        {% endif %}
+    </div>
+    </div>
+</div>
+</div>

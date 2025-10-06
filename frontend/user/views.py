@@ -70,12 +70,8 @@ def logout(request):
 def register(request):
     if request.method == 'POST':
         username = request.POST.get('username')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-        if password != confirm_password:
-            messages.error(request, 'Passwords do not match')
-            return render(request, 'user/register.html')
-        email = request.POST.get('email')
+        password = request.POST.get('password1')
+        # email = request.POST.get('email')
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already exists')
             return render(request, 'user/register.html')

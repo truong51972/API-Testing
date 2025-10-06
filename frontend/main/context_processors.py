@@ -4,7 +4,6 @@ from test_suite.models import ProjectTestSuite
 def recent_projects(request):
     if request.user.is_authenticated:
         projects = UserProject.objects.filter(user=request.user).order_by('-created_at')[:10]
-    
         return {'recent_projects': projects}
     return {'recent_projects': []}
 
