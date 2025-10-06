@@ -205,11 +205,11 @@ function checkAIStatusLoop(projectUuid) {
                                 <i class="bi bi-check-circle"></i> Processing completed successfully!
                             </div>
                         `;
-
                         // Auto navigate to step 3 with a full reload to refresh document doc_id state
-                        setTimeout(() => {
-                            window.location.href = `/project/{{ project.uuid }}/?step=3`;
-                        }, 2000);
+                         // Include fresh_analysis=1 to trigger FR analysis after AI processing
+                         setTimeout(() => {
+                             window.location.href = `/project/{{ project.uuid }}/?step=3&fresh_analysis=1`;
+                         }, 2000);
                     }
                 }, 100);
             } else if (data.status === 'processing') {
@@ -312,18 +312,17 @@ function loadFRAnnotations(analyzeOverride = null) {
         </div>
     `;
 
-    // Determine analyze parameter - default to cached mode for all loads
-    let analyze = false; // Always default to cached mode
+    // Determine analyze parameter
+    let analyze = false; // Default to cached mode
 
-    if (analyzeOverride !== null) {
-        // Explicit override from reload button (respects toggle state)
-        analyze = analyzeOverride;
-        console.log('Using override from reload button:', analyze);
-    } else {
-        // Always use cached mode for automatic loads (page refresh, navigation)
-        // Only fresh analysis when explicitly requested via reload button
-        analyze = false;
-        console.log('Automatic load - using cached mode');
+    // Check if fresh analysis is needed (e.g., after AI processing completion)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('fresh_analysis') === '1') {
+        analyze = true;
+        console.log('Fresh analysis triggered after AI processing completion');
+        // Remove the parameter from URL to prevent re-analysis on refresh
+        const newUrl = window.location.href.replace('&fresh_analysis=1', '').replace('?fresh_analysis=1', '');
+        window.history.replaceState({}, document.title, newUrl);
     }
 
     // Call the backend API endpoint

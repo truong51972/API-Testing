@@ -1576,9 +1576,36 @@ def get_fr_infors(request, project_uuid):
         # Get parameters from request
         data = json.loads(request.body) if request.body else {}
         lang = data.get('lang', 'vi')
-        analyze = data.get('analyze', False)  # Default to False for cached mode
+        analyze = data.get('analyze', True)  # Default to False for cached mode
 
-        # Always call the API with analyze parameter - let server handle caching
+        # Check if we have cached data in DB when analyze=False
+        if not analyze:
+            existing_frs = FunctionalRequirement.objects.filter(project=project)
+            if existing_frs.exists():
+                if DEBUG:
+                    print(f"Using cached FR data from DB: {existing_frs.count()} FRs")
+
+                # Return cached data from DB
+                fr_list = []
+                for fr_obj in existing_frs:
+                    fr_list.append({
+                        'fr_info_id': str(fr_obj.fr_info_id),
+                        'fr_group': fr_obj.fr_group,
+                        'name': fr_obj.fr_group.split(':', 1)[1].strip() if ':' in fr_obj.fr_group else fr_obj.fr_group,
+                        'full_name': fr_obj.fr_group,
+                        'description': fr_obj.description,
+                        'is_selected': fr_obj.is_selected,
+                        'documents': []  # Document locations not stored in DB, could be enhanced later
+                    })
+
+                return JsonResponse({
+                    'success': True,
+                    'fr_annotations': fr_list,
+                    'count': len(fr_list),
+                    'cached': True
+                })
+
+        # Call the API when analyze=True or no cached data exists
         payload = {
             "project_id": str(project.uuid),
             "lang": lang
