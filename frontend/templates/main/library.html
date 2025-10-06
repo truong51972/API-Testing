@@ -1,0 +1,88 @@
+{% extends "main/base.html" %}
+{% load static %}
+
+{% block title %}Document Library{% endblock %}
+
+{% block content %}
+
+<!-- Content wrapper -->
+<div class="content-wrapper">
+    <!-- Content -->
+    <div class="container-xxl flex-grow-1 container-p-y">
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Thư viện tài liệu</h5>
+                        <small class="text-muted">Quản lý tất cả tài liệu đã upload</small>
+                    </div>
+                    <div class="card-body">
+                        {% if documents %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Tên file</th>
+                                        <th>Dự án</th>
+                                        <th>Trạng thái AI</th>
+                                        <th>Ngày upload</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in documents %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fa fa-file me-2"></i>
+                                                <span>{{ doc.original_filename|default:doc.file_id }}</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ doc.project.project_name }}</td>
+                                        <td>
+                                            {% if doc.ai_processing_status == 'pending' %}
+                                                <span class="badge bg-warning">Chờ xử lý</span>
+                                            {% elif doc.ai_processing_status == 'processing' %}
+                                                <span class="badge bg-info">Đang xử lý</span>
+                                            {% elif doc.ai_processing_status == 'completed' %}
+                                                <span class="badge bg-success">Hoàn thành</span>
+                                            {% elif doc.ai_processing_status == 'failed' %}
+                                                <span class="badge bg-danger">Lỗi</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ doc.uploaded_at|date:"d/m/Y H:i" }}</td>
+                                        <td>
+                                            <a href="{% url 'project_detail_by_uuid' doc.project.uuid %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fa fa-eye"></i> Xem
+                                            </a>
+                                            {% if doc.ai_processing_status == 'completed' %}
+                                            <a href="{% url 'project_detail_by_uuid' doc.project.uuid %}?step=3" class="btn btn-sm btn-outline-success ms-1">
+                                                <i class="fa fa-tasks"></i> Sections
+                                            </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fa fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h5>Chưa có tài liệu nào</h5>
+                            <p class="text-muted">Hãy upload tài liệu trong các dự án của bạn</p>
+                            <a href="{% url 'project_add' %}" class="btn btn-primary">
+                                <i class="fa fa-plus"></i> Tạo dự án
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

@@ -27,7 +27,7 @@ def logout(request):
 def register(request):
     if request.method == 'POST':
         username = request.POST.get('username')
-        password = request.POST.get('password')
+        password = request.POST.get('password1')
         # email = request.POST.get('email')
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already exists')

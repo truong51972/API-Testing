@@ -1,0 +1,44 @@
+<!-- Step Wizard -->
+<div class="container">
+    <div class="steps-container mb-5">
+        <ul class="steps">
+            <li class="step active" id="step1">
+            <div class="step-icon">1</div>
+            <p>Upload / Review</p>
+            </li>
+            <li class="step" id="step2">
+            <div class="step-icon">2</div>
+            <p>AI Extract</p>
+            </li>
+            <li class="step" id="step3">
+             <div class="step-icon">3</div>
+             <p>View FRs</p>
+             </li>
+            <li class="step" id="step4">
+            <div class="step-icon">4</div>
+            <p>AI Test Case</p>
+            </li>
+            <li class="step" id="step5">
+            <div class="step-icon">5</div>
+            <p>Report</p>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+function setStep(n) {
+const steps = document.querySelectorAll('.step');
+steps.forEach((s, i) => {
+    s.classList.remove('active', 'completed');
+    if (i < n-1) s.classList.add('completed');
+    if (i === n-1) s.classList.add('active');
+});
+
+currentStep = n;
+
+// tính % width của line
+const percent = ((n-1) / (totalSteps-1)) * 100;
+document.querySelector('.progress-line').style.width = percent + "%";
+}
+</script>

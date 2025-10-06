@@ -19,6 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),
@@ -26,6 +27,7 @@ urlpatterns = [
     path('user/', include('user.urls')),
     path('project/', include('project.urls')),
     path('test_suite/', include('test_suite.urls')),
+
 ]
 
 if settings.DEBUG:

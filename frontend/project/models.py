@@ -27,6 +27,8 @@ class ProjectDocument(models.Model):
     project = models.ForeignKey("UserProject", on_delete=models.CASCADE, related_name="documents")
     file = models.FileField(upload_to="uploads/", blank=True, null=True)
     link = models.URLField(blank=True, null=True)
+    file_id = models.CharField(max_length=255, blank=True, null=True, help_text="File ID from upload API")
+    original_filename = models.CharField(max_length=255, blank=True, null=True, help_text="Original filename before upload")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     
     # AI Processing fields
@@ -46,6 +48,7 @@ class ProjectDocument(models.Model):
     # API Integration fields
     api_collection = models.CharField(max_length=255, blank=True, null=True, help_text="Collection name used in API")
     api_response = models.JSONField(blank=True, null=True, help_text="Full API response data")
+    doc_id = models.CharField(max_length=255, blank=True, null=True, help_text="Document ID from preprocessing API")
 
     def __str__(self):
         return self.file.name if self.file else self.link
@@ -75,3 +78,20 @@ class DocumentSection(models.Model):
 
     def __str__(self):
         return f"{self.document} - {self.section_title}"
+
+class FunctionalRequirement(models.Model):
+    """Model để lưu các Functional Requirements được AI annotate"""
+    project = models.ForeignKey("UserProject", on_delete=models.CASCADE, related_name="functional_requirements")
+    fr_info_id = models.UUIDField(unique=True, help_text="FR info ID from API")
+    fr_group = models.CharField(max_length=255, help_text="FR group like 'u-fr-001: User Service'")
+    description = models.TextField(blank=True, help_text="FR description")
+    is_selected = models.BooleanField(default=False, help_text="Whether FR is selected by user")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.fr_group
+
+    class Meta:
+        unique_together = ['project', 'fr_info_id']
+        ordering = ['fr_group']
