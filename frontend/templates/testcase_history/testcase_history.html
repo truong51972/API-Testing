@@ -1,0 +1,17 @@
+{% extends "main/base.html" %}
+
+{% block title %}Test Case History{% endblock %}
+
+
+{% block content %}
+    <div class="container mt-5">
+        <h2>Test Case History</h2>
+        <p>This section will display the test case history.</p>
+        <!-- Additional content can be added here -->
+        <a href="{% url 'testcase_history' %}" class="btn btn-primary">View Test Case History</a>
+    </div>
+    <div class="container mt-5">
+        <h2>Additional Information</h2>
+        <p>This section can be used for any other relevant information or links.</p>
+        <!-- You can add more content here as needed -->
+{% endblock %}

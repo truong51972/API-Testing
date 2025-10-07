@@ -26,8 +26,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-APIT_DATAQUIZ/
-
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -208,9 +206,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
-# Runtime data
-data/
-
-# langgraph api for dev
-.langgraph_api/
+media/uploads/

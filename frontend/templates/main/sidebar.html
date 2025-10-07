@@ -1,0 +1,202 @@
+{% load static %}
+<div class="sidebar-chatgpt">
+    <!-- Header -->
+    <div class="sidebar-header">
+        <a href="/" class="brand-link">
+            <span>APIT</span>
+        </a>
+    </div>
+
+    <!-- New Project Button -->
+    <a href="{% url 'project_add' %}" class="new-project-btn">
+        <i class="fa fa-plus"></i>
+        <span>New Project</span>
+    </a>
+
+    {% if user.is_authenticated %}
+    <!-- Navigation Container -->
+    <div class="nav-container">
+        <!-- Navigation Section -->
+        <div class="nav-section-header">
+            <span>Navigation</span>
+        </div>
+        <ul class="nav nav-pills flex-column">
+            <li class="nav-item">
+                <a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <i class="fa fa-home"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}">
+                    <i class="fa fa-book"></i>
+                    <span>Thư viện</span>
+                </a>
+            </li>
+        </ul>
+
+        <!-- Projects Section -->
+        <div class="nav-section-header">
+            <span>Projects</span>
+            <button class="add-btn-header" onclick="window.location.href='{% url 'project_add' %}'" title="Add new project">
+                <i class="fa fa-plus"></i>
+            </button>
+        </div>
+        
+        <ul class="nav nav-pills flex-column">
+            {% for project in recent_projects %}
+            <li class="nav-item">
+                <a href="{% url 'project_detail_by_uuid' project_uuid=project.uuid %}" 
+                   class="nav-link">
+                    <i class="fa fa-folder"></i>
+                    <span>{{ project.project_name }}</span>
+                </a>
+            </li>
+            {% endfor %}
+            {% if recent_projects %}
+            <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            <li class="nav-item">
+                <a href="{% url 'project_list' %}" class="nav-link">
+                    <i class="fa fa-list"></i>
+                    <span>All Projects</span>
+                </a>
+            </li>
+        </ul>
+
+        {% if test_suites_show and test_suites %}
+        <!-- Test Suites Section -->
+        <div class="nav-section-header">
+            <span>Test Suites</span>
+            <button class="add-btn-header" onclick="window.location.href='{% url 'test_suite_add' project_uuid=project.uuid %}'" title="Add new test suite">
+                <i class="fa fa-plus"></i>
+            </button>
+        </div>
+
+        <ul class="nav nav-pills flex-column">
+            {% for test_suite in test_suites %}
+            <li class="nav-item">
+                <a href="{% url 'test_suite_detail' test_suite_uuid=test_suite.uuid %}" 
+                   class="nav-link">
+                    <i class="fa fa-tasks"></i>
+                    <span>{{ test_suite.test_suite_name }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+
+    <!-- Footer with User Menu -->
+    <div class="sidebar-footer">
+        <div class="user-dropdown dropdown dropup">
+            <button class="user-menu-toggle dropdown-toggle" 
+                    type="button" 
+                    id="dropdownUser1" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false">
+                <div class="user-avatar">
+                    {{ user.username|first|upper }}
+                </div>
+                <div class="user-info">
+                    <div class="user-name">{{ user.username }}</div>
+                    {% if user.is_superuser %}
+                    <div class="user-status">Admin</div>
+                    {% else %}
+                    <div class="user-status">User</div>
+                    {% endif %}
+                </div>
+                <i class="fa fa-chevron-up user-chevron"></i>
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownUser1">
+                <li><a class="dropdown-item" href="{% url 'project_add' %}">
+                    <i class="fa fa-plus"></i>
+                    <span>New project</span>
+                </a></li>
+                <li><a class="dropdown-item" href="#">
+                    <i class="fa fa-cog"></i>
+                    <span>Settings</span>
+                </a></li>
+                <li><a class="dropdown-item" href="#">
+                    <i class="fa fa-user"></i>
+                    <span>Profile</span>
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'logout' %}">
+                    <i class="fa fa-sign-out-alt"></i>
+                    <span>Sign out</span>
+                </a></li>
+            </ul>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Navigation for Non-authenticated Users -->
+    <div class="nav-container">
+        <div class="nav-section-header">
+            <span>Navigation</span>
+        </div>
+        <ul class="nav nav-pills flex-column">
+            <li class="nav-item">
+                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}" onclick="showNotification('warning', 'Login Required', 'Please log in to access the Library.'); return false;">
+                    <i class="fa fa-book"></i>
+                    <span>Thư viện</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Authentication Section -->
+    <div class="auth-section">
+        <a href="{% url 'login' %}" class="auth-btn login">
+            <i class="fa fa-sign-in-alt"></i>
+            <span>Login</span>
+        </a>
+        <a href="{% url 'register' %}" class="auth-btn register">
+            <i class="fa fa-user-plus"></i>
+            <span>Register</span>
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- JavaScript for enhanced functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle active nav links
+    const currentPath = window.location.pathname;
+    const navLinks = document.querySelectorAll('.sidebar-chatgpt .nav-link');
+    
+    navLinks.forEach(link => {
+        // Remove existing active classes
+        link.classList.remove('active');
+        
+        // Add active class if href matches current path
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
+
+    // Smooth scrolling for sidebar
+    const sidebar = document.querySelector('.sidebar-chatgpt .nav-container');
+    if (sidebar) {
+        sidebar.addEventListener('wheel', function(e) {
+            e.stopPropagation();
+        });
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        const dropdowns = document.querySelectorAll('.sidebar-chatgpt .dropdown');
+        dropdowns.forEach(dropdown => {
+            if (!dropdown.contains(e.target)) {
+                const toggle = dropdown.querySelector('.dropdown-toggle');
+                const menu = dropdown.querySelector('.dropdown-menu');
+                if (toggle && menu) {
+                    bootstrap.Dropdown.getInstance(toggle)?.hide();
+                }
+            }
+        });
+    });
+});
+</script>

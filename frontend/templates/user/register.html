@@ -1,0 +1,352 @@
+{% extends "main/base.html" %}
+{% load static %}
+
+{% block title %}Register{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="floating-elements">
+        <div class="floating-circle"></div>
+        <div class="floating-circle"></div>
+        <div class="floating-circle"></div>
+    </div>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <i class="fas fa-user-plus"></i>
+            </div>
+            <h1>Create Account</h1>
+            <p>Join us and start your journey</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if form.non_field_errors %}
+            <div class="alert-error">
+                {% for error in form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" id="registerForm">
+            {% csrf_token %}
+            
+            <div class="auth-form-group">
+                <label for="username" class="auth-label">
+                    <i class="fas fa-user"></i>
+                    Username
+                </label>
+                <input 
+                    type="text" 
+                    class="auth-control" 
+                    id="username" 
+                    name="username" 
+                    placeholder="Choose a username"
+                    value="{{ form.username.value|default:'' }}"
+                    required
+                >
+                {% if form.username.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.username.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <!-- <div class="auth-form-group">
+                <label for="email" class="auth-label">
+                    <i class="fas fa-envelope"></i>
+                    Email
+                </label>
+                <input 
+                    type="email" 
+                    class="auth-control" 
+                    id="email" 
+                    name="email" 
+                    placeholder="Enter your email"
+                    value="{{ form.email.value|default:'' }}"
+                    required
+                >
+                {% if form.email.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.email.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div> -->
+
+            <div class="auth-form-group">
+                <label for="password1" class="auth-label">
+                    <i class="fas fa-lock"></i>
+                    Password
+                </label>
+                <input 
+                    type="password" 
+                    class="auth-control" 
+                    id="password1" 
+                    name="password1" 
+                    placeholder="Create a password"
+                    required
+                >
+                <div class="password-strength" id="passwordStrength">
+                    <div class="strength-bar">
+                        <div class="strength-fill"></div>
+                    </div>
+                    <div class="strength-text">Password strength: <span id="strengthText">Enter password</span></div>
+                </div>
+                {% if form.password1.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password1.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <!-- <div class="auth-form-group">
+                <label for="password2" class="auth-label">
+                    <i class="fas fa-lock"></i>
+                    Confirm Password
+                </label>
+                <input 
+                    type="password" 
+                    class="auth-control" 
+                    id="password2" 
+                    name="password2" 
+                    placeholder="Confirm your password"
+                    required
+                >
+                {% if form.password2.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password2.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div> -->
+
+            <button type="submit" class="auth-btn auth-btn-primary" id="submitBtn">
+                <i class="fas fa-user-plus"></i>
+                <span class="btn-text">Create Account</span>
+                <div class="loading-spinner" id="loadingSpinner"></div>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="{% url 'login' %}">Sign in here</a></p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registerForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const btnText = document.querySelector('.btn-text');
+    const usernameInput = document.getElementById('username');
+    const emailInput = document.getElementById('email');
+    const password1Input = document.getElementById('password1');
+    const password2Input = document.getElementById('password2');
+    const passwordStrength = document.getElementById('passwordStrength');
+    const strengthText = document.getElementById('strengthText');
+
+    // Password strength checker
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        let feedback = 'Very weak';
+
+        if (password.length >= 8) strength += 1;
+        if (password.match(/[a-z]/)) strength += 1;
+        if (password.match(/[A-Z]/)) strength += 1;
+        if (password.match(/[0-9]/)) strength += 1;
+        if (password.match(/[^a-zA-Z0-9]/)) strength += 1;
+
+        switch (strength) {
+            case 0:
+            case 1:
+                feedback = 'Very weak';
+                passwordStrength.className = 'password-strength strength-weak';
+                break;
+            case 2:
+            case 3:
+                feedback = 'Medium';
+                passwordStrength.className = 'password-strength strength-medium';
+                break;
+            case 4:
+            case 5:
+                feedback = 'Strong';
+                passwordStrength.className = 'password-strength strength-strong';
+                break;
+        }
+
+        strengthText.textContent = feedback;
+        return strength;
+    }
+
+    // Password input handler
+    password1Input.addEventListener('input', function() {
+        const password = this.value;
+        
+        if (password.length > 0) {
+            passwordStrength.style.display = 'block';
+            checkPasswordStrength(password);
+        } else {
+            passwordStrength.style.display = 'none';
+        }
+
+        // Check password match
+        if (password2Input.value && password !== password2Input.value) {
+            password2Input.classList.add('invalid');
+        } else if (password2Input.value) {
+            password2Input.classList.remove('invalid');
+            password2Input.classList.add('valid');
+        }
+    });
+
+    // Confirm password handler
+    password2Input.addEventListener('input', function() {
+        const password1 = password1Input.value;
+        const password2 = this.value;
+
+        if (password2 && password1 !== password2) {
+            this.classList.add('invalid');
+            this.classList.remove('valid');
+        } else if (password2) {
+            this.classList.remove('invalid');
+            this.classList.add('valid');
+        }
+    });
+
+    // Email validation
+    emailInput.addEventListener('blur', function() {
+        const email = this.value;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (email && !emailRegex.test(email)) {
+            this.classList.add('invalid');
+        } else if (email) {
+            this.classList.remove('invalid');
+            this.classList.add('valid');
+        }
+    });
+
+    // Username validation
+    usernameInput.addEventListener('input', function() {
+        const username = this.value;
+        
+        if (username.length >= 3) {
+            this.classList.remove('invalid');
+            this.classList.add('valid');
+        } else if (username.length > 0) {
+            this.classList.add('invalid');
+            this.classList.remove('valid');
+        }
+    });
+
+    // Form submission with validation
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+
+        // Validate username
+        if (!usernameInput.value.trim() || usernameInput.value.length < 3) {
+            usernameInput.classList.add('invalid');
+            isValid = false;
+        }
+
+        // Validate email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailInput.value || !emailRegex.test(emailInput.value)) {
+            emailInput.classList.add('invalid');
+            isValid = false;
+        }
+
+        // Validate password
+        if (!password1Input.value || password1Input.value.length < 6) {
+            password1Input.classList.add('invalid');
+            isValid = false;
+        }
+
+        // Validate password confirmation
+        if (!password2Input.value || password1Input.value !== password2Input.value) {
+            password2Input.classList.add('invalid');
+            isValid = false;
+        }
+
+        if (!isValid) {
+            e.preventDefault();
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        loadingSpinner.style.display = 'block';
+        btnText.textContent = 'Creating Account...';
+    });
+
+    // Remove invalid class on focus
+    [usernameInput, emailInput, password1Input, password2Input].forEach(input => {
+        input.addEventListener('focus', function() {
+            this.classList.remove('invalid');
+        });
+    });
+
+    // Auto-focus username input
+    usernameInput.focus();
+
+    // Password visibility toggle for both password fields
+    [password1Input, password2Input].forEach(input => {
+        const togglePassword = document.createElement('i');
+        togglePassword.className = 'fas fa-eye';
+        togglePassword.style.cssText = `
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9a9a9a;
+            transition: color 0.2s;
+        `;
+        
+        const passwordGroup = input.parentElement;
+        passwordGroup.style.position = 'relative';
+        passwordGroup.appendChild(togglePassword);
+
+        togglePassword.addEventListener('click', function() {
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        togglePassword.addEventListener('mouseenter', function() {
+            this.style.color = '#10a37f';
+        });
+
+        togglePassword.addEventListener('mouseleave', function() {
+            this.style.color = '#9a9a9a';
+        });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            form.submit();
+        }
+    });
+});
+</script>
+{% endblock %}

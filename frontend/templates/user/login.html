@@ -1,0 +1,185 @@
+{% extends "main/base.html" %}
+{% load static %}
+
+{% block title %}Login{% endblock %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="floating-elements">
+        <div class="floating-circle"></div>
+        <div class="floating-circle"></div>
+        <div class="floating-circle"></div>
+    </div>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <i class="fas fa-sign-in-alt"></i>
+            </div>
+            <h1>Welcome Back</h1>
+            <p>Sign in to your account</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if form.non_field_errors %}
+            <div class="alert-error">
+                {% for error in form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <form method="post" id="loginForm">
+            {% csrf_token %}
+            
+            <div class="auth-form-group">
+                <label for="username" class="auth-label">
+                    <i class="fas fa-user"></i>
+                    Username
+                </label>
+                <input 
+                    type="text" 
+                    class="auth-control" 
+                    id="username" 
+                    name="username" 
+                    placeholder="Enter your username"
+                    value="{{ form.username.value|default:'' }}"
+                    required
+                >
+                {% if form.username.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.username.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <div class="auth-form-group">
+                <label for="password" class="auth-label">
+                    <i class="fas fa-lock"></i>
+                    Password
+                </label>
+                <input 
+                    type="password" 
+                    class="auth-control" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Enter your password"
+                    required
+                >
+                {% if form.password.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="auth-btn auth-btn-primary" id="submitBtn">
+                <i class="fas fa-sign-in-alt"></i>
+                <span class="btn-text">Sign In</span>
+                <div class="loading-spinner" id="loadingSpinner"></div>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{% url 'register' %}">Create one here</a></p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const btnText = document.querySelector('.btn-text');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+
+    // Form submission with loading state
+    form.addEventListener('submit', function(e) {
+        // Basic validation
+        if (!usernameInput.value.trim()) {
+            usernameInput.classList.add('invalid');
+            usernameInput.focus();
+            e.preventDefault();
+            return;
+        }
+
+        if (!passwordInput.value) {
+            passwordInput.classList.add('invalid');
+            passwordInput.focus();
+            e.preventDefault();
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        loadingSpinner.style.display = 'block';
+        btnText.textContent = 'Signing in...';
+    });
+
+    // Remove invalid class on input
+    [usernameInput, passwordInput].forEach(input => {
+        input.addEventListener('input', function() {
+            this.classList.remove('invalid');
+        });
+    });
+
+    // Auto-focus username input
+    usernameInput.focus();
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            form.submit();
+        }
+    });
+
+    // Password visibility toggle (optional enhancement)
+    const togglePassword = document.createElement('i');
+    togglePassword.className = 'fas fa-eye';
+    togglePassword.style.cssText = `
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #9a9a9a;
+        transition: color 0.2s;
+    `;
+    
+    const passwordGroup = passwordInput.parentElement;
+    passwordGroup.style.position = 'relative';
+    passwordGroup.appendChild(togglePassword);
+
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
+
+    togglePassword.addEventListener('mouseenter', function() {
+        this.style.color = '#667eea';
+    });
+
+    togglePassword.addEventListener('mouseleave', function() {
+        this.style.color = '#9a9a9a';
+    });
+});
+</script>
+{% endblock %}

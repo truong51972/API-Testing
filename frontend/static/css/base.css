@@ -1,0 +1,63 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body > .d-flex {
+    min-height: 100vh; /* full height của màn hình */
+}
+
+main {
+    overflow-y: auto; /* cho cuộn nếu nội dung dài */
+    height: 100vh;    /* luôn full chiều cao */
+    width: calc(100vw - 280px); /* trừ đi width của sidebar */
+    max-width: calc(100vw - 280px);
+    flex: 1;
+}
+
+/* Đảm bảo sidebar không bị ảnh hưởng bởi các CSS khác */
+.sidebar-chatgpt {
+    flex-shrink: 0 !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+}
+
+/* Đảm bảo main content có width nhất quán */
+.content-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Đảm bảo container có width đúng */
+.container-xxl {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Đảm bảo các card và content khác không bị ảnh hưởng */
+.card {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Global Loading Overlay */
+#global-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+}
+.global-loading-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(1px);
+}
+.global-loading-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+

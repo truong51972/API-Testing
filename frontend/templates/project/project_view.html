@@ -1,0 +1,84 @@
+{% extends 'main/base.html' %}
+
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/process_bar.css' %}">
+<link rel="stylesheet" href="{% static 'css/upload.css' %}">
+<style>
+.project-header .x-small { font-size: .72rem; }
+.project-header .text-truncate { max-width: 60vw; }
+@media (max-width: 992px){ .project-header .text-truncate { max-width: 50vw; } }
+
+.project-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2c3e50;       /* xám xanh đậm */
+  letter-spacing: .5px; /* tạo cảm giác spacing rộng hơn */
+}
+
+.section-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.section-card:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.section-checkbox:checked + label .section-card {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+</style>
+{% endblock %}
+
+{% block title %}Project Details{% endblock %}
+
+{% block content %}
+{% include 'project/main/project_header.html' %}
+{% include 'project/main/step_wizard.html' %}
+{% include 'project/main/upload_documents.html' %}
+{% include 'project/main/ai_processing.html' %}
+{% include 'project/main/section_selection.html' %}
+{% include 'project/main/ai_test_generation.html' %}
+{% include 'project/main/phase_controls.html' %}
+{% include 'project/main/scripts.html' %}
+
+<!-- <h2 class="mt-5">Test Suites</h2>
+<table class="table table-hover mt-3">
+    <thead>
+        <tr>
+            <th scope="col">Test Suite Name</th>
+            <th scope="col">Description</th>
+            <th scope="col">Created At</th>
+            <th scope="col">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for test_suite in test_suites %}
+        <tr>
+            <td>{{ test_suite.test_suite_name }}</td>
+            <td>{{ test_suite.description }}</td>
+            <td>{{ test_suite.created_at }}</td>
+            <td>
+                <a href="{% url 'test_suite_detail' test_suite_uuid=test_suite.uuid %}" class="btn btn-info">View</a>
+                <a href="" class="btn btn-secondary">Edit</a>
+                <a href="" class="btn btn-danger">Delete</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{% url 'test_suite_add' project_uuid=project.uuid %}" class="btn btn-primary mt-3">Add New Test Suite</a> -->
+{% endblock %}

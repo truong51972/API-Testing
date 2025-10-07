@@ -1,0 +1,140 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Project List{% endblock %}
+
+{% load static %}
+
+{% block content %}
+ <h1>Project List</h1>
+
+ <!-- API Info -->
+ <div class="mb-3">
+     <span class="badge bg-info">API Mode ({{ api_count }} projects)</span>
+ </div>
+
+ <table class="table table-hover mt-3">
+     <thead>
+         <tr>
+             <th scope="col">Project Name</th>
+             <th scope="col">Description</th>
+             <th scope="col">Created At</th>
+             <th scope="col">Updated At</th>
+             <th scope="col">User ID</th>
+             <th scope="col">Actions</th>
+         </tr>
+     </thead>
+     <tbody>
+         {% for project in projects %}
+         <tr>
+             <td>{{ project.project_name }}</td>
+             <td>{{ project.description }}</td>
+             <td>{{ project.created_at|default:"N/A" }}</td>
+             <td>{{ project.updated_at|default:"N/A" }}</td>
+             <td>{{ project.user_id|default:"N/A" }}</td>
+            <td>
+                <a href="{% url 'project_detail_by_uuid' project_uuid=project.project_id %}" class="btn btn-primary btn-sm me-2">
+                     View
+                 </a>
+                 <a href="{% url 'project_delete' project_uuid=project.project_id %}" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to delete this project?');">
+                     Delete
+                 </a>
+             </td>
+         </tr>
+         {% endfor %}
+
+ </table>
+
+ <div class="mt-3">
+     <a href="{% url 'project_add' %}" class="btn btn-primary">Add New Project</a>
+     <!-- <button type="button" class="btn btn-success ms-2" onclick="createProjectViaAPI()">Quick Create</button> -->
+ </div>
+ {% endblock %}
+
+ {% block extra_js %}
+ <script>
+ function createProjectViaAPI() {
+     const projectName = prompt('Enter project name:');
+     const description = prompt('Enter description:');
+
+     if (projectName) {
+         // Find the button and disable it
+         const button = document.querySelector('button[onclick="createProjectViaAPI()"]');
+         const originalText = button.innerHTML;
+         button.disabled = true;
+         button.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating...';
+
+        fetch('{% url "api_create_project" %}', {
+             method: 'POST',
+             headers: {
+                 'Content-Type': 'application/json',
+                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+             body: JSON.stringify({
+                 project_name: projectName,
+                 description: description || '',
+                 user_id: '{{ user.id }}'
+            }),
+            _timeoutMs: 60000
+         })
+         .then(response => response.json())
+         .then(data => {
+             if (data.success) {
+                 showAlert('success', 'Thành công!', 'Dự án đã được tạo thành công!');
+                 location.reload();
+             } else {
+                 showAlert('error', 'Lỗi!', data.message);
+                 // Restore button
+                 button.disabled = false;
+                 button.innerHTML = originalText;
+             }
+         })
+         .catch(error => {
+             showAlert('error', 'Lỗi!', error.message);
+             // Restore button
+             button.disabled = false;
+             button.innerHTML = originalText;
+         });
+     }
+
+     function showAlert(type, title, message) {
+         // Map alert types to icons and colors
+         const alertConfig = {
+             'success': { icon: 'check-circle', color: 'success' },
+             'error': { icon: 'exclamation-triangle', color: 'danger' },
+             'warning': { icon: 'exclamation-triangle', color: 'warning' },
+             'info': { icon: 'info-circle', color: 'info' },
+             'danger': { icon: 'exclamation-triangle', color: 'danger' }
+         };
+
+         const config = alertConfig[type] || alertConfig['info'];
+         
+         const alertHtml = `
+             <div class="alert alert-${config.color} alert-dismissible fade show" role="alert">
+                 <i class="bi bi-${config.icon} me-2"></i>
+                 <strong>${title}</strong> ${message}
+                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+             </div>
+         `;
+
+         // Remove any existing alerts first
+         const existingAlerts = document.querySelectorAll('.alert');
+         existingAlerts.forEach(alert => alert.remove());
+
+         // Insert alert at the top of the content
+         const content = document.querySelector('.container-fluid');
+         if (content) {
+             content.insertAdjacentHTML('afterbegin', alertHtml);
+
+             // Auto dismiss after 5 seconds
+             setTimeout(() => {
+                 const alert = content.querySelector('.alert');
+                 if (alert) {
+                     alert.remove();
+                 }
+             }, 5000);
+         }
+     }
+ }
+ </script>
+ {% endblock %}

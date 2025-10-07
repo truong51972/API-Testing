@@ -1,0 +1,45 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Test Suite Detail{% endblock %}
+
+{% load static %}
+
+{% block content %}
+<h1>Test Suite Detail</h1>
+<div class="container-fluid mt-5">
+    <b>Project Name: {{ project.project_name }}</b>
+    <p>Test Suite Name: {{ test_suite.test_suite_name }}</p>
+    <p>Description: {{ test_suite.description }}</p>
+    <p>Created on: {{ test_suite.created_at }}</p>
+    <a href="" class="btn btn-secondary">Edit Test Suite</a>
+    <a href="" class="btn btn-danger">Delete Test Suite</a>
+    <a href="{% url 'project_detail_by_uuid' project_uuid=project.uuid %}" class="btn btn-primary">Back to Project</a>
+</div>
+<h2 class="mt-5">Test Cases</h2>
+<table class="table table-hover mt-3">
+    <thead>
+        <tr>
+            <th scope="col">Test Case Name</th>
+            <th scope="col">Test Case</th>
+            <th scope="col">Created At</th>
+            <th scope="col">Updated At</th>
+            <th scope="col">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for test_case in test_cases %}
+        <tr>
+            <td>{{ test_case.test_case_name }}</td>
+            <td>{{ test_case.test_case }}</td>
+            <td>{{ test_case.created_at }}</td>
+            <td>{{ test_case.updated_at }}</td>
+            <td>
+                <a href="" class="btn btn-info">View</a>
+                <a href="" class="btn btn-secondary">Edit</a>
+                <a href="" class="btn btn-danger">Delete</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

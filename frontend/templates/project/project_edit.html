@@ -1,0 +1,23 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Edit Project{% endblock %}
+
+{% load static %}
+
+{% block content %}
+<h1>Edit Project</h1>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="project_name" class="form-label">Project Name</label>
+        <input type="text" class="form-control" id="project_name" name="project_name" value="{{ project.project_name }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea class="form-control" id="description" name="description" required>{{ project.description }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Edit Project</button>
+    <a href="{% url 'project_detail_by_uuid' project_uuid=project.uuid %}" class="btn btn-secondary">Cancel</a>
+</form>
+
+{% endblock %}

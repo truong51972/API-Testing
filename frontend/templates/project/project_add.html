@@ -1,0 +1,433 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block title %}Add New Project{% endblock %}
+
+{% block extra_css %}
+<style>
+.add-project-container {
+    min-height: calc(100vh - 200px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+}
+
+.project-form-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(0, 0, 0, 0.02);
+    width: 100%;
+    max-width: 500px;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-form-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.form-header h1 {
+    color: #2d3748;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.form-header p {
+    color: #718096;
+    font-size: 15px;
+    margin: 0;
+}
+
+.enhanced-form-group {
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.enhanced-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 8px;
+}
+
+.enhanced-label i {
+    color: #667eea;
+    width: 16px;
+}
+
+.enhanced-control {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #ffffff;
+    transition: all 0.3s ease;
+    color: #2d3748;
+}
+
+.enhanced-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.enhanced-control:hover {
+    border-color: #cbd5e0;
+}
+
+.enhanced-control::placeholder {
+    color: #a0aec0;
+}
+
+.enhanced-textarea {
+    min-height: 100px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.char-counter {
+    position: absolute;
+    bottom: -20px;
+    right: 0;
+    font-size: 12px;
+    color: #a0aec0;
+}
+
+.enhanced-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.enhanced-btn {
+    padding: 14px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.enhanced-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.enhanced-btn:hover::before {
+    left: 100%;
+}
+
+.enhanced-btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.enhanced-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.enhanced-btn-secondary {
+    background: #f7fafc;
+    color: #4a5568;
+    border: 2px solid #e2e8f0;
+}
+
+.enhanced-btn-secondary:hover {
+    background: #edf2f7;
+    border-color: #cbd5e0;
+    transform: translateY(-1px);
+    color: #4a5568;
+    text-decoration: none;
+}
+
+.enhanced-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.loading-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.field-error {
+    color: #e53e3e;
+    font-size: 13px;
+    margin-top: 6px;
+    display: none;
+}
+
+.enhanced-control.invalid {
+    border-color: #e53e3e;
+    box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+}
+
+.enhanced-control.valid {
+    border-color: #38a169;
+    box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.1);
+}
+
+/* Django form errors */
+.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+}
+
+.errorlist li {
+    color: #e53e3e;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.errorlist li::before {
+    content: '\f06a';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+}
+
+/* Success messages */
+.alert-success {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+    color: #276749;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 576px) {
+    .project-form-card {
+        padding: 24px;
+        margin: 10px;
+    }
+
+    .form-header h1 {
+        font-size: 24px;
+    }
+
+    .enhanced-actions {
+        flex-direction: column;
+    }
+
+    .enhanced-btn {
+        flex: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="add-project-container">
+    <div class="project-form-card">
+        <div class="form-header">
+            <h1>Create New Project</h1>
+            <p>Start your journey with a new API testing project</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    <i class="fas fa-check-circle"></i>
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" id="projectForm" novalidate>
+            {% csrf_token %}
+            
+            <div class="enhanced-form-group">
+                <label for="project_name" class="enhanced-label">
+                    <i class="fas fa-rocket"></i>
+                    Project Name
+                </label>
+                <input 
+                    type="text" 
+                    class="enhanced-control" 
+                    id="project_name" 
+                    name="project_name" 
+                    placeholder="Enter your project name"
+                    value="{{ form.project_name.value|default:'' }}"
+                    required
+                    maxlength="50"
+                >
+                <div class="char-counter">
+                    <span id="nameCounter">{{ form.project_name.value|default:''|length }}</span>/50
+                </div>
+                {% if form.project_name.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.project_name.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <div class="field-error" id="nameError"></div>
+            </div>
+
+            <div class="enhanced-form-group">
+                <label for="description" class="enhanced-label">
+                    <i class="fas fa-align-left"></i>
+                    Description
+                </label>
+                <textarea 
+                    class="enhanced-control enhanced-textarea" 
+                    id="description" 
+                    name="description"
+                    placeholder="Describe your project (optional)"
+                    maxlength="500"
+                >{{ form.description.value|default:'' }}</textarea>
+                <div class="char-counter">
+                    <span id="descCounter">{{ form.description.value|default:''|length }}</span>/500
+                </div>
+                {% if form.description.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.description.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            <div class="enhanced-actions">
+                <button type="submit" class="enhanced-btn enhanced-btn-primary" id="submitBtn">
+                    <i class="fas fa-plus-circle"></i>
+                    <span class="btn-text">Create Project</span>
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+                </button>
+                <a href="{% url 'project_list' %}" class="enhanced-btn enhanced-btn-secondary">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectNameInput = document.getElementById('project_name');
+    const descriptionInput = document.getElementById('description');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const btnText = document.querySelector('.btn-text');
+    const nameCounter = document.getElementById('nameCounter');
+    const descCounter = document.getElementById('descCounter');
+    const nameError = document.getElementById('nameError');
+
+    // Character counting
+    projectNameInput.addEventListener('input', function() {
+        nameCounter.textContent = this.value.length;
+        validateProjectName();
+    });
+
+    descriptionInput.addEventListener('input', function() {
+        descCounter.textContent = this.value.length;
+    });
+
+    // Real-time validation
+    function validateProjectName() {
+        const value = projectNameInput.value.trim();
+        
+        if (value.length === 0) {
+            showError('Project name is required');
+            return false;
+        } else if (value.length < 3) {
+            showError('Project name must be at least 3 characters');
+            return false;
+        } else {
+            hideError();
+            return true;
+        }
+    }
+
+    function showError(message) {
+        projectNameInput.classList.add('invalid');
+        nameError.textContent = message;
+        nameError.style.display = 'block';
+    }
+
+    function hideError() {
+        projectNameInput.classList.remove('invalid');
+        projectNameInput.classList.add('valid');
+        nameError.style.display = 'none';
+    }
+
+    // Form submission with loading state
+    document.getElementById('projectForm').addEventListener('submit', function(e) {
+        if (!validateProjectName()) {
+            e.preventDefault();
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        loadingSpinner.style.display = 'block';
+        btnText.textContent = 'Creating...';
+    });
+
+    // Auto-focus first input
+    projectNameInput.focus();
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            document.getElementById('projectForm').submit();
+        }
+    });
+});
+</script>
+{% endblock %}

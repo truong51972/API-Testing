@@ -1,0 +1,21 @@
+{% extends 'main/base.html' %}
+
+{% block title %}Delete Project{% endblock %}
+
+{% load static %}
+
+{% block content %}
+<h1>Delete Project</h1>
+<span class="text-danger">Are you sure you want to delete the project <b>"{{ project.project_name }}"</b>?</span>
+<div class="container-fluid mt-5">
+    <b>Project Name: {{ project.project_name }}</b>
+    <p>Description: {{ project.description }}</p>
+    <p>Created on: {{ project.created_at }}</p>
+    <a href="{% url 'project_edit' project_uuid=project.uuid %}" class="btn btn-secondary">Edit Project</a>
+    <form action="{% url 'project_delete' project_uuid=project.uuid %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this project?\nThis action CANNOT BE REVERSED.');">Delete Project</button>
+    </form>
+    <a href="{% url 'project_list' %}" class="btn btn-primary">Back to Projects</a>
+</div>
+{% endblock %}

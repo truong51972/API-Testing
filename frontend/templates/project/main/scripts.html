@@ -1,0 +1,1281 @@
+<script>
+document.getElementById('fileInput').addEventListener('change', function() {
+    if (this.files.length > 0) {
+        // Show loading state for file upload
+        const uploadBox = document.querySelector('.upload-box');
+        const originalContent = uploadBox.innerHTML;
+        const fileCount = this.files.length;
+        const fileText = fileCount === 1 ? 'file' : 'files';
+        uploadBox.innerHTML = `
+            <i class="bi bi-hourglass-split" style="font-size: 2rem;"></i>
+            <p class="mt-2">Uploading ${fileCount} ${fileText}...</p>
+            <small class="text-muted">Please wait while we upload your files</small>
+        `;
+        uploadBox.style.pointerEvents = 'none';
+
+        document.getElementById('uploadForm').submit();
+    }
+});
+
+// Link upload form loading state
+document.getElementById('linkUploadForm').addEventListener('submit', function(e) {
+    const linkInput = document.getElementById('docLink');
+    const submitBtn = document.getElementById('linkUploadBtn');
+
+    if (!linkInput.value.trim()) {
+        e.preventDefault();
+        showAlert('warning', 'Cảnh báo', 'Vui lòng nhập URL hợp lệ');
+        return;
+    }
+
+    // Show loading state
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+
+    // Store original text for restoration if needed
+    submitBtn.setAttribute('data-original-text', originalText);
+});
+</script>
+
+<script>
+let currentStep = 1;
+let totalSteps = 5;
+
+function setStep(n) {
+const steps = document.querySelectorAll('.step');
+steps.forEach((s, i) => {
+    s.classList.remove('active', 'completed');
+    if (i < n-1) s.classList.add('completed'); // bước đã qua
+    if (i === n-1) s.classList.add('active');  // bước hiện tại
+});
+currentStep = n;
+
+// Ẩn/hiện nội dung theo step
+document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
+const currentPhase = document.getElementById('phase' + n);
+if (currentPhase) currentPhase.classList.remove('d-none');
+}
+
+function nextStep() {
+    if (currentStep === 1) {
+        // Always allow next from step 1 (let backend handle document validation)
+        setStep(2);
+        // Auto start AI processing when entering step 2
+        setTimeout(() => {
+            startAIProcessing('{{ project.uuid }}');
+        }, 500);
+    } else if (currentStep === 2) {
+        // Check if AI processing is completed
+        const aiStatus = document.getElementById('aiStatusText').textContent;
+        if (aiStatus.includes('Completed')) {
+            setStep(3);
+            loadSections();
+        } else {
+            showAlert('warning', 'Cảnh báo', 'Vui lòng chờ AI xử lý hoàn thành.');
+        }
+    } else if (currentStep === 3) {
+        // Check if FR selections are saved
+        const saveButton = document.querySelector('button[onclick="saveFRSelections()"]');
+        if (saveButton && saveButton.style.display !== 'none') {
+            showAlert('warning', 'Cảnh báo', 'Vui lòng lưu lựa chọn Functional Requirements trước khi tiếp tục.');
+        } else {
+            setStep(4);
+        }
+    } else if (currentStep < totalSteps) {
+        setStep(currentStep + 1);
+    }
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        setStep(currentStep - 1);
+    }
+}
+
+// init: mở bước theo query param ?step=, mặc định 1
+document.addEventListener("DOMContentLoaded", function() {
+const params = new URLSearchParams(window.location.search);
+const stepParam = parseInt(params.get('step'));
+if (!isNaN(stepParam) && stepParam >= 1 && stepParam <= totalSteps) {
+    setStep(stepParam);
+    if (stepParam === 3) {
+        loadSections();
+    }
+} else {
+    setStep(1);
+}
+});
+
+// AI Processing Functions
+function startAIProcessing(projectUuid) {
+    // Update UI to show processing
+    document.getElementById('aiStatusText').textContent = 'AI Processing Started...';
+    document.getElementById('aiStatusMessage').textContent = 'AI is analyzing your document...';
+
+    // Realistic progress stages
+    const progressStages = [
+        { progress: 5, message: 'Initializing AI processing...', duration: 3000 },
+        { progress: 15, message: 'Reading document content...', duration: 2000 },
+        { progress: 30, message: 'Analyzing document structure...', duration: 2500 },
+        { progress: 45, message: 'Extracting key sections...', duration: 3000 },
+        { progress: 60, message: 'Processing API endpoints...', duration: 5000 },
+        { progress: 75, message: 'Generating section metadata...', duration: 5000 },
+        { progress: 85, message: 'Finalizing analysis...', duration: 2000 },
+        { progress: 95, message: 'Almost complete...', duration: 1000 }
+    ];
+
+    let currentStage = 0;
+    let progressInterval;
+
+    function updateProgress() {
+        if (currentStage < progressStages.length) {
+            const stage = progressStages[currentStage];
+            document.getElementById('aiProgressBar').style.width = stage.progress + '%';
+            document.getElementById('aiStatusMessage').textContent = stage.message;
+
+            currentStage++;
+            setTimeout(updateProgress, stage.duration);
+        } else {
+            // Keep at 95% until actual completion
+            document.getElementById('aiProgressBar').style.width = '95%';
+            document.getElementById('aiStatusMessage').textContent = 'Waiting for completion...';
+        }
+    }
+
+    // Start the staged progress
+    setTimeout(updateProgress, 500);
+
+    fetch(`/project/${projectUuid}/ai/start/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        _timeoutMs: 60000
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Start checking status
+            checkAIStatusLoop(projectUuid);
+        } else {
+            // Stop any ongoing progress updates
+            document.getElementById('aiStatusText').textContent = 'Error';
+            document.getElementById('aiStatusMessage').textContent = data.message;
+            document.getElementById('aiStatusIndicator').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> ${data.message}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('aiStatusText').textContent = 'Error';
+        document.getElementById('aiStatusMessage').textContent = 'An error occurred while starting AI processing.';
+        document.getElementById('aiStatusIndicator').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> An error occurred while starting AI processing.
+            </div>
+        `;
+    });
+}
+
+function checkAIStatusLoop(projectUuid) {
+    let checking = false;
+    const checkStatus = () => {
+        if (checking) return; // prevent overlap
+        checking = true;
+        fetch(`/project/${projectUuid}/ai/status/`, { _noLoading: true, _timeoutMs: 15000, _retries: 1 })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'completed') {
+                // Gradually complete the progress bar
+                let finalProgress = 95;
+                const finalInterval = setInterval(() => {
+                    finalProgress += 1;
+                    document.getElementById('aiProgressBar').style.width = finalProgress + '%';
+                    if (finalProgress >= 100) {
+                        clearInterval(finalInterval);
+                        document.getElementById('aiStatusText').textContent = 'AI Processing Completed!';
+                        document.getElementById('aiStatusMessage').textContent = 'Document analysis completed successfully.';
+                        document.getElementById('aiStatusIndicator').innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> Processing completed successfully!
+                            </div>
+                        `;
+                        // Auto navigate to step 3 with a full reload to refresh document doc_id state
+                         // Include fresh_analysis=1 to trigger FR analysis after AI processing
+                         setTimeout(() => {
+                             window.location.href = `/project/{{ project.uuid }}/?step=3&fresh_analysis=1`;
+                         }, 2000);
+                    }
+                }, 100);
+            } else if (data.status === 'processing') {
+                // Update status message with progress info
+                document.getElementById('aiStatusMessage').textContent = data.message;
+                // Continue checking
+                setTimeout(() => { checking = false; checkStatus(); }, 2000);
+            } else {
+                // Stop progress updates
+                document.getElementById('aiStatusText').textContent = 'Error';
+                document.getElementById('aiStatusMessage').textContent = data.message;
+                document.getElementById('aiStatusIndicator').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> ${data.message}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('aiStatusText').textContent = 'Error';
+            document.getElementById('aiStatusMessage').textContent = 'An error occurred while checking status.';
+            document.getElementById('aiStatusIndicator').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> An error occurred while checking status.
+                </div>
+            `;
+        })
+        .finally(() => { checking = false; });
+    };
+
+    // Start checking after 1 second
+    setTimeout(checkStatus, 1000);
+}
+
+function loadSections() {
+    // Load sections from all completed documents
+    fetch(`/project/{{ project.uuid }}/sections/json/`, { _noLoading: true, _timeoutMs: 30000, _retries: 1 })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.sections.length > 0) {
+            const container = document.getElementById('sectionsContainer');
+            container.innerHTML = `
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>${data.total_sections || data.sections.length} sections</strong> extracted from <strong>${data.documents_count || 'all processed'} documents</strong>.
+                </div>
+                <div class="row"></div>
+            `;
+            const row = container.querySelector('.row');
+
+            data.sections.forEach(section => {
+                const sectionCard = createSectionCard(section);
+                row.appendChild(sectionCard);
+            });
+
+            // Hide sections and show FR annotations instead
+            document.getElementById('sectionsContainer').style.display = 'none';
+
+            // Reset the first load flag to ensure analyze=true for fresh data when coming from step 2
+            localStorage.removeItem('fr_first_load_done');
+
+            // Load FR annotations after sections
+            loadFRAnnotations();
+        } else {
+            document.getElementById('sectionsContainer').innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                    <h5 class="mt-3 text-muted">No sections found</h5>
+                    <p class="text-muted">AI processing may not have extracted any sections from the uploaded documents.</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading sections:', error);
+        document.getElementById('sectionsContainer').innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: #dc3545;"></i>
+                <h5 class="mt-3 text-muted">Error loading sections</h5>
+                <p class="text-muted">An error occurred while loading sections.</p>
+            </div>
+        `;
+    });
+}
+
+function loadFRAnnotations(analyzeOverride = null) {
+    const frList = document.getElementById('frList');
+    if (!frList) return;
+
+    // Show loading state
+    frList.innerHTML = `
+        <div class="col-12">
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading Functional Requirements...</p>
+            </div>
+        </div>
+    `;
+
+    // Determine analyze parameter
+    let analyze = false; // Default to cached mode
+
+    // Check if fresh analysis is needed (e.g., after AI processing completion)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('fresh_analysis') === '1') {
+        analyze = true;
+        console.log('Fresh analysis triggered after AI processing completion');
+        // Remove the parameter from URL to prevent re-analysis on refresh
+        const newUrl = window.location.href.replace('&fresh_analysis=1', '').replace('?fresh_analysis=1', '');
+        window.history.replaceState({}, document.title, newUrl);
+    }
+
+    // Check saved preference if no fresh analysis trigger
+    if (!urlParams.get('fresh_analysis')) {
+        const savedPreference = localStorage.getItem('fr_analyze_preference');
+        if (savedPreference !== null) {
+            analyze = JSON.parse(savedPreference);
+        }
+    }
+
+    // Call the backend API endpoint
+    const apiUrl = `/project/{{ project.uuid }}/annotate-fr/`;
+
+    console.log('Loading FR annotations with analyze=', analyze);
+
+    fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'accept': 'application/json'
+        },
+        body: JSON.stringify({
+            lang: 'vi',
+            analyze: analyze
+        }),
+        _timeoutMs: 60000,
+        _retries: 1
+    })
+    .then(response => {
+        console.log('FR API response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('FR API response data:', data);
+
+        // Handle both wrapped response (success: true, fr_annotations: [...]) and direct array response
+        let frArray = [];
+        if (data.success && data.fr_annotations && Array.isArray(data.fr_annotations)) {
+            frArray = data.fr_annotations;
+            // Show cache status if applicable
+            if (data.cached) {
+                const cacheAlert = document.createElement('div');
+                cacheAlert.className = 'alert alert-info alert-dismissible fade show mb-3';
+                cacheAlert.innerHTML = `
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Using cached data.</strong> Toggle "Fresh" and reload to re-analyze documents.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                frList.appendChild(cacheAlert);
+            }
+        } else if (Array.isArray(data)) {
+            // Direct array response from API
+            frArray = data;
+        }
+
+        if (frArray.length > 0) {
+            // Show the FR container
+            document.getElementById('frContainer').style.display = 'block';
+            document.getElementById('sectionsContainer').style.display = 'none';
+
+            frList.innerHTML = '';
+
+            frArray.forEach(fr => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 mb-3';
+
+                const card = document.createElement('div');
+                card.className = 'card h-100 border';
+
+                const cardBody = document.createElement('div');
+                cardBody.className = 'card-body d-flex flex-column';
+
+                // Checkbox
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.className = 'form-check mb-2';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-check-input fr-checkbox';
+                checkbox.value = fr.fr_info_id;
+                checkbox.id = `fr_${fr.fr_info_id}`;
+                // Restore selection state from cached data
+                checkbox.checked = fr.is_selected || false;
+
+                const checkboxLabel = document.createElement('label');
+                checkboxLabel.className = 'form-check-label fw-bold';
+                checkboxLabel.htmlFor = `fr_${fr.fr_info_id}`;
+                checkboxLabel.textContent = fr.fr_group;
+
+                checkboxDiv.appendChild(checkbox);
+                checkboxDiv.appendChild(checkboxLabel);
+
+                // Description
+                const description = document.createElement('p');
+                description.className = 'card-text text-muted small flex-grow-1';
+                description.textContent = fr.description || 'No description available';
+
+                // Document locations
+                if (fr.documents && fr.documents.length > 0) {
+                    const docInfo = document.createElement('div');
+                    docInfo.className = 'mt-2';
+                    fr.documents.forEach(doc => {
+                        const docBadge = document.createElement('span');
+                        docBadge.className = 'badge bg-info me-1 mb-1';
+                        docBadge.textContent = `Doc ${doc.doc}, §${doc.heading}`;
+                        docInfo.appendChild(docBadge);
+                    });
+                    cardBody.appendChild(docInfo);
+                }
+
+                // Info row
+                const infoRow = document.createElement('div');
+                infoRow.className = 'mt-auto';
+                infoRow.appendChild(description);
+
+                // Controls row
+                const controlsRow = document.createElement('div');
+                controlsRow.className = 'd-flex justify-content-between align-items-center mt-2';
+
+                const frId = document.createElement('small');
+                frId.className = 'text-muted';
+                frId.textContent = `ID: ${fr.fr_info_id}`;
+
+                const controlsRight = document.createElement('div');
+                controlsRight.className = 'd-flex align-items-center gap-2';
+
+                const statusBadge = document.createElement('span');
+                statusBadge.className = `badge ${fr.is_selected ? 'bg-success' : 'bg-secondary'}`;
+                statusBadge.textContent = fr.is_selected ? 'Selected' : 'Not Selected';
+
+                const viewDetailsBtn = document.createElement('button');
+                viewDetailsBtn.className = 'btn btn-sm btn-outline-info';
+                viewDetailsBtn.innerHTML = '<i class="bi bi-eye"></i>';
+                viewDetailsBtn.title = 'View FR Details';
+                viewDetailsBtn.onclick = () => showFRDetails(fr, fr.fr_info_id);
+
+                controlsRight.appendChild(statusBadge);
+                controlsRight.appendChild(viewDetailsBtn);
+
+                controlsRow.appendChild(frId);
+                controlsRow.appendChild(controlsRight);
+
+                cardBody.appendChild(checkboxDiv);
+                cardBody.appendChild(infoRow);
+                cardBody.appendChild(controlsRow);
+                card.appendChild(cardBody);
+                col.appendChild(card);
+
+                frList.appendChild(col);
+            });
+
+            // Add event listeners to update badge status when checkboxes change
+            document.querySelectorAll('.fr-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const badge = this.closest('.card-body').querySelector('.badge');
+                    if (badge) {
+                        if (this.checked) {
+                            badge.className = 'badge bg-success';
+                            badge.textContent = 'Selected';
+                        } else {
+                            badge.className = 'badge bg-secondary';
+                            badge.textContent = 'Not Selected';
+                        }
+                    }
+                });
+            });
+
+            // Show the Save FR Selections button after loading
+            document.getElementById('saveFRSelectionContainer').style.display = 'block';
+        } else {
+            frList.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> ${data.message || 'Error loading Functional Requirements.'}
+                    </div>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading FR annotations:', error);
+        frList.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Failed to load Functional Requirements: ${error.message}
+                </div>
+            </div>
+        `;
+    });
+}
+
+
+function updateAnalyzeLabel() {
+    const toggle = document.getElementById('analyzeToggle');
+    const label = document.getElementById('analyzeLabel');
+    if (toggle && label) {
+        label.textContent = toggle.checked ? 'Fresh' : 'Cached';
+        // Save preference to localStorage
+        localStorage.setItem('fr_analyze_preference', toggle.checked);
+    }
+}
+
+function loadAnalyzePreference() {
+    const toggle = document.getElementById('analyzeToggle');
+    if (toggle) {
+        // Load from localStorage, default to false (cached mode) for performance
+        const savedPreference = localStorage.getItem('fr_analyze_preference');
+        toggle.checked = savedPreference !== null ? JSON.parse(savedPreference) : false;
+        updateAnalyzeLabel();
+    }
+}
+
+// Set up analyze toggle event listener
+document.addEventListener('DOMContentLoaded', function() {
+    const analyzeToggle = document.getElementById('analyzeToggle');
+    if (analyzeToggle) {
+        analyzeToggle.addEventListener('change', updateAnalyzeLabel);
+        loadAnalyzePreference(); // Load saved preference
+    }
+});
+
+function reloadFRs() {
+    // Get current toggle state
+    const analyzeToggle = document.getElementById('analyzeToggle');
+    const shouldAnalyze = analyzeToggle ? analyzeToggle.checked : false;
+
+    // Reload FRs with current analyze setting
+    loadFRAnnotations(shouldAnalyze);
+}
+
+
+
+
+function saveFRSelections() {
+    const selectedFRs = Array.from(document.querySelectorAll('.fr-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+
+    if (selectedFRs.length === 0) {
+        alert('Vui lòng chọn ít nhất một Functional Requirement');
+        return;
+    }
+
+    const button = document.getElementById('saveFRSelectionContainer').querySelector('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+    button.disabled = true;
+
+    // Call the backend select API with all selected FRs
+    console.log('Saving FR selections:', selectedFRs);
+    fetch(`/project/{{ project.uuid }}/select-fr/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'accept': 'application/json'
+        },
+        body: JSON.stringify({
+            fr_info_ids: selectedFRs,
+            is_selected: true
+        }),
+        _timeoutMs: 30000,
+        _retries: 1
+    })
+    .then(response => {
+        console.log('API response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('API response data:', data);
+        if (data.success) {
+            showAlert('success', 'Success!', `Đã lưu ${selectedFRs.length} Functional Requirements thành công (${data.updated_count} bản ghi được cập nhật).`);
+            // Hide save button and allow proceeding to next step
+            document.getElementById('saveFRSelectionContainer').style.display = 'none';
+
+            // Ensure cached data is marked as fresh after saving selections
+            // This prevents unnecessary re-analysis on page refresh
+            localStorage.setItem('fr_cache_fresh', Date.now().toString());
+        } else {
+            showAlert('danger', 'Error!', data.message || 'Failed to save FR selections.');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving FR selections:', error);
+        showAlert('danger', 'Error!', 'Failed to save FR selections.');
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function showFRDetails(fr, frInfoId) {
+    // Create modal for FR details
+    const modalHtml = `
+        <div class="modal fade" id="frDetailModal" tabindex="-1" aria-labelledby="frDetailModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="frDetailModalLabel">
+                            <i class="bi bi-card-text me-2"></i>${fr.fr_group}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <strong class="text-primary">📋 FR Group:</strong>
+                                    <div class="mt-1">
+                                        <code class="bg-light px-2 py-1 rounded">${fr.fr_group}</code>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong class="text-primary">📝 Description:</strong>
+                                    <div class="mt-2 p-3 bg-light rounded">
+                                        ${fr.description || '<em class="text-muted">No description available.</em>'}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong class="text-primary">🏷️ Name:</strong>
+                                    <div class="mt-1">
+                                        <span class="badge bg-info fs-6">${fr.name || fr.fr_group.split(':', 1)[1]?.trim() || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-primary">ℹ️ Details</h6>
+                                        <div class="mb-2">
+                                            <strong>ID:</strong>
+                                                <code class="small">${frInfoId || 'N/A'}</code>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Status:</strong>
+                                            <span class="badge ${fr.is_selected ? 'bg-success' : 'bg-secondary'} ms-1">
+                                                ${fr.is_selected ? 'Selected' : 'Not Selected'}
+                                            </span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <strong>Type:</strong>
+                                            <span class="badge bg-light text-dark">Functional Requirement</span>
+                                        </div>
+                                        ${fr.documents && fr.documents.length > 0 ? `
+                                        <div class="mb-2">
+                                            <strong>Documents:</strong>
+                                            <div class="mt-1">
+                                                ${fr.documents.map(doc => `<small class="badge bg-secondary me-1">${doc.doc}:${doc.heading}</small>`).join('')}
+                                            </div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-1"></i>Close
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="toggleFRSelection('${frInfoId}', ${!fr.is_selected})">
+                            <i class="bi bi-${fr.is_selected ? 'dash-circle' : 'check-circle'} me-1"></i>
+                            ${fr.is_selected ? 'Deselect' : 'Select'} FR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('frDetailModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('frDetailModal'));
+    modal.show();
+}
+
+function toggleFRSelection(frId, select) {
+    // Update checkbox state
+    const checkbox = document.querySelector(`input[type="checkbox"][value="${frId}"]`);
+    if (checkbox) {
+        checkbox.checked = select;
+
+        // Update badge
+        const badge = checkbox.closest('.card-body').querySelector('.badge');
+        if (badge) {
+            if (select) {
+                badge.className = 'badge bg-success';
+                badge.textContent = 'Selected';
+            } else {
+                badge.className = 'badge bg-secondary';
+                badge.textContent = 'Not Selected';
+            }
+        }
+    }
+
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('frDetailModal'));
+    if (modal) {
+        modal.hide();
+    }
+
+    // Show success message
+    showAlert('success', 'FR Updated', `FR has been ${select ? 'selected' : 'deselected'}. Remember to save your selections!`);
+}
+
+
+function createSectionCard(section) {
+    const col = document.createElement('div');
+    col.className = 'col-md-6 mb-3';
+
+    const card = document.createElement('div');
+    card.className = 'card section-card';
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body';
+
+    const formCheck = document.createElement('div');
+    formCheck.className = 'form-check';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'form-check-input section-checkbox';
+    checkbox.value = section.id;
+    checkbox.id = `section_${section.id}`;
+    checkbox.checked = section.is_selected;
+
+    const label = document.createElement('label');
+    label.className = 'form-check-label w-100';
+    label.htmlFor = `section_${section.id}`;
+
+    const flexDiv = document.createElement('div');
+    flexDiv.className = 'd-flex justify-content-between align-items-start';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'flex-grow-1';
+
+    const badgeClass = section.section_type ? `bg-${section.section_type}` : 'bg-secondary';
+    const displayTitle = section.section_title || section.title;
+    const displayContent = section.section_content || section.content;
+    const truncatedContent = displayContent.split(' ').slice(0,20).join(' ') + (displayContent.split(' ').length > 20 ? '...' : '');
+
+    const title = document.createElement('h6');
+    title.className = 'card-title mb-2';
+
+    const badge = document.createElement('span');
+    badge.className = `badge ${badgeClass} me-2`;
+    badge.textContent = section.get_section_type_display || section.type_display;
+
+    const titleText = document.createElement('span');
+    titleText.textContent = displayTitle;
+
+    title.appendChild(badge);
+    title.appendChild(titleText);
+
+    const content = document.createElement('p');
+    content.className = 'card-text text-muted small';
+    content.textContent = truncatedContent;
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(content);
+
+    if (section.document_name) {
+        const small = document.createElement('small');
+        small.className = 'text-muted';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-file-earmark';
+        small.appendChild(icon);
+        small.appendChild(document.createTextNode(' From: ' + section.document_name));
+        contentDiv.appendChild(small);
+    }
+    flexDiv.appendChild(contentDiv);
+    label.appendChild(flexDiv);
+
+    formCheck.appendChild(checkbox);
+    formCheck.appendChild(label);
+    cardBody.appendChild(formCheck);
+    card.appendChild(cardBody);
+    col.appendChild(card);
+
+    // Add click handler
+    card.addEventListener('click', function(e) {
+        if (e.target.type !== 'checkbox') {
+            checkbox.checked = !checkbox.checked;
+        }
+    });
+
+    return col;
+}
+
+function selectAllSections() {
+    document.querySelectorAll('.section-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function deselectAllSections() {
+    document.querySelectorAll('.section-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+// Save Section Selection
+function saveSectionSelection() {
+    const selectedSections = Array.from(document.querySelectorAll('.section-checkbox:checked'))
+        .map(checkbox => parseInt(checkbox.value));
+
+    if (selectedSections.length === 0) {
+        showAlert('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một section');
+        return;
+    }
+
+    const button = document.querySelector('button[onclick="saveSectionSelection()"]');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+    button.disabled = true;
+
+    fetch(`/project/{{ project.uuid }}/sections/update/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            selected_sections: selectedSections
+        }),
+        _timeoutMs: 60000
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Thành công!', data.message);
+            // Hide save button and show next step option
+            document.getElementById('saveSelectionContainer').style.display = 'none';
+            // Enable next button
+            document.getElementById('nextButton').disabled = false;
+        } else {
+            showAlert('error', 'Lỗi!', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('error', 'Lỗi!', 'Lỗi mạng: ' + error.message);
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// Generate Test Suite
+function generateTestSuite() {
+    const button = document.getElementById('generateTestSuiteBtn');
+    const originalText = button.innerHTML;
+
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
+    button.disabled = true;
+
+    fetch(`/project/{{ project.uuid }}/test-suite/create/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        _timeoutMs: 120000
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showTestSuiteResult(true, data.message, data);
+        } else {
+            showTestSuiteResult(false, data.message, null);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showTestSuiteResult(false, 'Network error: ' + error.message, null);
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function showTestSuiteResult(success, message, data) {
+    const resultContainer = document.getElementById('testSuiteResult');
+    const alertClass = success ? 'alert-success' : 'alert-danger';
+    const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+
+    let resultHtml = `
+        <div class="alert ${alertClass}">
+            <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
+        </div>
+    `;
+
+    if (success && data) {
+        resultHtml += `
+            <div class="mt-3">
+                <h6>Test Suite Created:</h6>
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">${data.test_suite_name}</h6>
+                        <p class="card-text">${data.message}</p>
+                        <a href="/project/{{ project.uuid }}/" class="btn btn-primary btn-sm">View Project</a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    resultContainer.innerHTML = resultHtml;
+    resultContainer.style.display = 'block';
+}
+
+function showAlert(type, title, message) {
+    // Map alert types to icons and colors
+    const alertConfig = {
+        'success': { icon: 'check-circle', color: 'success' },
+        'error': { icon: 'exclamation-triangle', color: 'danger' },
+        'warning': { icon: 'exclamation-triangle', color: 'warning' },
+        'info': { icon: 'info-circle', color: 'info' },
+        'danger': { icon: 'exclamation-triangle', color: 'danger' }
+    };
+
+    const config = alertConfig[type] || alertConfig['info'];
+    
+    const alertHtml = `
+        <div class="alert alert-${config.color} alert-dismissible fade show" role="alert">
+            <i class="bi bi-${config.icon} me-2"></i>
+            <strong>${title}</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+
+    // Remove any existing alerts first
+    const existingAlerts = document.querySelectorAll('.alert');
+    existingAlerts.forEach(alert => alert.remove());
+
+    // Insert alert at the top of the current phase
+    const currentPhase = document.querySelector('.phase:not(.d-none)');
+    if (currentPhase) {
+        const cardBody = currentPhase.querySelector('.card-body');
+        if (cardBody) {
+            cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                const alert = cardBody.querySelector('.alert');
+                if (alert) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+    }
+}
+
+// Test API Integration Function
+function testApiIntegration() {
+    const button = document.querySelector('button[onclick="testApiIntegration()"]');
+    const originalText = button.innerHTML;
+
+    // Show loading state
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing API...';
+    button.disabled = true;
+
+    fetch(`/project/{{ project.uuid }}/ai/test/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message
+            showApiTestResult(true, data.message, data.api_response);
+        } else {
+            // Show error message
+            showApiTestResult(false, data.message, null);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showApiTestResult(false, 'Network error: ' + error.message, null);
+    })
+    .finally(() => {
+        // Reset button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function showApiTestResult(success, message, apiResponse) {
+    // Create modal or alert to show result
+    const alertClass = success ? 'alert-success' : 'alert-danger';
+    const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+
+    let responseHtml = '';
+    if (apiResponse && success) {
+        responseHtml = `
+            <div class="mt-3">
+                <h6>API Response:</h6>
+                <pre class="bg-light p-2 rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">
+${JSON.stringify(apiResponse, null, 2)}
+                </pre>
+            </div>
+        `;
+    }
+
+    const alertHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
+            ${responseHtml}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+    // Insert alert before the test button
+    const testButtonContainer = document.querySelector('button[onclick="testApiIntegration()"]').parentElement;
+    testButtonContainer.insertAdjacentHTML('beforebegin', alertHtml);
+
+    // Auto dismiss after 10 seconds
+    setTimeout(() => {
+        const alert = testButtonContainer.previousElementSibling;
+        if (alert && alert.classList.contains('alert')) {
+            alert.remove();
+        }
+    }, 10000);
+}
+</script>
+
+<script>
+// Delete preprocessed document by doc_id via backend endpoint that calls external API
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function deletePreprocessedDocument(projectUuid, docId, fallbackUrl, btnEl) {
+    // Prefer API delete when docId exists; otherwise fall back to legacy URL (server will also attempt API if possible)
+    if (!docId) {
+        if (fallbackUrl) {
+            window.location.href = fallbackUrl;
+        }
+        return;
+    }
+
+    if (!confirm('Bạn có chắc muốn xoá tài liệu này?')) {
+        return;
+    }
+
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken') || '';
+
+    // UI: disable button without spinner; keep icon intact
+    if (btnEl) {
+        if (btnEl.dataset.deleting === '1') return; // prevent double delete
+        btnEl.dataset.deleting = '1';
+        btnEl.disabled = true;
+        btnEl.classList.add('disabled');
+        btnEl.setAttribute('aria-disabled', 'true');
+        btnEl.style.opacity = '0.7';
+    }
+
+    fetch(`/project/${projectUuid}/preprocessed-document/${encodeURIComponent(docId)}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Accept': 'application/json'
+        },
+        _noLoading: true,
+        _timeoutMs: 30000
+    })
+    .then(async res => {
+        try { return await res.json(); } catch (_) {
+            return { success: res.ok, message: res.ok ? 'Deleted' : 'Delete failed' };
+        }
+    })
+    .then(data => {
+        if (data.success) {
+            // Remove the nearest list/card element without full page reload
+            if (btnEl) {
+                const container = btnEl.closest('.list-group-item, .card');
+                if (container) {
+                    // If it's a card inside grid, remove the column wrapper for clean layout
+                    const col = container.closest('.col-md-6, .col-lg-4, .col-12');
+                    (col || container).remove();
+                } else {
+                    btnEl.remove();
+                }
+            }
+            // Update sections if on step 3
+            try { loadSections(); } catch (e) {}
+            showAlert('success', 'Đã xóa!', data.message || 'Tài liệu đã được xóa thành công.');
+            // Refresh back to step 1 after successful deletion
+            window.location.href = `/project/{{ project.uuid }}/?step=1`;
+        } else {
+            showAlert('error', 'Lỗi!', data.message || 'Không thể xóa tài liệu.');
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.classList.remove('disabled');
+                btnEl.removeAttribute('aria-disabled');
+                btnEl.style.opacity = '';
+                delete btnEl.dataset.deleting;
+            }
+        }
+    })
+    .catch(err => {
+        console.error('Delete error:', err);
+        showAlert('error', 'Lỗi!', 'Lỗi mạng: ' + (err?.message || err));
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.classList.remove('disabled');
+            btnEl.removeAttribute('aria-disabled');
+            btnEl.style.opacity = '';
+            delete btnEl.dataset.deleting;
+        }
+    });
+}
+</script>
+
+<!-- Document View Modal -->
+<div class="modal fade" id="documentViewModal" tabindex="-1" aria-labelledby="documentViewModalLabel" aria-hidden="true">
+<div class="modal-dialog modal-xl">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="documentViewModalLabel">Viewing Document</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div id="documentViewer" style="height: 70vh;">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading document...</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" id="downloadBtn">Download</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+function viewDocument(fileId, filename, link) {
+    let fileUrl;
+
+    if (fileId) {
+        const minioBaseUrl = "https://minio-api-t.truong51972.id.vn";
+        const bucketName = "apit-project";
+        fileUrl = `${minioBaseUrl}/${bucketName}/${fileId}`;
+    } else if (link) {
+        fileUrl = link;
+    } else {
+        showAlert('warning', 'Cảnh báo', 'File không khả dụng để xem');
+        return;
+    }
+
+    const safeFilename = filename || (fileId ? fileId.split('/').pop() : (link ? link.split('/').pop() : 'Document'));
+    document.getElementById('documentViewModalLabel').textContent = `Viewing: ${safeFilename}`;
+
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const viewer = document.getElementById('documentViewer');
+    viewer.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading document...</p>
+        </div>
+    `;
+
+    const modal = new bootstrap.Modal(document.getElementById('documentViewModal'));
+    modal.show();
+
+    setTimeout(() => {
+        // Special handling for Google Drive sharing links
+        try {
+            const urlObj = new URL(fileUrl);
+            if (urlObj.hostname.includes('drive.google.com')) {
+                // Match /file/d/<id>/...
+                const match = fileUrl.match(/\/file\/d\/([^\/]+)/);
+                const fileIdGg = match && match[1] ? match[1] : null;
+                if (fileIdGg) {
+                    const previewUrl = `https://drive.google.com/file/d/${fileIdGg}/preview`;
+                    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileIdGg}`;
+                    viewer.innerHTML = `<iframe src="${previewUrl}" width="100%" height="100%" style="border: none;"></iframe>`;
+                    downloadBtn.onclick = function() { window.open(downloadUrl, '_blank'); };
+                    return;
+                }
+            }
+        } catch (e) { /* ignore URL parse errors */ }
+
+        const lower = safeFilename.toLowerCase();
+        const hasExt = lower.includes('.')
+        const ext = hasExt ? lower.split('.').pop() : '';
+        const encodedUrl = encodeURIComponent(fileUrl);
+
+        // Prefer Office viewer for Word docs (works around CORS/X-Frame-Options for many hosts)
+        if (ext === 'doc' || ext === 'docx') {
+            const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+            viewer.innerHTML = `<iframe src="${officeSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
+            downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
+            return;
+        }
+
+        // PDF: try direct, else Google viewer fallback
+        if (ext === 'pdf' || (!hasExt && !fileId)) {
+            const iframe = document.createElement('iframe');
+            iframe.width = '100%';
+            iframe.height = '100%';
+            iframe.style.border = 'none';
+            iframe.src = fileUrl;
+
+            let loaded = false;
+            const fallbackTimer = setTimeout(() => {
+                if (!loaded) {
+                    const googleSrc = `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodedUrl}`;
+                    viewer.innerHTML = `<iframe src="${googleSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
+                }
+            }, 2000);
+
+            iframe.onload = function() { loaded = true; clearTimeout(fallbackTimer); };
+            viewer.innerHTML = '';
+            viewer.appendChild(iframe);
+            downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
+            return;
+        }
+
+        // Default: no inline preview, provide open button
+        viewer.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-file-earmark" style="font-size: 3rem; color: #6c757d;"></i>
+                <h5 class="mt-3">File Preview Not Available</h5>
+                <p class="text-muted">This file type cannot be previewed directly in the browser.</p>
+                <button class="btn btn-primary" onclick="window.open('${fileUrl}', '_blank')">Open in New Tab</button>
+            </div>
+        `;
+        downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
+    }, 300);
+}
+</script>
