@@ -1,30 +1,8 @@
 services:
-  nginx:
-    build: 
-      context: ${PROJECT_ROOT}/docker/nginx
-    restart: on-failure:5
-    depends_on:
-      - backend
-    volumes:
-      - ${PROJECT_ROOT}/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ${PROJECT_ROOT}/nginx/SSL:/etc/nginx/SSL
-      - backend_data:/backend_data
-    deploy:
-      resources:
-        limits:
-          cpus: '1.00'
-          memory: 1GB
-        reservations:
-          cpus: '0.50'
-          memory: 512MB
-
   backend:
-    build: 
-      context: ${PROJECT_ROOT}/
-      dockerfile: ${PROJECT_ROOT}/docker/Dockerfile 
+    image: agent-service
     restart: on-failure:5
     volumes:
-      - ${PROJECT_ROOT}/:/app
       - backend_data:/backend_data
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-backend_database}
@@ -49,24 +27,6 @@ services:
           devices:
             - driver: nvidia
               capabilities: [gpu]
-
-  frontend:
-    build: 
-      context: ./docker/frontend
-    volumes:
-      - ./frontend:/app
-    restart: on-failure:5
-    environment:
-      - API_HOST=${API_HOST:-backend}
-      - API_PORT=${API_PORT:-8000}
-    deploy:
-      resources:
-        limits:
-          cpus: '1.00'
-          memory: 1GB
-        reservations:
-          cpus: '0.50'
-          memory: 512MB
 
   redis:
     image: redis:latest
@@ -128,6 +88,7 @@ services:
     environment:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+    restart: on-failure:5
     # ports:
       # - "9001:9001"
       # - "9000:9000"
