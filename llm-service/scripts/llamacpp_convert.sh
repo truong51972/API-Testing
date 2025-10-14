@@ -7,11 +7,14 @@ MODEL_NAME="$1"
 # Remove './models/' prefix if present
 MODEL_NAME="${MODEL_NAME#./models/}"
 MODEL_NAME="${MODEL_NAME#/models/}"
+MODEL_NAME="${MODEL_NAME#models/}"
 
 shift
 
 VOLUME_MOUNT="$CURRENT_PATH/models/"
 OUT_TYPE="f16"
+QUANTIZATION_METHOD="q4_k_m"
+DO_QUANTIZATION=false
 
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -23,6 +26,13 @@ while [[ $# -gt 0 ]]; do
             ;;
         --out-type)
             OUT_TYPE="$2"
+            shift
+            ;;
+        --quantize)
+            DO_QUANTIZATION=true
+            ;;  
+        --quantization-method)
+            QUANTIZATION_METHOD="$2"
             shift
             ;;
         *)
@@ -48,13 +58,45 @@ else
         exit 1
     fi
 fi
-
-echo
-echo "---------------------------------------------------------------------"
 echo
 
-docker run --rm -v $VOLUME_MOUNT:/models \
+echo "Converting model '$MODEL_NAME' to gguf format..."
+docker run -u $(id -u):$(id -g) --rm -v $VOLUME_MOUNT:/models \
     ghcr.io/ggml-org/llama.cpp:full \
     --convert /models/$MODEL_NAME \
     --outfile /models/$MODEL_NAME/model.gguf \
-    --outtype $OUT_TYPE
+    --outtype $OUT_TYPE \
+    > /dev/null 2>&1 # Suppress output
+    
+echo "Done!"
+echo
+
+if [ "$DO_QUANTIZATION" = true ]; then
+    echo "Quantizing model '$MODEL_NAME' with method '$QUANTIZATION_METHOD'..."
+    docker run -u $(id -u):$(id -g) --rm -v $VOLUME_MOUNT:/models \
+        ghcr.io/ggml-org/llama.cpp:full \
+        --quantize /models/$MODEL_NAME/model.gguf \
+        /models/$MODEL_NAME/model-$QUANTIZATION_METHOD.bin \
+        $QUANTIZATION_METHOD \
+        10 \
+        > /dev/null 2>&1 # Suppress output
+
+    if [ $? -ne 0 ]; then
+        echo "Quantization failed!"
+        exit 1
+    fi
+    echo "Done!"
+    echo
+
+
+    echo "Replacing original model with quantized model..."
+    rm $VOLUME_MOUNT$MODEL_NAME/model.gguf
+    mv $VOLUME_MOUNT$MODEL_NAME/model-$QUANTIZATION_METHOD.bin $VOLUME_MOUNT$MODEL_NAME/model.gguf
+    echo "Done!"
+    echo
+
+    MODEL_NAME="$MODEL_NAME/model-$QUANTIZATION_METHOD.bin"
+else
+    echo "Converting model '$MODEL_NAME' to gguf format..."
+fi
+
