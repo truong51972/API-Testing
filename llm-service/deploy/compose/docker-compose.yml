@@ -1,21 +1,31 @@
 services:
-  nginx:
-    build: 
-      context: ${PROJECT_ROOT}/docker/nginx
+  llm:
+    image: llm-service
     restart: on-failure:5
-    depends_on:
-      - backend
     volumes:
-      - ${PROJECT_ROOT}/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ${PROJECT_ROOT}/nginx/SSL:/etc/nginx/SSL
+      - backend_data:/backend_data
+      - ${PROJECT_ROOT}/models:/models
+      - ${PROJECT_ROOT}/modelfile:/modelfile
+      - /var/run/docker.sock:/var/run/docker.sock
     deploy:
       resources:
         limits:
-          cpus: '1.00'
-          memory: 1GB
+          cpus: '4.00'
+          memory: 4GB
         reservations:
-          cpus: '0.50'
-          memory: 512MB
+          cpus: '2.00'
+          memory: 2GB
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.llm.rule=PathPrefix(`/llm-service/llm`)"
+      - "traefik.http.routers.llm.entrypoints=api-t"
+      - "traefik.http.services.llm.loadbalancer.server.port=8000"
+    networks:
+      - local_net
+      - gateway_net
 
   ollama:
     image: ollama/ollama
@@ -31,24 +41,23 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
-  cloudflare_tunnel:
-    build: 
-      context: ${PROJECT_ROOT}/docker/cloudflare_tunnel
-    restart: on-failure:5
-    environment:
-      - TUNNEL_TOKEN
-      - NO_AUTOUPDATE
-      - TUNNEL_ORIGIN_KEEPALIVE_TIMEOUT=30s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512MB
-        reservations:
-          cpus: '0.25'
-          memory: 256MB
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ollama.rule=PathPrefix(`/llm-service/ollama`)"
+      - "traefik.http.routers.ollama.entrypoints=api-t"
+      - "traefik.http.middlewares.ollama-stripper.stripprefix.prefixes=/llm-service/ollama"
+      - "traefik.http.routers.ollama.middlewares=ollama-stripper"
+      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
+    networks:
+      - gateway_net
+      - local_net
 
 volumes:
   backend_data:
   ollama:
+
+networks:
+  gateway_net:
+    external: true
+  local_net:
+    driver: bridge

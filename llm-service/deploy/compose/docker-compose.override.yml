@@ -1,12 +1,14 @@
 services:
-  nginx:
+  backend:
+    command: ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0"]
     ports:
-      - "80:80"
-      # - "8000:8000"
-    # volumes:
-    #   - ./.backend_data:/backend_data
-    profiles:
-      - disabled
+      - "8080:8000"
+    volumes:
+      - ${PROJECT_ROOT}/:/app
+    environment:
+      - DEBUG=True
+    # profiles:
+    #   - disabled
 
   ollama:
     ports:

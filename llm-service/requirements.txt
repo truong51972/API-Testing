@@ -1,3 +1,7 @@
+fastapi==0.116.1
+gunicorn==23.0.0
+uvicorn==0.37.0
+
 unsloth==2025.9.1
 unsloth_zoo==2025.9.2
 

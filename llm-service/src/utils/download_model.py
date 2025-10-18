@@ -4,6 +4,7 @@ import subprocess
 
 def from_hf(model_name: str) -> bool:
     result = subprocess.run(f"./scripts/hf_download.sh {model_name}", shell=True)
+    print("Done!\n")
     return result.returncode == 0
 
 

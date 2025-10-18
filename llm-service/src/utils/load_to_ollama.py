@@ -3,7 +3,7 @@ import subprocess
 
 def load_model_to_ollama(model_name: str, modelfile_path: str):
     result = subprocess.run(
-        f"docker exec -it llm-service_ollama ollama create {model_name} -f {modelfile_path}",
+        f"docker exec llm-service_ollama ollama create {model_name} -f {modelfile_path}",
         shell=True,
         check=True,
     )
