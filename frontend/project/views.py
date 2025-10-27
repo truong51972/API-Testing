@@ -36,25 +36,25 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Constants
 DEBUG = True  # Set to False to disable debug prints
-MINIO_ENDPOINT = "minio-api-t.truong51972.id.vn"
+MINIO_ENDPOINT = "minio-api.truong51972.id.vn"
 MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
 MINIO_BUCKET_NAME = "apit-project"
-MINIO_BASE_URL = "http://minio-api-t.truong51972.id.vn"
+MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
+# MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
 
-AGENT_API_BASE_URL = "https://agent-service_api.truong51972.id.vn"
-AI_AGENT_ENDPOINT = f"{AGENT_API_BASE_URL}/api/ai_agent"
-DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/docs-preprocessing"
-SELECT_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/select-fr-info"
-GET_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/get-fr-infos"
-ANNOTATE_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/annotate-fr"
+AGENT_API_BASE_URL = "https://api-t.truong51972.id.vn/"
+DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/docs-preprocessing"
+SELECT_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/select-fr-info"
+GET_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/get-fr-infos"
+ANNOTATE_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/annotate-fr"
 
-PREPROCESSED_DOCUMENTS_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/all/"
-PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}/api/document/delete/"
+PREPROCESSED_DOCUMENTS_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/all/"
+PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/delete/"
 
 # Project API endpoints
-PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}/api/project/create"
-PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/api/project/all"
+PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/project/create"
+PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/project/all"
 
 # API Status Configuration
 API_STATUS_CACHE_TIMEOUT = 60  # seconds - Cache for 30 seconds as requested
@@ -310,7 +310,7 @@ def check_api_server_status():
     try:
         # Try to connect to the API server with a simple health check
         # Use the health check endpoint for proper status checking
-        test_url = f"{AGENT_API_BASE_URL}/api/common/health"
+        test_url = f"{AGENT_API_BASE_URL}/agent-service/agent/api/common/health"
         headers = {'accept': 'application/json'}
 
         if DEBUG:

@@ -43,9 +43,19 @@
                     <div class="mt-2 small text-muted">Đang xử lý...</div>
                 </div>
             </div>
-            <!-- Notification Container -->
+            <!-- Global Notification Container -->
+            <div id="global-notification-container" class="notification-container"></div>
+            
+            <!-- Django Messages Container - Hidden by default, will be converted to notifications -->
             {% if messages %}
-            <div id="notification-container" class="notification-container"></div>
+            <div id="django-messages-container" style="display: none;">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert" data-message-id="{{ forloop.counter }}">
+                    <i class="bi bi-info-circle me-2"></i>{{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
             {% endif %}
 
 
@@ -81,17 +91,112 @@
             }
         };
 
-        // Simple notification system
+        // Enhanced notification system
         document.addEventListener('DOMContentLoaded', function() {
-            // Basic notification functionality
-            window.showNotification = function(type, title, message = '') {
-                // Simple alert for now - can be enhanced later
-                if (type === 'error') {
-                    console.error(title + ': ' + message);
-                } else {
-                    console.log(title + ': ' + message);
+            // Clear any old notifications from localStorage
+            const lastCleared = localStorage.getItem('notifications_last_cleared');
+            const now = Date.now();
+            if (!lastCleared || (now - parseInt(lastCleared)) > 300000) { // 5 minutes
+                localStorage.removeItem('messages_displayed');
+                localStorage.setItem('notifications_last_cleared', now.toString());
+            }
+
+            // Enhanced notification functionality
+            window.showNotification = function(type, title, message = '', options = {}) {
+                const container = document.getElementById('global-notification-container');
+                if (!container) return;
+
+                // Map types to Bootstrap classes
+                const typeMap = {
+                    'success': 'success',
+                    'error': 'danger', 
+                    'warning': 'warning',
+                    'info': 'info',
+                    'danger': 'danger'
+                };
+
+                const alertClass = typeMap[type] || 'info';
+                const iconMap = {
+                    'success': 'check-circle',
+                    'error': 'exclamation-triangle',
+                    'warning': 'exclamation-triangle', 
+                    'info': 'info-circle',
+                    'danger': 'exclamation-triangle'
+                };
+                const icon = iconMap[type] || 'info-circle';
+
+                // Create unique ID for this notification
+                const notificationId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                const notificationHtml = `
+                    <div class="notification ${alertClass}" id="${notificationId}">
+                        <div class="notification-icon">
+                            <i class="bi bi-${icon}"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">${title}</div>
+                            ${message ? `<div class="notification-message">${message}</div>` : ''}
+                        </div>
+                        <button class="notification-close" onclick="removeNotification('${notificationId}')">
+                            <i class="bi bi-x"></i>
+                        </button>
+                        <div class="notification-progress"></div>
+                    </div>
+                `;
+
+                container.insertAdjacentHTML('beforeend', notificationHtml);
+
+                // Auto remove after timeout (default 3 seconds)
+                const timeout = options.timeout || 3000;
+                setTimeout(() => {
+                    removeNotification(notificationId);
+                }, timeout);
+            };
+
+            // Function to remove notification
+            window.removeNotification = function(notificationId) {
+                const notification = document.getElementById(notificationId);
+                if (notification) {
+                    // Stop progress bar animation
+                    const progressBar = notification.querySelector('.notification-progress');
+                    if (progressBar) {
+                        progressBar.style.animationPlayState = 'paused';
+                    }
+                    
+                    notification.classList.add('removing');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
                 }
             };
+
+            // Clear all notifications
+            window.clearAllNotifications = function() {
+                const container = document.getElementById('global-notification-container');
+                if (container) {
+                    container.innerHTML = '';
+                }
+            };
+
+            // Convert Django messages to notifications
+            const djangoMessagesContainer = document.getElementById('django-messages-container');
+            if (djangoMessagesContainer) {
+                const messages = djangoMessagesContainer.querySelectorAll('.alert');
+                messages.forEach((message, index) => {
+                    const messageText = message.textContent.trim();
+                    const messageType = message.classList.contains('alert-success') ? 'success' :
+                                      message.classList.contains('alert-danger') ? 'error' :
+                                      message.classList.contains('alert-warning') ? 'warning' :
+                                      message.classList.contains('alert-info') ? 'info' : 'info';
+                    
+                    // Show notification with slight delay to avoid overlap
+                    setTimeout(() => {
+                        showNotification(messageType, '', messageText, { timeout: 3000 });
+                    }, index * 200);
+                });
+            }
         });
 
 

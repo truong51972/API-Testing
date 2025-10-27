@@ -24,7 +24,7 @@ document.getElementById('linkUploadForm').addEventListener('submit', function(e)
 
     if (!linkInput.value.trim()) {
         e.preventDefault();
-        showAlert('warning', 'Cảnh báo', 'Vui lòng nhập URL hợp lệ');
+        showNotification('warning', 'Cảnh báo', 'Vui lòng nhập URL hợp lệ');
         return;
     }
 
@@ -72,13 +72,13 @@ function nextStep() {
             setStep(3);
             loadSections();
         } else {
-            showAlert('warning', 'Cảnh báo', 'Vui lòng chờ AI xử lý hoàn thành.');
+            showNotification('warning', 'Cảnh báo', 'Vui lòng chờ AI xử lý hoàn thành.');
         }
     } else if (currentStep === 3) {
         // Check if FR selections are saved
         const saveButton = document.querySelector('button[onclick="saveFRSelections()"]');
         if (saveButton && saveButton.style.display !== 'none') {
-            showAlert('warning', 'Cảnh báo', 'Vui lòng lưu lựa chọn Functional Requirements trước khi tiếp tục.');
+            showNotification('warning', 'Cảnh báo', 'Vui lòng lưu lựa chọn Functional Requirements trước khi tiếp tục.');
         } else {
             setStep(4);
         }
@@ -594,7 +594,7 @@ function saveFRSelections() {
     .then(data => {
         console.log('API response data:', data);
         if (data.success) {
-            showAlert('success', 'Success!', `Đã lưu ${selectedFRs.length} Functional Requirements thành công (${data.updated_count} bản ghi được cập nhật).`);
+            showNotification('success', 'Thành công!', `Đã lưu ${selectedFRs.length} Functional Requirements thành công (${data.updated_count} bản ghi được cập nhật).`);
             // Hide save button and allow proceeding to next step
             document.getElementById('saveFRSelectionContainer').style.display = 'none';
 
@@ -602,12 +602,12 @@ function saveFRSelections() {
             // This prevents unnecessary re-analysis on page refresh
             localStorage.setItem('fr_cache_fresh', Date.now().toString());
         } else {
-            showAlert('danger', 'Error!', data.message || 'Failed to save FR selections.');
+            showNotification('error', 'Lỗi!', data.message || 'Failed to save FR selections.');
         }
     })
     .catch(error => {
         console.error('Error saving FR selections:', error);
-        showAlert('danger', 'Error!', 'Failed to save FR selections.');
+        showNotification('error', 'Lỗi!', 'Failed to save FR selections.');
     })
     .finally(() => {
         button.innerHTML = originalText;
@@ -734,7 +734,7 @@ function toggleFRSelection(frId, select) {
     }
 
     // Show success message
-    showAlert('success', 'FR Updated', `FR has been ${select ? 'selected' : 'deselected'}. Remember to save your selections!`);
+    showNotification('success', 'FR Updated', `FR has been ${select ? 'selected' : 'deselected'}. Remember to save your selections!`);
 }
 
 
@@ -839,7 +839,7 @@ function saveSectionSelection() {
         .map(checkbox => parseInt(checkbox.value));
 
     if (selectedSections.length === 0) {
-        showAlert('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một section');
+        showNotification('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một section');
         return;
     }
 
@@ -862,18 +862,18 @@ function saveSectionSelection() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showAlert('success', 'Thành công!', data.message);
+            showNotification('success', 'Thành công!', data.message);
             // Hide save button and show next step option
             document.getElementById('saveSelectionContainer').style.display = 'none';
             // Enable next button
             document.getElementById('nextButton').disabled = false;
         } else {
-            showAlert('error', 'Lỗi!', data.message);
+            showNotification('error', 'Lỗi!', data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('error', 'Lỗi!', 'Lỗi mạng: ' + error.message);
+        showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + error.message);
     })
     .finally(() => {
         button.innerHTML = originalText;
@@ -945,46 +945,19 @@ function showTestSuiteResult(success, message, data) {
     resultContainer.style.display = 'block';
 }
 
+// Legacy showAlert function - now redirects to showNotification
 function showAlert(type, title, message) {
-    // Map alert types to icons and colors
-    const alertConfig = {
-        'success': { icon: 'check-circle', color: 'success' },
-        'error': { icon: 'exclamation-triangle', color: 'danger' },
-        'warning': { icon: 'exclamation-triangle', color: 'warning' },
-        'info': { icon: 'info-circle', color: 'info' },
-        'danger': { icon: 'exclamation-triangle', color: 'danger' }
+    // Map old alert types to new notification types
+    const typeMap = {
+        'success': 'success',
+        'error': 'error',
+        'warning': 'warning', 
+        'info': 'info',
+        'danger': 'error'
     };
-
-    const config = alertConfig[type] || alertConfig['info'];
     
-    const alertHtml = `
-        <div class="alert alert-${config.color} alert-dismissible fade show" role="alert">
-            <i class="bi bi-${config.icon} me-2"></i>
-            <strong>${title}</strong> ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-
-    // Remove any existing alerts first
-    const existingAlerts = document.querySelectorAll('.alert');
-    existingAlerts.forEach(alert => alert.remove());
-
-    // Insert alert at the top of the current phase
-    const currentPhase = document.querySelector('.phase:not(.d-none)');
-    if (currentPhase) {
-        const cardBody = currentPhase.querySelector('.card-body');
-        if (cardBody) {
-            cardBody.insertAdjacentHTML('afterbegin', alertHtml);
-
-            // Auto dismiss after 5 seconds
-            setTimeout(() => {
-                const alert = cardBody.querySelector('.alert');
-                if (alert) {
-                    alert.remove();
-                }
-            }, 5000);
-        }
-    }
+    const notificationType = typeMap[type] || 'info';
+    showNotification(notificationType, title, message);
 }
 
 // Test API Integration Function
@@ -1125,11 +1098,11 @@ function deletePreprocessedDocument(projectUuid, docId, fallbackUrl, btnEl) {
             }
             // Update sections if on step 3
             try { loadSections(); } catch (e) {}
-            showAlert('success', 'Đã xóa!', data.message || 'Tài liệu đã được xóa thành công.');
+            showNotification('success', 'Đã xóa!', data.message || 'Tài liệu đã được xóa thành công.');
             // Refresh back to step 1 after successful deletion
             window.location.href = `/project/{{ project.uuid }}/?step=1`;
         } else {
-            showAlert('error', 'Lỗi!', data.message || 'Không thể xóa tài liệu.');
+            showNotification('error', 'Lỗi!', data.message || 'Không thể xóa tài liệu.');
             if (btnEl) {
                 btnEl.disabled = false;
                 btnEl.classList.remove('disabled');
@@ -1141,7 +1114,7 @@ function deletePreprocessedDocument(projectUuid, docId, fallbackUrl, btnEl) {
     })
     .catch(err => {
         console.error('Delete error:', err);
-        showAlert('error', 'Lỗi!', 'Lỗi mạng: ' + (err?.message || err));
+        showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + (err?.message || err));
         if (btnEl) {
             btnEl.disabled = false;
             btnEl.classList.remove('disabled');
@@ -1184,13 +1157,13 @@ function viewDocument(fileId, filename, link) {
     let fileUrl;
 
     if (fileId) {
-        const minioBaseUrl = "https://minio-api-t.truong51972.id.vn";
+        const minioBaseUrl = "https://minio-api.truong51972.id.vn";
         const bucketName = "apit-project";
         fileUrl = `${minioBaseUrl}/${bucketName}/${fileId}`;
     } else if (link) {
         fileUrl = link;
     } else {
-        showAlert('warning', 'Cảnh báo', 'File không khả dụng để xem');
+        showNotification('warning', 'Cảnh báo', 'File không khả dụng để xem');
         return;
     }
 

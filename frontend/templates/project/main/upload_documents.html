@@ -5,6 +5,9 @@
 </div>
 <div class="card-body" style="padding-block-start: 10px;">
 
+    <!-- Django Messages sẽ được hiển thị ở base.html -->
+    <!-- Không cần container riêng cho upload messages -->
+
     <!-- Form Upload File -->
     <form id="uploadForm" method="post" enctype="multipart/form-data" style="display:none;">
     {% csrf_token %}
