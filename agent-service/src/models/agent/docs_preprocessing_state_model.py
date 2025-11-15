@@ -40,6 +40,8 @@ class DocsPreProcessingStateModel(BaseModel):
             "example": {
                 "doc_url": "https://example.com/document.pdf",
                 "project_id": "00000000-0000-0000-0000-000000000000",
+                "doc_name": "Sample Document",
+                "lang": "en",
             }
         }
     )
