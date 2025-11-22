@@ -67,7 +67,7 @@ class DocumentContentRepository(SQLModel, table=True):
         data: List["DocumentContentRepository"],
     ) -> List["DocumentContentRepository"]:
 
-        embedding = BaseEmbeddingService().get_embedding()
+        embedding = BaseEmbeddingService()
 
         vectors = embedding.embed_documents([item.text for item in data])
 

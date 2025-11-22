@@ -45,7 +45,6 @@ class DocumentMetadataRepository(SQLModel, table=True):
     raw_doc_path: str = Field(
         default_factory=str,
         min_length=3,
-        max_length=512,
         description="document name",
     )
 

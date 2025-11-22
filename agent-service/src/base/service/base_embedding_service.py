@@ -6,37 +6,29 @@ from pydantic import Field, model_validator
 
 from src.base.service.base_multi_api_tokens import BaseMultiApiTokens
 from src.enums.enums import ModelTypeEnum
-from src.settings import GOOGLE_API_KEYS
 
 
-class BaseEmbeddingService(BaseMultiApiTokens):
-    embedding_model: str = Field(
-        default="gemini-embedding-001", min_length=5, max_length=100
-    )
+class BaseEmbeddingService(GoogleGenerativeAIEmbeddings):
+    model: str = Field(default="gemini-embedding-001", min_length=5, max_length=100)
 
     embedding_dim: Optional[int] = Field(
         default=None,
         ge=1,
-        description="The dimension of the embeddings, set after initialization if get_embedding_dim is True.",
+        description="The dimension of the embeddings",
     )
-    model_type: str = ModelTypeEnum.embedding.value
 
     @model_validator(mode="after")
     def __after_init(self):
-        model_params = {
-            "model": self.embedding_model,
-            "transport": "rest",
-        }
-
-        self._embeddings = []
-
-        for google_api_key in GOOGLE_API_KEYS:
-            _model_params = model_params.copy()
-            _model_params["google_api_key"] = google_api_key
-
-            self._embeddings.append(GoogleGenerativeAIEmbeddings(**_model_params))
-
         return self
 
-    def get_embedding(self) -> GoogleGenerativeAIEmbeddings:
-        return self._embeddings[self._get_next_model_index()]
+    def embed_query(self, text: str) -> list[float]:
+        embedding = super().embed_query(text, output_dimensionality=self.embedding_dim)
+
+        return embedding
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        embeddings = super().embed_documents(
+            texts, output_dimensionality=self.embedding_dim
+        )
+
+        return embeddings
