@@ -8,7 +8,10 @@ from src.graph.nodes.docs_preprocessing.stopword_removal import StopWordRemovalN
 from src.graph.nodes.docs_preprocessing.document_normalization import (
     DocumentNormalizationNode,
 )
-from src.graph.nodes.docs_preprocessing.document_processing import (
-    DocumentProcessingNode,
+from src.graph.nodes.docs_preprocessing.document_chunking import (
+    DocumentChunkingNode,
 )
 from src.graph.nodes.docs_preprocessing.fr_annotation import FrAnnotationNode
+from src.graph.nodes.docs_preprocessing.document_description import (
+    DocumentDescriptionNode,
+)

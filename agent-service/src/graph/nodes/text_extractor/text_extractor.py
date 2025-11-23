@@ -9,7 +9,7 @@ from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
 )
 from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import model_validator, validate_call
 
@@ -90,7 +90,6 @@ class TextExtractorNode(BaseAgentService):
         if not doc_url.startswith("http"):
             doc_url = "data/" + doc_url
         lang = state.lang.value
-        doc_name = state.doc_name
 
         text, doc_name = self.__extract(doc_url)
 
@@ -100,13 +99,11 @@ class TextExtractorNode(BaseAgentService):
             )
             text = self.__fix_orc_split_text(text, lang)
 
-        result = {"messages": [AIMessage(content=text)]}
+        state.extra_parameters["extracted_text"] = text
+        state.last_extra_parameter = "extracted_text"
+        state.doc_name = doc_name if not state.doc_name else state.doc_name
 
-        # add doc_name if state has no doc_name
-        if not doc_name:
-            result["doc_name"] = doc_name
-
-        return result
+        return state
 
 
 if __name__ == "__main__":

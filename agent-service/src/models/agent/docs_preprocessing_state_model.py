@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, Any
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -33,6 +33,16 @@ class DocsPreProcessingStateModel(BaseModel):
     messages: Annotated[List[BaseMessage], add_messages] = Field(
         default_factory=list,
         description="Messages exchanged during the conversation",
+    )
+
+    last_extra_parameter: Optional[str] = Field(
+        default=None,
+        description="The key of the last extra parameter added",
+    )
+
+    extra_parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional parameters for processing",
     )
 
     model_config = ConfigDict(
