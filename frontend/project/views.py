@@ -106,21 +106,11 @@ def call_file_upload_api(file_obj, user=None, project=None):
 
         # Create object name in structure: username/projectname/filename
         # Sử dụng quote để encode URL đúng chuẩn (xử lý khoảng trắng và ký tự đặc biệt)
-        if user and project:
-            # Encode từng phần riêng biệt để giữ nguyên cấu trúc thư mục với dấu "/"
-            username = quote(user.username, safe='')
-            project_name = quote(project.project_name, safe='')
-            file_name = quote(file_obj.name, safe='')
-            object_name = f"{username}/{project_name}/{file_name}"
-        else:
-            # Fallback if no user/project info
-            file_name = file_obj.name
-            file_extension = file_name.split('.')[-1] if '.' in file_name else ''
-            base_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
-            # Encode base_name để xử lý khoảng trắng và ký tự đặc biệt
-            base_name = quote(base_name, safe='')
-            timestamp = str(int(time.time()))
-            object_name = f"{base_name}_{timestamp}.{file_extension}" if file_extension else f"{base_name}_{timestamp}"
+
+        username = user.username
+        project_name = project.project_name
+        file_name = file_obj.name
+        object_name = f"{username}/{project_name}/{file_name}"
 
         # Check and create bucket if not exists
         found = client.bucket_exists(MINIO_BUCKET_NAME)
@@ -472,12 +462,14 @@ def call_docs_preprocessing(doc_url, project_id, doc_name=None):
             from urllib.parse import urlparse, unquote
             parsed_url = urlparse(doc_url)
             doc_name = os.path.basename(parsed_url.path)
-            # Decode URL để lấy tên file gốc nếu có
             doc_name = unquote(doc_name)
+        
+        from urllib.parse import quote
+        safe_doc_url = quote(doc_url, safe=':/?#[]@!$&\'()*+,;=')
         
         payload = {
             "doc_name": doc_name,  # Tên file gốc không qua xử lý
-            "doc_url": doc_url,
+            "doc_url": safe_doc_url,  # URL đã safe
             "lang": "en",
             "project_id": str(project_id),
         }
