@@ -78,6 +78,10 @@ class DocumentCollector(BaseAgentService):
                             top_k=1,
                         )
 
+                    # remove first line if it contains the heading
+                    if content and content[0].text.startswith(heading):
+                        content[0].text = content[0].text[len(heading) :].strip()
+
                     collected_documents += f"{content[0].text}\n"
 
         state.extra_parameters["collected_documents"] = collected_documents
