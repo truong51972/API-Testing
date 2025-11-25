@@ -60,7 +60,7 @@ PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/project/al
 # API Status Configuration
 API_STATUS_CACHE_TIMEOUT = 60  # seconds - Cache for 30 seconds as requested
 API_CONNECTION_TIMEOUT = 5     # seconds - Reduced for faster response
-API_REQUEST_TIMEOUT = 300       # seconds
+API_REQUEST_TIMEOUT = 500       # seconds
 
 # Global variable to cache API status
 _api_status_cache = {
@@ -818,7 +818,7 @@ def project_add(request):
                     description=description
                 )
                 messages.success(request, f"Dự án đã được tạo thành công. ID dự án: {local_project.uuid}")
-                return redirect('project_list')
+                return redirect('project_detail_by_uuid', project_uuid=local_project.uuid)
             else:
                 messages.error(request, f"Không thể tạo dự án qua API: {response.text}")
                 return render(request, 'project/project_add.html')
