@@ -1,5 +1,6 @@
 import hashlib
 import inspect
+import logging
 import pickle
 from functools import wraps
 
@@ -28,10 +29,10 @@ def __make_cache_key(func, args, kwargs):
     return key_hash
 
 
-def cache_func_wrapper(func=None, *, ex=300):
+def cache_func_wrapper(func=None, *, ex=3600):
     """
     Decorator to cache function results in Redis using a key generated from function source and arguments.
-    ex: expiration time in seconds (default 300s = 5 minutes)
+    ex: expiration time in seconds (default 3600s = 1 hour)
     """
 
     def decorator(inner_func):
@@ -44,6 +45,7 @@ def cache_func_wrapper(func=None, *, ex=300):
             # Try to get cached result from Redis
             cached_result = redis_client.get(cache_key)
             if cached_result is not None:
+                logging.info(f"Cache hit for key: {cache_key}")
                 # Return cached result if available
                 return pickle.loads(cached_result)
 
