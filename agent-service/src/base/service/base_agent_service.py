@@ -2,6 +2,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
+from langchain.chat_models import init_chat_model
+
 # from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAI
@@ -11,6 +13,7 @@ from pydantic import BaseModel, Field, model_validator, validate_call
 from src.common.common import split_by_size
 from src.enums.enums import LanguageEnum, ModelTypeEnum
 from src.settings import ENVIRONMENT, OLLAMA_BASE_URL
+from src.cache import cache_func_wrapper
 
 
 class BaseAgentService(BaseModel):
@@ -35,6 +38,12 @@ class BaseAgentService(BaseModel):
         description="Top-k sampling for the LLM, controls the number of highest probability tokens to consider.",
     )
 
+    llm_thinking_budget: Optional[int] = Field(
+        default=0,
+        ge=-1,
+        description="Used to disable thinking for supported models (when set to 0) or to constrain the number of tokens used for thinking.\nDynamic thinking (allowing the model to decide how many tokens to use) is enabled when set to -1.",
+    )
+
     tools: Optional[List[object]] = Field(
         default_factory=list, description="List of tools that the agent can use."
     )
@@ -52,12 +61,6 @@ class BaseAgentService(BaseModel):
 
     @model_validator(mode="after")
     def __after_init(self):
-        models = {
-            "gemini": ChatGoogleGenerativeAI,
-            "gemma": GoogleGenerativeAI,
-            "ollama": OllamaLLM,
-        }
-
         model_params = {
             "model": self.llm_model,
             "temperature": self.llm_temperature,
@@ -79,7 +82,11 @@ class BaseAgentService(BaseModel):
 
         elif model_type in ["gemini", "gemma"]:
             _model_params = model_params.copy()
-            llm = models[model_type](**_model_params)
+
+            _model_params["thinking_budget"] = self.llm_thinking_budget
+            _model_params["model"] = "google_genai:" + self.llm_model
+
+            llm = init_chat_model(**_model_params)
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -128,6 +135,7 @@ class BaseAgentService(BaseModel):
         return messages
 
     @validate_call
+    @cache_func_wrapper
     def run(self, human: str, chat_history: List[AnyMessage] = []) -> AIMessage:
         messages = self._get_messages(human, chat_history)
 
