@@ -11,7 +11,7 @@ from src.models import TestcasesGenStateModel
 
 class TestCaseGenerator(BaseAgentService):
     llm_model: str = "vllm-QC-AI"
-    llm_temperature: float = 0.0
+    llm_temperature: float = 0.1
 
     path_to_prompt: dict[LanguageEnum, str] = {
         LanguageEnum.VI: "src/graph/nodes/testcase_generator/prompts/testcase_generator_vi.md",
