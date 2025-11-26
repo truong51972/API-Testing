@@ -8,13 +8,6 @@ from src.models import DocsPreProcessingStateModel
 
 
 class DocsPreprocessingWorkflow(BaseModel):
-    collection_name: str = Field(
-        default="e_commerce_ai", description="Collection name for vector database"
-    )
-    llm_temperature: float = Field(
-        default=0.1, ge=0.0, le=2.0, description="Temperature for LLM generation"
-    )
-
     agent_state: BaseModel = Field(
         default=DocsPreProcessingStateModel,
         description="State of the AI agent, including user input and intent",
