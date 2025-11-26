@@ -2,7 +2,7 @@
   "dependencies": ["./src/", "./src/**/*.txt"],
   "graphs": {
     "docs_preprocessing_workflow": "./src/graph/workflows/.langgraph_dev.py:docs_preprocessing_graph",
-    "simple_qa_workflow": "./src/graph/workflows/.langgraph_dev.py:simple_qa_graph"
+    "testcase_generation_workflow": "./src/graph/workflows/.langgraph_dev.py:testcase_generation_graph"
   },
   "env": ".env"
 }
