@@ -1,6 +1,4 @@
 # src.graph.nodes.testcase_generator.document_preparator
-from typing import Any, Dict
-
 from pydantic import BaseModel, validate_call
 from sqlmodel import Session
 
@@ -33,7 +31,8 @@ class DocumentPreparator(BaseModel):
         for doc_metadata in docs_metadata:
             all_docs_toc += f"Document Name: {doc_metadata.doc_name}\n{doc_metadata.table_of_contents}\n\n"
 
-        state.all_docs_toc = all_docs_toc
+        state.extra_parameters["generated_testcases"] = []
+        state.extra_parameters["all_docs_toc"] = all_docs_toc
         return state
 
 
