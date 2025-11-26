@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.routers import all_routers
-from src.settings import setup_logging
 
-setup_logging()
+from src import settings
+from src.api.routers import all_routers
+
+settings.setup(verbose=True)
 
 app = FastAPI(
     docs_url="/agent-service/agent/api/docs",
