@@ -103,3 +103,19 @@ class DocumentFRInfoRepository(SQLModel, table=True):
                 DocumentFRToContentRepository.delete_by_fr_info_id(fr_info.fr_info_id)
                 session.delete(fr_info)
             session.commit()
+
+    @classmethod
+    def get_all_fr_groups(
+        cls,
+        project_id: str,
+        get_selected: bool = False,
+        session: Optional[Session] = None,
+    ) -> list[str]:
+        session = session or Session(get_db_engine())
+
+        with session:
+            statement = select(cls.fr_group).where(
+                (cls.project_id == project_id) & (cls.is_selected == get_selected)
+            )
+            results = session.exec(statement).all()
+            return results
