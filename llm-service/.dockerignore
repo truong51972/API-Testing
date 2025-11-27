@@ -1,1 +1,4 @@
-models/*
+models
+deploy
+docker
+unsloth_compiled_cache
