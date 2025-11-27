@@ -21,6 +21,7 @@ Thông tin đầu vào được cung cấp theo 4 phần:
 ```json
 {
   "url": "<full_url>",
+  "method": "<http_method>",
   "headers": {
     "<header_name>": "<value>",
     ...

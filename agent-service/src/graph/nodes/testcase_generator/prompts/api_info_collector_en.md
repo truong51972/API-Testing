@@ -21,6 +21,7 @@ Input information is provided in four sections:
 ```json
 {
   "url": "<full_url>",
+  "method": "<http_method>",
   "headers": {
     "<header_name>": "<value>",
     ...
