@@ -97,7 +97,11 @@ class ProjectRepository(SQLModel, table=True):
         """
         session = session or Session(get_db_engine())
         with session:
-            projects = session.exec(select(cls).where(cls.user_id == user_id)).all()
+            projects = session.exec(
+                select(cls)
+                .where(cls.user_id == user_id)
+                .order_by(cls.created_at.desc())
+            ).all()
         return projects
 
     @classmethod
