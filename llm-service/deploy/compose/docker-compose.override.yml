@@ -1,10 +1,11 @@
 services:
-  backend:
-    command: ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0"]
-    ports:
-      - "8080:8000"
+  llm:
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0"]
+    # command: ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0"]
+    # ports:
+    #   - "8080:8000"
     volumes:
-      - ${PROJECT_ROOT}/:/app
+      - .:/app
     environment:
       - DEBUG=True
     # profiles:

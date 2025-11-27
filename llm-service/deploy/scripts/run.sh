@@ -21,12 +21,14 @@ OVERRIDE_FILE="$PROJECT_ROOT/deploy/compose/docker-compose.override.yml"
 TAG="$1"
 
 if [ "$TAG" == "dev" ] && [ -f "$OVERRIDE_FILE" ]; then
+    export ENVIRONMENT="dev"
+
     echo "Run server (dev)"
-    docker compose -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" up -d
+    docker compose -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" --project-directory "$PROJECT_ROOT" up -d
 elif [ "$TAG" == "stop" ]; then
     echo "Stop server"
-    docker compose -f "$COMPOSE_FILE" down
+    docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_ROOT" down
 else
     echo "Run server"
-    docker compose -f "$COMPOSE_FILE" up -d
+    docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_ROOT" up -d
 fi
