@@ -5,7 +5,6 @@ import re
 import threading
 import time
 import uuid
-from urllib.parse import quote
 
 # Third-party imports
 import requests
@@ -17,7 +16,6 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -31,13 +29,13 @@ from testcase_history.models import TestCaseHistory
 from test_suite.models import ProjectTestSuite
 
 from .forms import ProjectDocumentForm
-from .models import DocumentSection, ProjectDocument, UserProject, GeneratedTestCase
+from .models import DocumentSection, ProjectDocument, UserProject
 
 # Disable SSL warnings for development
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Constants
-DEBUG = False  # Set to False to disable debug prints
+DEBUG = True  # Set to False to disable debug prints
 MINIO_ENDPOINT = "minio-api.truong51972.id.vn"
 MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
@@ -46,33 +44,22 @@ MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
 # MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
 
 AGENT_API_BASE_URL = "https://api-t.truong51972.id.vn/"
-DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/docs-preprocessing"
-SELECT_FR_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/select-fr-info"
-GET_FR_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/get-fr-infos"
+DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/docs-preprocessing"
+SELECT_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/select-fr-info"
+GET_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/get-fr-infos"
+ANNOTATE_FR_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/annotate-fr"
 
-# New async test entities endpoints
-GENERATE_TEST_ENTITIES_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/test-entities/generate"
-GET_TEST_SUITES_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/test-entities/test-suites"
-GET_TEST_CASES_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/test-entities/test-cases"
-SELECT_TEST_CASES_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/test-entities/test-cases/select"
-
-# Execute and Report endpoints
-EXECUTE_TEST_SUITE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/execute-and-report/execute"
-GET_TEST_REPORT_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/execute-and-report/report"
-
-# Preprocessed Document API endpoints
 PREPROCESSED_DOCUMENTS_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/all/"
-PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/delete/"
+PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/document/delete/"
 
 # Project API endpoints
-PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/"
-PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/all"
-PROJECT_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/"
+PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/project/create"
+PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}/agent-service/agent/api/project/all"
 
 # API Status Configuration
 API_STATUS_CACHE_TIMEOUT = 60  # seconds - Cache for 30 seconds as requested
 API_CONNECTION_TIMEOUT = 5     # seconds - Reduced for faster response
-API_REQUEST_TIMEOUT = 500       # seconds
+API_REQUEST_TIMEOUT = 60       # seconds
 
 # Global variable to cache API status
 _api_status_cache = {
@@ -117,12 +104,19 @@ def call_file_upload_api(file_obj, user=None, project=None):
         client = get_minio_client()
 
         # Create object name in structure: username/projectname/filename
-        # Sử dụng quote để encode URL đúng chuẩn (xử lý khoảng trắng và ký tự đặc biệt)
-
-        username = user.username
-        project_name = project.project_name
-        file_name = file_obj.name
-        object_name = f"{username}/{project_name}/{file_name}"
+        if user and project:
+            username = user.username.replace(' ', '_')
+            project_name = project.project_name.replace(' ', '_')
+            file_name = file_obj.name.replace(' ', '_')
+            object_name = f"{username}/{project_name}/{file_name}"
+        else:
+            # Fallback if no user/project info
+            file_name = file_obj.name
+            file_extension = file_name.split('.')[-1] if '.' in file_name else ''
+            base_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+            base_name = base_name.replace(' ', '_')
+            timestamp = str(int(time.time()))
+            object_name = f"{base_name}_{timestamp}.{file_extension}" if file_extension else f"{base_name}_{timestamp}"
 
         # Check and create bucket if not exists
         found = client.bucket_exists(MINIO_BUCKET_NAME)
@@ -224,7 +218,6 @@ def download_and_upload_from_url(url, user, project):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36',
             'Accept': '*/*',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
         }
         response = requests.get(url, timeout=60, verify=False, headers=headers, allow_redirects=True)
         response.raise_for_status()
@@ -317,12 +310,8 @@ def check_api_server_status():
     try:
         # Try to connect to the API server with a simple health check
         # Use the health check endpoint for proper status checking
-        test_url = f"{AGENT_API_BASE_URL}/api/v1/common/health"
-        headers = {
-            'accept': 'application/json', 
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
+        test_url = f"{AGENT_API_BASE_URL}/agent-service/agent/api/common/health"
+        headers = {'accept': 'application/json'}
 
         if DEBUG:
             print(f"=== API STATUS CHECK DEBUG ===")
@@ -421,12 +410,6 @@ def call_api_with_retry(url, method='GET', headers=None, json_data=None, max_ret
 
     last_exception = None
 
-    # Ensure headers dict exists and add Authorization header if not present
-    if headers is None:
-        headers = {}
-    if 'Authorization' not in headers:
-        headers['Authorization'] = 'Basic YWRtaW46YWRtaW4='
-
     for attempt in range(max_retries + 1):
         try:
             if DEBUG and attempt > 0:
@@ -436,10 +419,6 @@ def call_api_with_retry(url, method='GET', headers=None, json_data=None, max_ret
                 response = requests.get(url, headers=headers, timeout=API_REQUEST_TIMEOUT, verify=False)
             elif method.upper() == 'POST':
                 response = requests.post(url, headers=headers, json=json_data, timeout=API_REQUEST_TIMEOUT, verify=False)
-            elif method.upper() == 'PUT':
-                response = requests.put(url, headers=headers, json=json_data, timeout=API_REQUEST_TIMEOUT, verify=False)
-            elif method.upper() == 'DELETE':
-                response = requests.delete(url, headers=headers, json=json_data, timeout=API_REQUEST_TIMEOUT, verify=False)
             else:
                 return False, None, f"Unsupported HTTP method: {method}"
 
@@ -473,7 +452,7 @@ def call_api_with_retry(url, method='GET', headers=None, json_data=None, max_ret
     return False, None, f"API call failed after {max_retries + 1} attempts: {str(last_exception)}"
 
 
-def call_docs_preprocessing(doc_url, project_id, doc_name=None):
+def call_docs_preprocessing(doc_url, project_id):
     """Gọi API docs preprocessing với format mới và error handling cải tiến"""
     # Check API server status first
     api_status, error_message = check_api_server_status()
@@ -484,37 +463,15 @@ def call_docs_preprocessing(doc_url, project_id, doc_name=None):
         raise Exception(user_friendly_error)
 
     try:
-        # Sử dụng doc_name gốc nếu được truyền vào, nếu không thì lấy từ URL
-        if not doc_name:
-            from urllib.parse import urlparse, unquote
-            parsed_url = urlparse(doc_url)
-            doc_name = os.path.basename(parsed_url.path)
-            doc_name = unquote(doc_name)
-        
-        from urllib.parse import quote
-        safe_doc_url = quote(doc_url, safe=':/?#[]@!$&\'()*+,;=')
-        
         payload = {
-            "doc_name": doc_name,  # Tên file gốc không qua xử lý
-            "doc_url": safe_doc_url,  # URL đã safe
-            "lang": "en",
-            "project_id": str(project_id),
+            "doc_url": doc_url,
+            "project_id": str(project_id)
         }
-
-        # Debug: In request body
-        if DEBUG:
-            import json
-            print(f"=== DOCS PREPROCESSING REQUEST BODY ===")
-            print(f"Endpoint: {DOCS_PREPROCESSING_ENDPOINT}")
-            print(f"Request Body (JSON):")
-            print(json.dumps(payload, indent=2, ensure_ascii=False))
-            print(f"======================================")
 
         # Gửi POST request với link document
         headers = {
             'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service'
+            'accept': 'application/json'
         }
 
         # Use retry mechanism for API calls
@@ -537,7 +494,6 @@ def call_docs_preprocessing(doc_url, project_id, doc_name=None):
             print(f"=== DOCS PREPROCESSING ERROR ===")
             print(f"Error: {str(e)}")
             print(f"Doc URL: {doc_url}")
-            print(f"Doc Name: {doc_name}")
             print(f"Project ID: {project_id}")
             print(f"===============================")
         raise Exception(f"Lỗi xử lý document: {str(e)}")
@@ -554,9 +510,7 @@ def call_docs_preprocessing_file(file, project_id):
         # Gửi POST request với file
         headers = {
             'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
         if DEBUG:
@@ -678,7 +632,6 @@ def project_list(request):
 
             context = {
                 'projects': [],
-                'paginator': None,
                 'api_count': 0,
                 'api_server_offline': True,
                 'error_message': error_message,
@@ -687,12 +640,14 @@ def project_list(request):
             return render(request, 'project/project_list.html', context)
 
         headers = {
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service'
+            'accept': 'application/json'
         }
 
         # Update endpoint to include user_id
-        user_projects_endpoint = f"{PROJECT_ALL_ENDPOINT}"
+        user_projects_endpoint = f"{PROJECT_ALL_ENDPOINT}/{request.user.id}"
+
+        if DEBUG:
+            print(f"Fetching projects for user ID: {request.user.id} from {user_projects_endpoint}")
 
         # Use retry mechanism for API calls
         success, api_projects, error_msg = call_api_with_retry(
@@ -707,7 +662,6 @@ def project_list(request):
             messages.error(request, f"Không thể tải danh sách dự án: {error_msg}")
             context = {
                 'projects': [],
-                'paginator': None,
                 'api_count': 0,
                 'api_error': True,
                 'error_message': error_msg
@@ -779,14 +733,8 @@ def project_list(request):
                             print(f"Error creating project {project_name}: {str(e)}")
                         continue
 
-        # Pagination: 12 projects per page
-        paginator = Paginator(api_projects, 12)
-        page_number = request.GET.get('page', 1)
-        projects_page = paginator.get_page(page_number)
-
         context = {
-            'projects': projects_page,
-            'paginator': paginator,
+            'projects': api_projects,
             'api_count': len(api_projects),
             'api_server_online': True
         }
@@ -800,7 +748,6 @@ def project_list(request):
         messages.error(request, f"Lỗi hệ thống: {str(e)}")
         context = {
             'projects': [],
-            'paginator': None,
             'api_count': 0,
             'api_error': True,
             'error_message': str(e)
@@ -835,12 +782,10 @@ def project_add(request):
 
             headers = {
                 'Content-Type': 'application/json',
-                'accept': 'application/json',
-                'X-Service-Name': 'agent-service',
-                'Authorization': 'Basic YWRtaW46YWRtaW4='
+                'accept': 'application/json'
             }
 
-            response = requests.put(
+            response = requests.post(
                 PROJECT_CREATE_ENDPOINT,
                 json=payload,
                 headers=headers,
@@ -848,77 +793,17 @@ def project_add(request):
                 verify=False
             )
 
-            if DEBUG:
-                print(f"=== PROJECT ADD API RESPONSE DEBUG ===")
-                print(f"Status Code: {response.status_code}")
-                print(f"Response Headers: {dict(response.headers)}")
-                print(f"Response Text: {response.text}")
-                print(f"=====================================")
-
             if response.status_code == 200:
                 result = response.json()
-                
-                if DEBUG:
-                    print(f"=== PROJECT ADD API RESULT ===")
-                    print(f"API Response JSON:")
-                    print(json.dumps(result, indent=2, ensure_ascii=False))
-                    print(f"=============================")
-                
-                # Check API response format: {"result": {"code": ["0000"], ...}, "data": {"project_id": "..."}}
-                api_result = result.get('result', {})
-                api_code = api_result.get('code', [])
-                
-                # Check if API call was successful
-                if api_code != ['0000']:
-                    error_description = api_result.get('description', 'Unknown error')
-                    messages.error(request, f"API trả về lỗi: {error_description}")
-                    return render(request, 'project/project_add.html')
-                
-                # Get project_id from data field
-                api_data = result.get('data', {})
-                api_project_id = api_data.get('project_id')
-                
-                if not api_project_id:
-                    messages.error(request, "API không trả về project_id. Vui lòng thử lại.")
-                    return render(request, 'project/project_add.html')
-                
-                if DEBUG:
-                    print(f"Project ID from API: {api_project_id}")
-                    print(f"=============================")
-                
-                # Validate UUID format
-                try:
-                    api_project_uuid = uuid.UUID(str(api_project_id))
-                except (ValueError, TypeError) as e:
-                    if DEBUG:
-                        print(f"Invalid UUID format from API: {api_project_id}, error: {str(e)}")
-                    messages.error(request, f"Project ID từ API không hợp lệ: {api_project_id}")
-                    return render(request, 'project/project_add.html')
-                
                 # Also save to local database for sidebar and detail views
-                # Use the UUID from API response instead of generating a new one
                 local_project = UserProject.objects.create(
-                    uuid=api_project_uuid,  # Use UUID from API response
                     user=request.user,
                     project_name=project_name,
                     description=description
                 )
-                
-                if DEBUG:
-                    print(f"=== LOCAL PROJECT CREATED ===")
-                    print(f"Local Project UUID: {local_project.uuid}")
-                    print(f"API Project ID: {api_project_id}")
-                    print(f"Match: {str(local_project.uuid) == str(api_project_id)}")
-                    print(f"============================")
-                
                 messages.success(request, f"Dự án đã được tạo thành công. ID dự án: {local_project.uuid}")
-                return redirect('project_detail_by_uuid', project_uuid=local_project.uuid)
+                return redirect('project_list')
             else:
-                if DEBUG:
-                    print(f"=== PROJECT ADD API ERROR ===")
-                    print(f"Status Code: {response.status_code}")
-                    print(f"Error Response: {response.text}")
-                    print(f"=============================")
                 messages.error(request, f"Không thể tạo dự án qua API: {response.text}")
                 return render(request, 'project/project_add.html')
 
@@ -965,47 +850,21 @@ def project_edit(request, project_uuid):
 
 @set_test_suites_show(True)
 @login_required
-@require_http_methods(["POST"])
 def project_delete(request, project_uuid):
     # This view will handle deleting a project via API
-    if DEBUG:
-        print(f"=== PROJECT DELETE DEBUG ===")
-        print(f"Request Method: {request.method}")
-        print(f"User: {request.user}")
-        print(f"User Authenticated: {request.user.is_authenticated}")
-        print(f"Project UUID: {project_uuid}")
-        print(f"CSRF Token Present: {'csrftoken' in request.COOKIES}")
-        print(f"POST Data: {request.POST}")
-        print(f"Headers: {dict(request.headers)}")
-        print(f"=============================")
-    
     try:
-        delete_url = PROJECT_DELETE_ENDPOINT
+        delete_url = f"{AGENT_API_BASE_URL}/api/project/delete/{project_uuid}"
 
         headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
-        payload = {
-            'project_id': str(project_uuid)
-        }
-
-        response = requests.delete(
+        response = requests.post(
             delete_url,
-            json=payload,
             headers=headers,
             timeout=30,
             verify=False
         )
-
-        if DEBUG:
-            print(f"=== API DELETE RESPONSE ===")
-            print(f"Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
-            print(f"===========================")
 
         if response.status_code == 200:
             # Delete from local database as well
@@ -1156,9 +1015,7 @@ def delete_document(request, doc_id):
         try:
             delete_url = f"{PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT}{doc.doc_id}"
             headers = {
-                'accept': 'application/json',
-                'X-Service-Name': 'agent-service',
-                'Authorization': 'Basic YWRtaW46YWRtaW4='
+                'accept': 'application/json'
             }
             response = requests.post(
                 delete_url,
@@ -1189,9 +1046,7 @@ def delete_preprocessed_document(request, project_uuid, doc_id):
         delete_url = f"{PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT}{doc_id}"
 
         headers = {
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
         response = requests.post(
@@ -1310,13 +1165,9 @@ def start_ai_processing(request, project_uuid):
                     print(f"Final doc_url: {doc_url}")
                     print(f"===========================")
 
-                # Sử dụng tên file gốc không qua xử lý
-                original_doc_name = document.original_filename if hasattr(document, 'original_filename') and document.original_filename else None
-                
                 api_response = call_docs_preprocessing(
                     doc_url=doc_url,
-                    project_id=project.uuid,
-                    doc_name=original_doc_name,
+                    project_id=project.uuid
                 )
 
                 # Lưu API response
@@ -1654,12 +1505,10 @@ def api_create_project(request):
 
         headers = {
             'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
-        response = requests.put(
+        response = requests.post(
             PROJECT_CREATE_ENDPOINT,
             json=payload,
             headers=headers,
@@ -1669,37 +1518,15 @@ def api_create_project(request):
 
         if response.status_code == 200:
             result = response.json()
-            
-            # Check API response format: {"result": {"code": ["0000"], ...}, "data": {"project_id": "..."}}
-            api_result = result.get('result', {})
-            api_code = api_result.get('code', [])
-            
             if DEBUG:
                 print(f"API Create Project Response: {result}")
-                print(f"API Code: {api_code}")
-            
-            # Check if API call was successful
-            if api_code == ['0000']:
-                # Get project_id from data field
-                api_data = result.get('data', {})
-                project_id = api_data.get('project_id', '')
-                
-                if DEBUG:
-                    print(f"Project ID returned by API: {project_id}")
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': api_result.get('description', 'Project created successfully via API'),
-                    'project_id': project_id,
-                    'data': result
-                })
-            else:
-                error_description = api_result.get('description', 'Unknown error')
-                return JsonResponse({
-                    'success': False,
-                    'message': f'API trả về lỗi: {error_description}',
-                    'data': result
-                })
+                print(f"Project ID returned by API: {result.get('project_id', 'N/A')}")
+            return JsonResponse({
+                'success': True,
+                'message': 'Project created successfully via API',
+                'project_id': result.get('project_id', ''),
+                'data': result
+            })
         else:
             error_msg = f"API call failed with status {response.status_code}: {response.text}"
             return JsonResponse({
@@ -1729,160 +1556,46 @@ def api_create_project(request):
         })
 
 @login_required
-@require_http_methods(["POST"])
 def api_get_all_projects(request):
     """Lấy tất cả projects qua API"""
-    if DEBUG:
-        print("=" * 80)
-        print("[DEBUG] api_get_all_projects - START")
-        print(f"[DEBUG] User ID: {request.user.id}")
-        print(f"[DEBUG] User: {request.user.username}")
-    
     try:
         headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
-        # Get pagination parameters from request (GET params or default to 0 for all)
-        page_no = int(request.GET.get('page_no', 0))
-        page_size = int(request.GET.get('page_size', 0))
-
-        request_body = {
-            'user_id': str(request.user.id),
-            'page_no': page_no,
-            'page_size': page_size
-        }
-
-        if DEBUG:
-            print(f"[DEBUG] Endpoint: {PROJECT_ALL_ENDPOINT}")
-            print(f"[DEBUG] Headers: {json.dumps(headers, indent=2, ensure_ascii=False)}")
-            print("-" * 80)
-            print("[DEBUG] ========== REQUEST BODY ==========")
-            print(json.dumps(request_body, indent=2, ensure_ascii=False))
-            print("[DEBUG] ==================================")
-            print("-" * 80)
-            print(f"[DEBUG] Making POST request...")
-
-        response = requests.post(
+        response = requests.get(
             PROJECT_ALL_ENDPOINT,
             headers=headers,
-            json=request_body,
             timeout=30,
             verify=False
         )
 
-        if DEBUG:
-            print("-" * 80)
-            print(f"[DEBUG] Response Status Code: {response.status_code}")
-            print(f"[DEBUG] Response Headers: {json.dumps(dict(response.headers), indent=2, ensure_ascii=False)}")
-            print("-" * 80)
-
         if response.status_code == 200:
-            response_data = response.json()
-            if DEBUG:
-                print("[DEBUG] ========== API RESPONSE ==========")
-                print(json.dumps(response_data, indent=2, ensure_ascii=False))
-                print("[DEBUG] ==================================")
-                print("-" * 80)
-            
-            # Extract data from response structure
-            # Response structure: { "result": {...}, "data": { "projects": [...] } }
-            result_info = response_data.get('result', {})
-            data = response_data.get('data', {})
-            projects = data.get('projects', [])
-            
-            # Check result code
-            result_code = result_info.get('code', [])
-            result_description = result_info.get('description', '')
-            
-            if DEBUG:
-                print("[DEBUG] ========== PARSED RESPONSE ==========")
-                print(f"[DEBUG] Result Code: {result_code}")
-                print(f"[DEBUG] Result Description: {result_description}")
-                print(f"[DEBUG] Number of projects: {len(projects)}")
-                print("[DEBUG] Projects data:")
-                print(json.dumps(projects, indent=2, ensure_ascii=False))
-                print("[DEBUG] =====================================")
-                print("[DEBUG] api_get_all_projects - SUCCESS")
-                print("=" * 80)
-            
-            # Check if API returned success code
-            if result_code and result_code[0] == "0000":
-                return JsonResponse({
-                    'success': True,
-                    'message': result_description or 'Projects retrieved successfully via API',
-                    'projects': projects,
-                    'count': len(projects)
-                })
-            else:
-                # API returned error code
-                error_msg = f"API returned error code: {result_code}, description: {result_description}"
-                if DEBUG:
-                    print(f"[DEBUG] API returned error code!")
-                    print(f"[DEBUG] {error_msg}")
-                    print("=" * 80)
-                
-                return JsonResponse({
-                    'success': False,
-                    'message': error_msg,
-                    'projects': [],
-                    'count': 0
-                })
+            result = response.json()
+            return JsonResponse({
+                'success': True,
+                'message': 'Projects retrieved successfully via API',
+                'projects': result,
+                'count': len(result)
+            })
         else:
             error_msg = f"API call failed with status {response.status_code}: {response.text}"
-            if DEBUG:
-                print("[DEBUG] ========== ERROR RESPONSE ==========")
-                print(f"[DEBUG] Status Code: {response.status_code}")
-                try:
-                    error_response = response.json()
-                    print("[DEBUG] Response JSON:")
-                    print(json.dumps(error_response, indent=2, ensure_ascii=False))
-                except:
-                    print(f"[DEBUG] Response Text: {response.text}")
-                print("[DEBUG] ====================================")
-                print("[DEBUG] api_get_all_projects - FAILED")
-                print("=" * 80)
-            
             return JsonResponse({
                 'success': False,
                 'message': error_msg
             })
 
     except requests.exceptions.Timeout:
-        if DEBUG:
-            print("[DEBUG] Exception: requests.exceptions.Timeout")
-            print("[DEBUG] api_get_all_projects - TIMEOUT")
-            print("=" * 80)
-        
         return JsonResponse({
             'success': False,
             'message': 'API request timeout'
         })
     except requests.exceptions.RequestException as e:
-        if DEBUG:
-            print(f"[DEBUG] Exception: requests.exceptions.RequestException")
-            print(f"[DEBUG] Error: {str(e)}")
-            print(f"[DEBUG] Error Type: {type(e).__name__}")
-            print("[DEBUG] api_get_all_projects - REQUEST EXCEPTION")
-            print("=" * 80)
-        
         return JsonResponse({
             'success': False,
             'message': f'API request failed: {str(e)}'
         })
     except Exception as e:
-        if DEBUG:
-            print(f"[DEBUG] Exception: Unexpected error")
-            print(f"[DEBUG] Error: {str(e)}")
-            print(f"[DEBUG] Error Type: {type(e).__name__}")
-            import traceback
-            print(f"[DEBUG] Traceback:\n{traceback.format_exc()}")
-            print("[DEBUG] api_get_all_projects - UNEXPECTED ERROR")
-            print("=" * 80)
-        
         return JsonResponse({
             'success': False,
             'message': f'Unexpected error: {str(e)}'
@@ -1894,32 +1607,18 @@ def api_delete_project(request, project_id):
     """Xóa project qua API"""
     try:
         # Gọi API xóa project
-        delete_url = PROJECT_DELETE_ENDPOINT
+        delete_url = f"{AGENT_API_BASE_URL}/api/project/delete/{project_id}"
 
         headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
-        payload = {
-            'project_id': str(project_id)
-        }
-
-        response = requests.delete(
+        response = requests.post(
             delete_url,
-            json=payload,
             headers=headers,
             timeout=30,
             verify=False
         )
-
-        if DEBUG:
-            print(f"=== PROJECT DELETE RESPONSE ===")
-            print(f"Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
-            print(f"=============================")
 
         if response.status_code == 200:
             return JsonResponse({
@@ -2069,9 +1768,7 @@ def annotate_fr_view(request, project_uuid):
     
             headers = {
                 'Content-Type': 'application/json',
-                'accept': 'application/json',
-                'X-Service-Name': 'agent-service',
-                'Authorization': 'Basic YWRtaW46YWRtaW4='
+                'accept': 'application/json'
             }
     
             response = requests.post(
@@ -2142,17 +1839,15 @@ def get_fr_infors(request, project_uuid):
                 # Return cached data from DB
                 fr_list = []
                 for fr_obj in existing_frs:
-                    # Only include FRs that start with 'm' (m-fr) instead of 'u' (u-fr)
-                    if fr_obj.fr_group.startswith('m-fr') or fr_obj.fr_group.startswith('m'):
-                        fr_list.append({
-                            'fr_info_id': str(fr_obj.fr_info_id),
-                            'fr_group': fr_obj.fr_group,
-                            'name': fr_obj.fr_group.split(':', 1)[1].strip() if ':' in fr_obj.fr_group else fr_obj.fr_group,
-                            'full_name': fr_obj.fr_group,
-                            'description': fr_obj.description,
-                            'is_selected': fr_obj.is_selected,
-                            'documents': []  # Document locations not stored in DB, could be enhanced later
-                        })
+                    fr_list.append({
+                        'fr_info_id': str(fr_obj.fr_info_id),
+                        'fr_group': fr_obj.fr_group,
+                        'name': fr_obj.fr_group.split(':', 1)[1].strip() if ':' in fr_obj.fr_group else fr_obj.fr_group,
+                        'full_name': fr_obj.fr_group,
+                        'description': fr_obj.description,
+                        'is_selected': fr_obj.is_selected,
+                        'documents': []  # Document locations not stored in DB, could be enhanced later
+                    })
 
                 return JsonResponse({
                     'success': True,
@@ -2169,9 +1864,7 @@ def get_fr_infors(request, project_uuid):
 
         headers = {
             'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
         # Use the get-fr-infos endpoint with analyze parameter
@@ -2230,11 +1923,6 @@ def get_fr_infors(request, project_uuid):
 
                 for fr_item in fr_annotations:
                     fr_group = fr_item.get('fr_group', '')
-                    
-                    # Only process FRs that start with 'm' (m-fr) instead of 'u' (u-fr)
-                    if not (fr_group.startswith('m-fr') or fr_group.startswith('m')):
-                        continue
-                    
                     # For annotate-fr format, we don't have fr_id, so generate one from fr_group
                     fr_info_id_str = fr_item.get('fr_info_id', fr_item.get('fr_id', ''))
 
@@ -2363,9 +2051,7 @@ def select_fr_info(request, project_uuid):
 
         headers = {
             'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
+            'accept': 'application/json'
         }
 
         if DEBUG:
@@ -2428,1249 +2114,5 @@ def select_fr_info(request, project_uuid):
             'message': f'Unexpected error: {str(e)}'
         }, status=500)
 
-
-# Test Case Generation Endpoints
-@login_required
-@require_http_methods(["GET"])
-def check_test_suite_exists(request, project_uuid):
-    """Check if test suite already exists for this project"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Check if test cases exist in database
-        test_cases_count = GeneratedTestCase.objects.filter(project=project).count()
-        
-        if DEBUG:
-            print(f"=== CHECK TEST SUITE EXISTS ===")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Test cases count: {test_cases_count}")
-            print(f"==============================")
-        
-        exists = test_cases_count > 0
-        
-        return JsonResponse({
-            'success': True,
-            'exists': exists,
-            'test_cases_count': test_cases_count,
-            'message': f'Test suite exists with {test_cases_count} test cases' if exists else 'No test suite found'
-        })
-        
-    except Exception as e:
-        if DEBUG:
-            print(f"=== CHECK TEST SUITE EXISTS ERROR ===")
-            print(f"Error: {str(e)}")
-            print(f"====================================")
-        return JsonResponse({
-            'success': False,
-            'exists': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["POST"])
-def generate_test_cases(request, project_uuid):
-    """Generate test cases from selected FRs - requires at least one FR to be selected"""
-    from .models import FunctionalRequirement
-    
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Check if at least one FR is selected
-        selected_frs = FunctionalRequirement.objects.filter(
-            project=project,
-            is_selected=True
-        )
-        
-        if not selected_frs.exists():
-            return JsonResponse({
-                'success': False,
-                'message': 'Vui lòng chọn ít nhất một Functional Requirement (FR) trước khi tạo test cases.'
-            }, status=400)
-        
-        # Get request body for lang parameter (default to 'en')
-        data = json.loads(request.body) if request.body else {}
-        lang = data.get('lang', 'en')
-        
-        # Prepare payload according to API specification
-        payload = {
-            'lang': lang,
-            'project_id': str(project.uuid)
-        }
-
-        headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service'
-        }
-
-        if DEBUG:
-            print(f"=== GENERATE TEST CASES (ASYNC) ===")
-            print(f"Endpoint: {GENERATE_TEST_ENTITIES_ENDPOINT}")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Payload: {payload}")
-            print(f"Selected FRs count: {selected_frs.count()}")
-            print(f"===========================")
-
-        # Call async API endpoint - it will return immediately with "Work in progress!"
-        success, response_data, error_msg = call_api_with_retry(
-            url=GENERATE_TEST_ENTITIES_ENDPOINT,
-            method='POST',
-            headers=headers,
-            json_data=payload,
-            max_retries=2,
-            retry_delay=2
-        )
-
-        if DEBUG:
-            print(f"=== GENERATE TEST CASES RESPONSE ===")
-            print(f"Success: {success}")
-            if success:
-                print(f"Response Data: {response_data}")
-            else:
-                print(f"Error: {error_msg}")
-            print(f"================================")
-        
-        if success:
-            # Set session start time for status tracking
-            import time as time_module
-            cache_key = f'test_case_gen_start_{project_uuid}'
-            request.session[cache_key] = time_module.time()
-            request.session.save()
-            
-            # Check response - should have "Work in progress!" message
-            if response_data and response_data.get('result', {}).get('description') == 'Work in progress!':
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Đang xử lý tạo test cases bất đồng bộ. Vui lòng đợi...',
-                    'selected_frs_count': selected_frs.count()
-                })
-            else:
-                return JsonResponse({
-                    'success': True,
-                    'message': 'Test case generation đã được khởi động',
-                    'selected_frs_count': selected_frs.count()
-                })
-        else:
-            return JsonResponse({
-                'success': False,
-                'message': f'Không thể khởi động tạo test cases: {error_msg}'
-            }, status=500)
-        
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'message': 'Invalid JSON data in request'
-        }, status=400)
-    except Exception as e:
-        if DEBUG:
-            print(f"=== GENERATE TEST CASES ERROR ===")
-            print(f"Error: {str(e)}")
-            print(f"Error type: {type(e)}")
-            print(f"================================")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-def fetch_and_save_test_cases_from_api(project):
-    """Fetch test suites and test cases from API and save to database"""
-    try:
-        # First, get test suites for this project
-        headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
-        
-        test_suites_url = f"{GET_TEST_SUITES_ENDPOINT}/{str(project.uuid)}"
-        
-        if DEBUG:
-            print(f"=== FETCHING TEST SUITES ===")
-            print(f"URL: {test_suites_url}")
-            print(f"============================")
-        
-        response = requests.get(test_suites_url, headers=headers, timeout=30, verify=False)
-        
-        if response.status_code != 200:
-            if DEBUG:
-                print(f"Failed to fetch test suites: {response.status_code} - {response.text}")
-            return False, f"Failed to fetch test suites: {response.status_code}"
-        
-        response_data = response.json()
-        
-        if DEBUG:
-            print(f"=== TEST SUITES RESPONSE ===")
-            print(f"Response: {response_data}")
-            print(f"============================")
-        
-        # Check if response is successful
-        result = response_data.get('result', {})
-        if result.get('code', []) != ['0000']:
-            return False, f"API returned error: {result.get('description', 'Unknown error')}"
-        
-        # Get test suites
-        data = response_data.get('data', {})
-        test_suites = data.get('test_suites', [])
-        
-        if not test_suites:
-            # No test suites yet
-            return False, None
-        
-        # Delete existing test cases for this project (if regenerating)
-        GeneratedTestCase.objects.filter(project=project).delete()
-        
-        saved_count = 0
-        
-        # Fetch test cases for each test suite
-        for test_suite in test_suites:
-            test_suite_id = test_suite.get('test_suite_id')
-            if not test_suite_id:
-                continue
-            
-            # Get or create ProjectTestSuite and save test_suite_id from API
-            test_suite_name = test_suite.get('test_suite_name', f'Test Suite {test_suite_id}')
-            test_suite_obj, created = ProjectTestSuite.objects.get_or_create(
-                project=project,
-                api_test_suite_id=test_suite_id,
-                defaults={
-                    'test_suite_name': test_suite_name,
-                    'description': test_suite.get('description', '')
-                }
-            )
-            
-            # Update api_test_suite_id if it wasn't set
-            if not test_suite_obj.api_test_suite_id:
-                test_suite_obj.api_test_suite_id = test_suite_id
-                test_suite_obj.save()
-            
-            if DEBUG:
-                print(f"=== TEST SUITE OBJECT ===")
-                print(f"Test Suite ID (API): {test_suite_id}")
-                print(f"Test Suite UUID (DB): {test_suite_obj.uuid}")
-                print(f"Created: {created}")
-                print(f"=========================")
-            
-            test_cases_url = f"{GET_TEST_CASES_ENDPOINT}/{test_suite_id}"
-            
-            if DEBUG:
-                print(f"=== FETCHING TEST CASES FOR SUITE ===")
-                print(f"Test Suite ID: {test_suite_id}")
-                print(f"URL: {test_cases_url}")
-                print(f"=====================================")
-            
-            test_cases_response = requests.get(test_cases_url, headers=headers, timeout=30, verify=False)
-            
-            if test_cases_response.status_code != 200:
-                if DEBUG:
-                    print(f"Failed to fetch test cases for suite {test_suite_id}: {test_cases_response.status_code}")
-                continue
-            
-            test_cases_data = test_cases_response.json()
-            
-            # Check if response is successful
-            test_cases_result = test_cases_data.get('result', {})
-            if test_cases_result.get('code', []) != ['0000']:
-                if DEBUG:
-                    print(f"API returned error for test cases: {test_cases_result.get('description', 'Unknown error')}")
-                continue
-            
-            # Get test cases
-            test_cases_info = test_cases_data.get('data', {})
-            test_cases_list = test_cases_info.get('test_cases', [])
-            
-            # Save test cases to database
-            for test_case in test_cases_list:
-                api_info = test_case.get('api_info', {})
-                request_body = test_case.get('request_body', {})
-                expected_output = test_case.get('expected_output', {})
-                test_case_type = test_case.get('test_case_type', 'basic_validation')
-                
-                # Determine HTTP method from api_info
-                http_method = api_info.get('method', 'GET')
-                
-                # Get URL from api_info
-                request_url = api_info.get('url', '')
-                
-                # Get headers from api_info
-                request_headers = api_info.get('headers', {})
-                
-                # Get test case ID and name
-                test_case_id = test_case.get('test_case_id', '')
-                test_case_name = test_case.get('test_case', '')
-                
-                # Create test case object
-                test_case_obj = GeneratedTestCase(
-                    project=project,
-                    api_name=request_url,  # Use URL as API name for now
-                    http_method=http_method,
-                    request_url=request_url,
-                    request_headers=request_headers,
-                    test_case_id=test_case_id,
-                    test_case_name=test_case_name,
-                    test_category=test_case_type,
-                    request_body_template=request_body,
-                    request_mapping={},  # Empty mapping as request_body is already the final body
-                    expected_output=expected_output,
-                    test_case_data=test_case
-                )
-                test_case_obj.save()
-                saved_count += 1
-        
-        if DEBUG:
-            print(f"=== SAVED TEST CASES ===")
-            print(f"Total saved: {saved_count}")
-            print(f"=========================")
-        
-        return True, saved_count
-        
-    except Exception as e:
-        if DEBUG:
-            print(f"=== FETCH AND SAVE TEST CASES ERROR ===")
-            print(f"Error: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            print(f"======================================")
-        return False, str(e)
-
-
-@login_required
-@require_http_methods(["GET"])
-def check_test_case_status(request, project_uuid):
-    """Check the status of test case generation with async polling logic"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Check if test cases exist in database
-        test_cases_count = GeneratedTestCase.objects.filter(project=project).count()
-        
-        if DEBUG:
-            print(f"=== CHECK TEST CASE STATUS ===")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Test cases count: {test_cases_count}")
-            print(f"=============================")
-        
-        if test_cases_count > 0:
-            # Test cases have been generated and saved
-            return JsonResponse({
-                'status': 'completed',
-                'message': f'Test case generation completed successfully ({test_cases_count} test cases)',
-                'test_cases_count': test_cases_count,
-                'test_cases': None  # Will be fetched separately
-            })
-        
-        # Still processing - check if generation was started
-        import time as time_module
-        cache_key = f'test_case_gen_start_{project_uuid}'
-        start_time = request.session.get(cache_key)
-        
-        if not start_time:
-            # Generation hasn't started yet
-            return JsonResponse({
-                'status': 'processing',
-                'message': 'Đang khởi tạo quá trình tạo test cases...',
-                'progress': 5
-            })
-        
-        elapsed = time_module.time() - start_time
-        
-        # Wait 1 minute (60 seconds) before starting to poll
-        if elapsed < 60:
-            return JsonResponse({
-                'status': 'processing',
-                'message': f'Đang xử lý... ({int(elapsed)}s / 60s)',
-                'progress': min(int((elapsed / 60) * 50), 50)
-            })
-        
-        # After 1 minute, start polling test-suites endpoint every 5 seconds
-        # Track last fetch time to only fetch every 5 seconds
-        last_fetch_key = f'test_case_last_fetch_{project_uuid}'
-        last_fetch_time = request.session.get(last_fetch_key, 0)
-        
-        # Only fetch if 5 seconds have passed since last fetch
-        if time_module.time() - last_fetch_time < 5:
-            # Still processing, but don't fetch yet
-            polling_elapsed = elapsed - 60  # Time spent polling
-            return JsonResponse({
-                'status': 'processing',
-                'message': f'Đang chờ test suites hoàn thành... ({int(polling_elapsed)}s polling)',
-                'progress': min(50 + int((polling_elapsed / 120) * 45), 95)  # 50-95% range
-            })
-        
-        # Update last fetch time
-        request.session[last_fetch_key] = time_module.time()
-        request.session.save()
-        
-        # Try to fetch test suites and test cases
-        success, result = fetch_and_save_test_cases_from_api(project)
-        
-        if success:
-            # Successfully fetched and saved test cases
-            # Clear session keys
-            if cache_key in request.session:
-                del request.session[cache_key]
-            if last_fetch_key in request.session:
-                del request.session[last_fetch_key]
-            request.session.save()
-            
-            test_cases_count = GeneratedTestCase.objects.filter(project=project).count()
-            return JsonResponse({
-                'status': 'completed',
-                'message': f'Test case generation completed successfully ({test_cases_count} test cases)',
-                'test_cases_count': test_cases_count,
-                'test_cases': None
-            })
-        elif result is None:
-            # No test suites yet - still processing, continue polling
-            # The frontend will call this again in 5 seconds
-            polling_elapsed = elapsed - 60  # Time spent polling
-            return JsonResponse({
-                'status': 'processing',
-                'message': f'Đang chờ test suites hoàn thành... ({int(polling_elapsed)}s polling)',
-                'progress': min(50 + int((polling_elapsed / 120) * 45), 95)  # 50-95% range
-            })
-        else:
-            # Error occurred
-            if DEBUG:
-                print(f"Error fetching test cases: {result}")
-            # Don't clear session keys yet, allow retry
-            return JsonResponse({
-                'status': 'processing',
-                'message': f'Đang thử lại... ({result})',
-                'progress': 90
-            })
-            
-    except Exception as e:
-        if DEBUG:
-            print(f"=== CHECK TEST CASE STATUS ERROR ===")
-            print(f"Error: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            print(f"===================================")
-        return JsonResponse({
-            'status': 'error',
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["GET"])
-def get_test_cases(request, project_uuid):
-    """Get test cases from API by test suite ID"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Get the latest test suite for this project
-        latest_test_suite = ProjectTestSuite.objects.filter(project=project).order_by('-created_at').first()
-        
-        if not latest_test_suite or not latest_test_suite.api_test_suite_id:
-            return JsonResponse({
-                'success': False,
-                'message': 'Không tìm thấy test suite cho project này.'
-            }, status=404)
-        
-        test_suite_id = latest_test_suite.api_test_suite_id
-        
-        if DEBUG:
-            print(f"\n=== GET TEST CASES FROM API ===")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Test Suite ID: {test_suite_id}")
-        
-        # Prepare headers according to API specification
-        headers = {
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
-        
-        # Build API URL
-        test_cases_url = f"{GET_TEST_CASES_ENDPOINT}/{test_suite_id}"
-        
-        if DEBUG:
-            print(f"API URL: {test_cases_url}")
-            print(f"Headers: {headers}")
-        
-        # Call API
-        response = requests.get(test_cases_url, headers=headers, timeout=30, verify=False)
-        
-        if DEBUG:
-            print(f"Response Status: {response.status_code}")
-        
-        if response.status_code != 200:
-            return JsonResponse({
-                'success': False,
-                'message': f'Lỗi khi gọi API: HTTP {response.status_code}'
-            }, status=response.status_code)
-        
-        # Parse response
-        response_data = response.json()
-        
-        if DEBUG:
-            print(f"Response Data: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
-        
-        # Check result code
-        result = response_data.get('result', {})
-        code = result.get('code', [])
-        
-        if code != ['0000']:
-            description = result.get('description', 'Unknown error')
-            return JsonResponse({
-                'success': False,
-                'message': f'API trả về lỗi: {description}'
-            }, status=400)
-        
-        # Extract test cases from response
-        data = response_data.get('data', {})
-        test_cases = data.get('test_cases', [])
-        
-        if DEBUG:
-            print(f"Found {len(test_cases)} test cases in API response")
-        
-        # Format test cases for frontend
-        formatted_test_cases = []
-        
-        for tc in test_cases:
-            # Extract data from API response
-            test_case_id = tc.get('test_case_id', 'N/A')
-            test_case_name = tc.get('test_case', 'N/A')
-            test_case_type = tc.get('test_case_type', 'basic_validation')
-            request_body = tc.get('request_body', {})
-            execute = tc.get('execute', False)
-            tc_id = tc.get('id', '')
-            api_info = tc.get('api_info', {})
-            expected_output = tc.get('expected_output', {})
-            
-            # Extract API info
-            api_url = api_info.get('url', 'N/A')
-            api_method = api_info.get('method', 'N/A')
-            api_headers = api_info.get('headers', {})
-            
-            # Extract expected output
-            expected_statuscode = expected_output.get('statuscode', 'N/A')
-            expected_response = expected_output.get('response_mapping', {})
-            
-            # Format category name
-            category_display = 'Basic Validation' if test_case_type == 'basic_validation' else 'Business Logic'
-            
-            # Format test case ID
-            formatted_test_case_id = f"TC-{test_case_id}" if test_case_id != 'N/A' else 'N/A'
-            
-            formatted_test_cases.append({
-                'test_case_id': formatted_test_case_id,
-                'endpoint': api_url,
-                'header': api_headers,
-                'test_case_name': test_case_name,
-                'test_category': category_display,
-                'request_body': json.dumps(request_body, indent=2, ensure_ascii=False),
-                'expected_statuscode': expected_statuscode,
-                'expected_response': json.dumps(expected_response, indent=2, ensure_ascii=False) if expected_response else 'N/A',
-                'api_name': api_url.split('/')[-1] if api_url != 'N/A' else 'N/A',  # Extract API name from URL
-                'http_method': api_method,
-                'uuid': tc_id,
-                'full_test_case_data': tc,  # Include full test case data from API
-                'is_selected': execute,  # Use execute field as selection state
-                'execute': execute
-            })
-        
-        if DEBUG:
-            print(f"Formatted {len(formatted_test_cases)} test cases")
-            print(f"===========================================\n")
-        
-        # Return as dataframe-like structure
-        return JsonResponse({
-            'success': True,
-            'data': {
-                'columns': ['test_case_id', 'endpoint', 'header', 'test_case_name', 'test_category', 
-                           'request_body', 'expected_statuscode', 'expected_response'],
-                'rows': formatted_test_cases,
-                'count': len(formatted_test_cases)
-            }
-        })
-        
-    except requests.exceptions.RequestException as e:
-        if DEBUG:
-            print(f"=== GET TEST CASES API ERROR ===")
-            print(f"Request Error: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            print(f"===================================")
-        return JsonResponse({
-            'success': False,
-            'message': f'Lỗi kết nối API: {str(e)}'
-        }, status=500)
-    except Exception as e:
-        if DEBUG:
-            print(f"=== GET TEST CASES ERROR ===")
-            print(f"Error: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            print(f"===========================")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["POST"])
-def select_test_cases(request, project_uuid):
-    """Select test cases for execution via API"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Parse request body
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== SELECT TEST CASES - START ===")
-            print(f"{'='*60}")
-            print(f"Request Body (raw): {request.body}")
-        
-        data = json.loads(request.body) if request.body else {}
-        test_case_ids = data.get('test_case_ids', [])
-        execute = data.get('execute', True)
-        
-        if DEBUG:
-            print(f"\n--- Request Parsed ---")
-            print(f"Project UUID: {project_uuid}")
-            print(f"User: {request.user}")
-            print(f"Test Case IDs: {test_case_ids}")
-            print(f"Test Case IDs Count: {len(test_case_ids)}")
-            print(f"Execute Flag: {execute}")
-            print(f"Full Request Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        
-        if not test_case_ids:
-            if DEBUG:
-                print(f"\n--- ERROR: No test case IDs provided ---")
-            return JsonResponse({
-                'success': False,
-                'message': 'Vui lòng chọn ít nhất một test case.'
-            }, status=400)
-        
-        # Warn if execute is False - this might be the issue
-        if not execute:
-            if DEBUG:
-                print(f"\n⚠ WARNING: execute=False was sent!")
-                print(f"  If you want to SELECT test cases for execution, execute should be True")
-                print(f"  execute=False might mean 'deselect' or 'unselect' test cases")
-                print(f"  This might explain why execute field is not being set to True on the server")
-        
-        # Validate and prepare test_case_ids
-        if not isinstance(test_case_ids, list):
-            return JsonResponse({
-                'success': False,
-                'message': 'test_case_ids phải là một array.'
-            }, status=400)
-        
-        # Ensure all test_case_ids are strings (UUIDs)
-        test_case_ids = [str(tc_id) for tc_id in test_case_ids]
-        
-        # Prepare payload according to API specification
-        payload = {
-            'test_case_ids': test_case_ids,
-            'execute': bool(execute)  # Ensure boolean
-        }
-        
-        # Prepare headers according to API specification
-        headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
-        
-        if DEBUG:
-            print(f"\n--- API Call Preparation ---")
-            print(f"Endpoint: {SELECT_TEST_CASES_ENDPOINT}")
-            print(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
-            print(f"Payload Type Check:")
-            print(f"  - test_case_ids type: {type(payload['test_case_ids'])}")
-            print(f"  - test_case_ids length: {len(payload['test_case_ids'])}")
-            print(f"  - execute type: {type(payload['execute'])}")
-            print(f"  - execute value: {payload['execute']}")
-            print(f"Headers: {json.dumps(headers, indent=2, ensure_ascii=False)}")
-        
-        # Call API endpoint
-        response = requests.post(
-            SELECT_TEST_CASES_ENDPOINT,
-            headers=headers,
-            json=payload,
-            timeout=30,
-            verify=False
-        )
-        
-        if DEBUG:
-            print(f"\n--- API Response ---")
-            print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            if DEBUG:
-                print(f"Response Text: {response.text}")
-                print(f"Response Headers: {dict(response.headers)}")
-            return JsonResponse({
-                'success': False,
-                'message': f'Lỗi khi gọi API: HTTP {response.status_code}'
-            }, status=response.status_code)
-        
-        # Parse response
-        try:
-            response_data = response.json()
-        except json.JSONDecodeError:
-            if DEBUG:
-                print(f"ERROR: Response is not valid JSON")
-                print(f"Response Text: {response.text}")
-                print(f"Response Headers: {dict(response.headers)}")
-            return JsonResponse({
-                'success': False,
-                'message': f'API trả về response không hợp lệ: {response.text[:200]}'
-            }, status=500)
-        
-        if DEBUG:
-            print(f"Response Data: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
-            print(f"Response Headers: {dict(response.headers)}")
-            print(f"Full Response Object: Status={response.status_code}, URL={response.url}")
-        
-        # Check result code
-        result = response_data.get('result', {})
-        code = result.get('code', [])
-        
-        if DEBUG:
-            print(f"\n--- Response Processing ---")
-            print(f"Result: {result}")
-            print(f"Code: {code}")
-            print(f"Code == ['0000']: {code == ['0000']}")
-        
-        if code != ['0000']:
-            description = result.get('description', 'Unknown error')
-            if DEBUG:
-                print(f"\n--- API Returned Error Code ---")
-                print(f"Code: {code}")
-                print(f"Description: {description}")
-                print(f"Full Result: {result}")
-                print(f"\n{'='*60}")
-                print(f"=== SELECT TEST CASES - END (ERROR CODE) ===")
-                print(f"{'='*60}\n")
-            return JsonResponse({
-                'success': False,
-                'message': f'API trả về lỗi: {description}'
-            }, status=400)
-        
-        # Extract selected test cases from response
-        data_response = response_data.get('data', {})
-        selected_test_cases = data_response.get('test_cases', [])
-        
-        if DEBUG:
-            print(f"\n--- Success ---")
-            print(f"Selected Test Cases: {selected_test_cases}")
-            print(f"Selected Count: {len(selected_test_cases)}")
-        
-        # Verify: Call get_test_cases API to check if execute was actually set
-        if DEBUG:
-            print(f"\n--- Verifying Execute Status ---")
-        
-        try:
-            # Get test suite ID for verification
-            latest_test_suite = ProjectTestSuite.objects.filter(project=project).order_by('-created_at').first()
-            if latest_test_suite and latest_test_suite.api_test_suite_id:
-                verify_headers = {
-                    'accept': 'application/json',
-                    'X-Service-Name': 'agent-service',
-                    'Authorization': 'Basic YWRtaW46YWRtaW4='
-                }
-                verify_url = f"{GET_TEST_CASES_ENDPOINT}/{latest_test_suite.api_test_suite_id}"
-                
-                if DEBUG:
-                    print(f"Verification URL: {verify_url}")
-                
-                # Wait and retry verification (backend might need time to process async update)
-                import time
-                execute_status_map = {}
-                max_retries = 5  # Try up to 5 times
-                initial_delay = 1.0  # Start with 1 second
-                max_delay = 3.0  # Max 3 seconds between retries
-                
-                for retry in range(max_retries):
-                    if retry > 0:
-                        # Exponential backoff: 1s, 2s, 3s, 3s, 3s
-                        delay = min(initial_delay * retry, max_delay)
-                        if DEBUG:
-                            print(f"  Retry {retry}/{max_retries-1}: Waiting {delay}s before checking...")
-                        time.sleep(delay)
-                    
-                    verify_response = requests.get(verify_url, headers=verify_headers, timeout=30, verify=False)
-                    
-                    if verify_response.status_code == 200:
-                        verify_data = verify_response.json()
-                        verify_result = verify_data.get('result', {})
-                        if verify_result.get('code', []) == ['0000']:
-                            verify_test_cases = verify_data.get('data', {}).get('test_cases', [])
-                            
-                            # Check execute status for selected test cases
-                            execute_status_map = {}
-                            for tc in verify_test_cases:
-                                tc_id = tc.get('id')
-                                tc_execute = tc.get('execute', False)
-                                if tc_id in selected_test_cases:
-                                    execute_status_map[tc_id] = tc_execute
-                            
-                            # Check if all selected test cases have execute=True
-                            all_execute_true = all(execute_status_map.values()) if execute_status_map else False
-                            
-                            if DEBUG:
-                                true_count = sum(1 for v in execute_status_map.values() if v is True)
-                                false_count = sum(1 for v in execute_status_map.values() if v is False)
-                                print(f"  Attempt {retry + 1}: Execute=True: {true_count}, Execute=False: {false_count}")
-                            
-                            # If all are True, we're done
-                            if all_execute_true:
-                                if DEBUG:
-                                    print(f"  ✓ All test cases have execute=True!")
-                                break
-                        else:
-                            if DEBUG:
-                                print(f"  Attempt {retry + 1}: API returned error code")
-                    else:
-                        if DEBUG:
-                            print(f"  Attempt {retry + 1}: HTTP {verify_response.status_code}")
-                
-                if DEBUG:
-                    print(f"\nVerification Results (after {max_retries} attempts):")
-                    print(f"  Total test cases checked: {len(execute_status_map)}")
-                    true_count = sum(1 for v in execute_status_map.values() if v is True)
-                    false_count = sum(1 for v in execute_status_map.values() if v is False)
-                    print(f"  Execute=True: {true_count}")
-                    print(f"  Execute=False: {false_count}")
-                    
-                    if false_count > 0:
-                        print(f"  ⚠ WARNING: {false_count} test case(s) still have execute=False!")
-                        print(f"  This might indicate:")
-                        print(f"    1. Backend API needs more time to process (async)")
-                        print(f"    2. Backend API has a bug")
-                        print(f"    3. Payload format might be incorrect")
-                        for tc_id, exec_status in execute_status_map.items():
-                            if not exec_status:
-                                print(f"    - {tc_id}: execute={exec_status}")
-                
-                # Prepare verification info for response
-                if execute_status_map:
-                    verification_info = {
-                        'verified': True,
-                        'execute_true_count': sum(1 for v in execute_status_map.values() if v is True),
-                        'execute_false_count': sum(1 for v in execute_status_map.values() if v is False),
-                        'execute_status': execute_status_map,
-                        'all_execute_true': all(execute_status_map.values())
-                    }
-                else:
-                    verification_info = {
-                        'verified': False,
-                        'error': 'Failed to verify: Could not retrieve test cases'
-                    }
-                    if DEBUG:
-                        print(f"Verification failed: Could not retrieve test cases")
-            else:
-                verification_info = {
-                    'verified': False,
-                    'error': 'No test suite found for verification'
-                }
-                if DEBUG:
-                    print(f"Verification skipped: No test suite found")
-        except Exception as verify_error:
-            verification_info = {
-                'verified': False,
-                'error': f'Verification error: {str(verify_error)}'
-            }
-            if DEBUG:
-                print(f"Verification error: {verify_error}")
-                import traceback
-                print(traceback.format_exc())
-        
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== SELECT TEST CASES - END (SUCCESS) ===")
-            print(f"{'='*60}\n")
-        
-        # Return success response with verification info
-        return JsonResponse({
-            'success': True,
-            'message': f'Đã chọn {len(selected_test_cases)} test case(s) thành công.',
-            'selected_count': len(selected_test_cases),
-            'selected_test_cases': selected_test_cases,
-            'verification': verification_info if 'verification_info' in locals() else {'verified': False, 'error': 'Verification not performed'},
-            'response': response_data
-        })
-        
-    except json.JSONDecodeError as e:
-        if DEBUG:
-            print(f"\n--- JSON Decode Error ---")
-            print(f"Error: {str(e)}")
-            print(f"Request Body: {request.body}")
-            print(f"\n{'='*60}")
-            print(f"=== SELECT TEST CASES - END (JSON ERROR) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': 'Invalid JSON data in request'
-        }, status=400)
-    except requests.exceptions.RequestException as e:
-        if DEBUG:
-            print(f"\n--- API Request Error ---")
-            print(f"Error: {str(e)}")
-            print(f"\n{'='*60}")
-            print(f"=== SELECT TEST CASES - END (API ERROR) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': f'Lỗi kết nối API: {str(e)}'
-        }, status=500)
-    except Exception as e:
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== SELECT TEST CASES - EXCEPTION ===")
-            print(f"Error Type: {type(e).__name__}")
-            print(f"Error Message: {str(e)}")
-            import traceback
-            print(f"\nFull Traceback:")
-            print(traceback.format_exc())
-            print(f"{'='*60}")
-            print(f"=== SELECT TEST CASES - END (EXCEPTION) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["GET"])
-def get_test_suite_id(request, project_uuid):
-    """Get test suite ID from database for the project"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== GET TEST SUITE ID - START ===")
-            print(f"{'='*60}")
-            print(f"Project UUID: {project_uuid}")
-            print(f"User: {request.user}")
-        
-        # Get the most recent test suite for this project
-        latest_test_suite = ProjectTestSuite.objects.filter(project=project).order_by('-created_at').first()
-        
-        if latest_test_suite:
-            # Ưu tiên dùng api_test_suite_id nếu có, nếu không thì dùng uuid
-            test_suite_id = latest_test_suite.api_test_suite_id or str(latest_test_suite.uuid)
-            if DEBUG:
-                print(f"\n--- Test Suite Found ---")
-                print(f"Test Suite UUID (DB): {latest_test_suite.uuid}")
-                print(f"API Test Suite ID: {latest_test_suite.api_test_suite_id}")
-                print(f"Final Test Suite ID (used): {test_suite_id}")
-                print(f"Test Suite Name: {latest_test_suite.test_suite_name}")
-                print(f"Created At: {latest_test_suite.created_at}")
-                print(f"\n{'='*60}")
-                print(f"=== GET TEST SUITE ID - END (SUCCESS) ===")
-                print(f"{'='*60}\n")
-            return JsonResponse({
-                'success': True,
-                'test_suite_id': test_suite_id,
-                'test_suite_name': latest_test_suite.test_suite_name,
-                'message': 'Đã lấy test_suite_id từ database thành công.'
-            })
-        else:
-            if DEBUG:
-                print(f"\n--- No Test Suite Found ---")
-                print(f"Project has {ProjectTestSuite.objects.filter(project=project).count()} test suites")
-                print(f"\n{'='*60}")
-                print(f"=== GET TEST SUITE ID - END (NOT FOUND) ===")
-                print(f"{'='*60}\n")
-            return JsonResponse({
-                'success': False,
-                'message': 'Không tìm thấy test suite trong database. Vui lòng đảm bảo test cases đã được generate.'
-            }, status=404)
-        
-    except Exception as e:
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== GET TEST SUITE ID - EXCEPTION ===")
-            print(f"Error Type: {type(e).__name__}")
-            print(f"Error Message: {str(e)}")
-            import traceback
-            print(f"\nFull Traceback:")
-            print(traceback.format_exc())
-            print(f"{'='*60}")
-            print(f"=== GET TEST SUITE ID - END (EXCEPTION) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["POST"])
-def execute_test_suite(request, project_uuid):
-    """Execute test suite and return test_suite_report_id"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        # Parse request body
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== EXECUTE TEST SUITE - START ===")
-            print(f"{'='*60}")
-            print(f"Request Body (raw): {request.body}")
-        
-        data = json.loads(request.body) if request.body else {}
-        test_suite_id = data.get('test_suite_id')
-        
-        if DEBUG:
-            print(f"\n--- Request Parsed ---")
-            print(f"Project UUID: {project_uuid}")
-            print(f"User: {request.user}")
-            print(f"Test Suite ID: {test_suite_id}")
-            print(f"Full Request Data: {json.dumps(data, indent=2, ensure_ascii=False)}")
-        
-        if not test_suite_id:
-            if DEBUG:
-                print(f"\n--- ERROR: No test_suite_id provided ---")
-                print(f"\n{'='*60}")
-                print(f"=== EXECUTE TEST SUITE - END (MISSING ID) ===")
-                print(f"{'='*60}\n")
-            return JsonResponse({
-                'success': False,
-                'message': 'test_suite_id là bắt buộc.'
-            }, status=400)
-        
-        # Prepare payload according to API specification
-        payload = {
-            'test_suite_id': test_suite_id
-        }
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
-        
-        if DEBUG:
-            print(f"\n--- API Call Preparation ---")
-            print(f"Endpoint: {EXECUTE_TEST_SUITE_ENDPOINT}")
-            print(f"Payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
-            print(f"Headers: {json.dumps({k: v for k, v in headers.items() if k != 'Authorization'}, indent=2, ensure_ascii=False)}")
-            print(f"Authorization: {'present' if 'Authorization' in headers else 'not present'}")
-        
-        # Call API endpoint
-        success, response_data, error_msg = call_api_with_retry(
-            url=EXECUTE_TEST_SUITE_ENDPOINT,
-            method='POST',
-            headers=headers,
-            json_data=payload,
-            max_retries=2,
-            retry_delay=2
-        )
-        
-        if DEBUG:
-            print(f"\n--- API Response ---")
-            print(f"Success: {success}")
-            if success:
-                print(f"Response Data Type: {type(response_data)}")
-                print(f"Response Data: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
-            else:
-                print(f"Error Message: {error_msg}")
-            print(f"{'='*60}\n")
-        
-        if success:
-            # Extract test_suite_report_id from response
-            # Response format: {"result": {...}, "data": {"test_suite_report_id": "..."}}
-            test_suite_report_id = None
-            data_response = response_data.get('data', {})
-            
-            if DEBUG:
-                print(f"\n--- Extracting test_suite_report_id ---")
-                print(f"Response Data: {response_data}")
-                print(f"Data Response: {data_response}")
-                print(f"Data Response Type: {type(data_response)}")
-                print(f"Full Response Keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'N/A'}")
-            
-            # Check various possible locations for test_suite_report_id
-            if isinstance(data_response, dict):
-                test_suite_report_id = data_response.get('test_suite_report_id')
-                if DEBUG:
-                    print(f"From data_response dict:")
-                    print(f"  - test_suite_report_id: {data_response.get('test_suite_report_id')}")
-                    print(f"  - All keys: {list(data_response.keys()) if isinstance(data_response, dict) else 'N/A'}")
-            elif isinstance(data_response, str):
-                # Sometimes data might be a string ID
-                test_suite_report_id = data_response
-                if DEBUG:
-                    print(f"From data_response string: {test_suite_report_id}")
-            
-            # Also check at root level
-            if not test_suite_report_id:
-                test_suite_report_id = response_data.get('test_suite_report_id')
-                if DEBUG:
-                    print(f"From root level:")
-                    print(f"  - test_suite_report_id: {response_data.get('test_suite_report_id')}")
-            
-            if DEBUG:
-                print(f"\n--- Final test_suite_report_id ---")
-                print(f"Extracted test_suite_report_id: {test_suite_report_id}")
-            
-            if test_suite_report_id:
-                response_json = {
-                    'success': True,
-                    'message': 'Đã khởi động chạy test suite thành công.',
-                    'test_suite_report_id': test_suite_report_id,
-                    'response': response_data
-                }
-                if DEBUG:
-                    print(f"\n--- Response JSON with test_suite_report_id ---")
-                    print(f"Response JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
-                    print(f"\n{'='*60}")
-                    print(f"=== EXECUTE TEST SUITE - END (SUCCESS) ===")
-                    print(f"{'='*60}\n")
-                return JsonResponse(response_json)
-            else:
-                # Try to find test_suite_report_id in other possible locations
-                if 'test_suite_report_id' in response_data:
-                    test_suite_report_id = response_data.get('test_suite_report_id')
-                    if DEBUG:
-                        print(f"\n--- Found test_suite_report_id at root level ---")
-                        print(f"test_suite_report_id: {test_suite_report_id}")
-                    response_json = {
-                        'success': True,
-                        'message': 'Đã khởi động chạy test suite thành công.',
-                        'test_suite_report_id': test_suite_report_id,
-                        'response': response_data
-                    }
-                    if DEBUG:
-                        print(f"\n--- Response JSON with test_suite_report_id (root level) ---")
-                        print(f"Response JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
-                        print(f"\n{'='*60}")
-                        print(f"=== EXECUTE TEST SUITE - END (SUCCESS - ROOT LEVEL) ===")
-                        print(f"{'='*60}\n")
-                    return JsonResponse(response_json)
-                else:
-                    if DEBUG:
-                        print(f"\n--- WARNING: No test_suite_report_id found ---")
-                        print(f"Response structure:")
-                        print(f"  - result: {response_data.get('result', 'N/A')}")
-                        print(f"  - data: {response_data.get('data', 'N/A')}")
-                        print(f"  - All keys: {list(response_data.keys()) if isinstance(response_data, dict) else 'N/A'}")
-                        print(f"\n{'='*60}")
-                        print(f"=== EXECUTE TEST SUITE - END (NO REPORT ID) ===")
-                        print(f"{'='*60}\n")
-                    return JsonResponse({
-                        'success': False,
-                        'message': 'Không tìm thấy test_suite_report_id trong response.',
-                        'response': response_data
-                    }, status=400)
-        else:
-            if DEBUG:
-                print(f"\n--- API Call Failed ---")
-                print(f"Error Message: {error_msg}")
-                print(f"\n{'='*60}")
-                print(f"=== EXECUTE TEST SUITE - END (API FAILED) ===")
-                print(f"{'='*60}\n")
-            return JsonResponse({
-                'success': False,
-                'message': f'Không thể chạy test suite: {error_msg}'
-            }, status=500)
-        
-    except json.JSONDecodeError as e:
-        if DEBUG:
-            print(f"\n--- JSON Decode Error ---")
-            print(f"Error: {str(e)}")
-            print(f"Request Body: {request.body}")
-            print(f"\n{'='*60}")
-            print(f"=== EXECUTE TEST SUITE - END (JSON ERROR) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': 'Invalid JSON data in request'
-        }, status=400)
-    except Exception as e:
-        if DEBUG:
-            print(f"\n{'='*60}")
-            print(f"=== EXECUTE TEST SUITE - EXCEPTION ===")
-            print(f"Error Type: {type(e).__name__}")
-            print(f"Error Message: {str(e)}")
-            import traceback
-            print(f"\nFull Traceback:")
-            print(traceback.format_exc())
-            print(f"{'='*60}")
-            print(f"=== EXECUTE TEST SUITE - END (EXCEPTION) ===")
-            print(f"{'='*60}\n")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
-
-
-@login_required
-@require_http_methods(["GET"])
-def get_test_report(request, project_uuid, test_suite_report_id):
-    """Get test suite report by test_suite_report_id"""
-    project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
-    
-    try:
-        if DEBUG:
-            print(f"=== GET TEST REPORT ===")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Test Suite Report ID: {test_suite_report_id}")
-            print(f"========================")
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'accept': 'application/json',
-            'X-Service-Name': 'agent-service',
-            'Authorization': 'Basic YWRtaW46YWRtaW4='
-        }
-        
-        # Call API endpoint
-        url = f"{GET_TEST_REPORT_ENDPOINT}/{test_suite_report_id}"
-        success, response_data, error_msg = call_api_with_retry(
-            url=url,
-            method='GET',
-            headers=headers,
-            max_retries=2,
-            retry_delay=2
-        )
-        
-        if DEBUG:
-            print(f"=== GET TEST REPORT RESPONSE ===")
-            print(f"Success: {success}")
-            if success:
-                print(f"Response Data: {response_data}")
-            else:
-                print(f"Error: {error_msg}")
-            print(f"================================")
-        
-        if success:
-            return JsonResponse({
-                'success': True,
-                'message': 'Đã lấy report thành công.',
-                'data': response_data.get('data', {}),
-                'result': response_data.get('result', {}),
-                'response': response_data
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'message': f'Không thể lấy report: {error_msg}'
-            }, status=500)
-        
-    except Exception as e:
-        if DEBUG:
-            print(f"=== GET TEST REPORT ERROR ===")
-            print(f"Error: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            print(f"============================")
-        return JsonResponse({
-            'success': False,
-            'message': f'Unexpected error: {str(e)}'
-        }, status=500)
+        return render(request, 'project/main/section_selection.html', context)
 

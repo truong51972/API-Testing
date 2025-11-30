@@ -3,154 +3,21 @@
 <div class="card-header bg-info text-white">
     <h5 class="mb-0">🤖 AI Test Case Generation</h5>
 </div>
-<div class="card-body">
-    <!-- AI Processing State -->
-    <div id="testCaseProcessingContainer" class="text-center">
-        <div class="mb-3">
-            <i class="bi bi-robot" style="font-size: 3rem; color: #0dcaf0;"></i>
-        </div>
-        <h4 id="testCaseStatusText">Starting to generate Test Cases...</h4>
-        <div class="progress mb-3" style="height: 20px;">
-            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
-                 id="testCaseProgressBar" role="progressbar" style="width: 0%">
-            </div>
-        </div>
-        <p id="testCaseStatusMessage" class="text-muted">AI is generating test cases from the selected sections...</p>
-        <div id="testCaseStatusIndicator" class="mt-3">
-            <div class="spinner-border text-info" role="status">
-                <span class="visually-hidden">Processing...</span>
-            </div>
-        </div>
+<div class="card-body text-center">
+    <div class="mb-3">
+        <i class="bi bi-robot" style="font-size: 3rem; color: #0dcaf0;"></i>
+    </div>
+    <h4>Generate Test Cases from Selected Sections</h4>
+    <p class="text-muted">AI will create comprehensive test cases based on your selected sections.</p>
+
+    <div class="mt-4">
+        <button class="btn btn-info btn-lg" onclick="generateTestSuite()" id="generateTestSuiteBtn">
+            <i class="bi bi-gear-fill"></i> Generate Test Suite
+        </button>
     </div>
 
-    <!-- Test Cases Results State -->
-    <div id="testCaseResultsContainer" style="display: none;">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0"><i class="bi bi-list-check"></i> Test Cases Đã Tạo</h5>
-            <div>
-                <button class="btn btn-sm btn-primary me-2" onclick="submitSelectedTestCases()" id="submitSelectedTestCasesBtn">
-                    <i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)
-                </button>
-                <button class="btn btn-sm btn-success me-2" onclick="quickSelectTestCases()" id="quickSelectTestCasesBtn">
-                    <i class="bi bi-check2-all"></i> Chọn Tất Cả
-                </button>
-                <button class="btn btn-sm btn-outline-secondary me-2" onclick="clearSelectedTestCases()" id="clearSelectedTestCasesBtn">
-                    <i class="bi bi-x-circle"></i> Bỏ Chọn Tất Cả
-                </button>
-                <button class="btn btn-sm btn-outline-primary" onclick="refreshTestCases()" id="refreshTestCasesBtn">
-                    <i class="bi bi-arrow-clockwise"></i> Làm mới
-                </button>
-            </div>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-striped table-bordered" id="testCasesTable">
-                <thead class="table-info">
-                    <tr>
-                        <th style="width: 50px;">
-                            <input type="checkbox" id="selectAllTestCases" onchange="toggleAllTestCases(this)" title="Chọn/Bỏ chọn tất cả">
-                        </th>
-                        <th style="width: 50px;">#</th>
-                        <th style="width: 120px;">Test Case ID</th>
-                        <th style="width: 200px;">Request URL</th>
-                        <th style="width: 180px;">Headers</th>
-                        <th>Test Case Name</th>
-                        <th style="width: 150px;">Category</th>
-                        <th style="width: 130px;">Expected Status</th>
-                        <th style="width: 120px;">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="testCasesTableBody">
-                    <!-- Test cases will be populated here -->
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-3 d-flex justify-content-between align-items-center">
-            <p class="text-muted mb-0" id="testCasesCount">
-                <i class="bi bi-info-circle"></i> Total: <strong>0</strong> test cases
-            </p>
-            <!-- Pagination -->
-            <nav aria-label="Test cases pagination" id="testCasesPagination">
-                <ul class="pagination pagination-sm mb-0" id="testCasesPaginationList">
-                    <!-- Pagination items will be generated here -->
-                </ul>
-            </nav>
-        </div>
-    </div>
-</div>
-
-<!-- Test Case Detail Modal -->
-<div class="modal fade" id="testCaseDetailModal" tabindex="-1" aria-labelledby="testCaseDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title" id="testCaseDetailModalLabel">
-                    <i class="bi bi-file-text"></i> Test Case Details
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong><i class="bi bi-tag"></i> Test Case ID:</strong>
-                        <p class="mb-0"><code id="testCaseDetailId">-</code></p>
-                    </div>
-                    <div class="col-md-6">
-                        <strong><i class="bi bi-bookmark"></i> Category:</strong>
-                        <p class="mb-0"><span class="badge bg-primary" id="testCaseDetailCategory">-</span></p>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <strong><i class="bi bi-card-heading"></i> Test Case Name:</strong>
-                    <p class="mb-0" id="testCaseDetailName">-</p>
-                </div>
-                
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong><i class="bi bi-link-45deg"></i> Endpoint:</strong>
-                        <p class="mb-0"><code class="text-info" id="testCaseDetailEndpoint">-</code></p>
-                    </div>
-                    <div class="col-md-6">
-                        <strong><i class="bi bi-check-circle"></i> Expected Status Code:</strong>
-                        <p class="mb-0"><span class="badge bg-success" id="testCaseDetailStatus">-</span></p>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <strong><i class="bi bi-heading"></i> Headers:</strong>
-                    <pre id="testCaseDetailHeader" class="mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.9rem;">-</pre>
-                </div>
-                
-                <div class="mb-3">
-                    <strong><i class="bi bi-send"></i> Request Body:</strong>
-                    <pre id="testCaseDetailRequestBody" class="mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.9rem;">-</pre>
-                </div>
-                
-                <div class="mb-3">
-                    <strong><i class="bi bi-reply"></i> Expected Response:</strong>
-                    <pre id="testCaseDetailExpectedResponse" class="mb-0" style="max-height: 200px; overflow-y: auto; font-size: 0.9rem;">-</pre>
-                </div>
-                
-                <!-- cURL Command Section -->
-                <div class="mb-3" id="curlCommandSection" style="display: none;">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <strong><i class="bi bi-terminal"></i> cURL Command:</strong>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyCurlCommand()" id="copyCurlBtn" title="Copy cURL command">
-                            <i class="bi bi-clipboard"></i> Copy
-                        </button>
-                    </div>
-                    <pre id="testCaseDetailCurl" class="mb-0 bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; font-family: 'Courier New', monospace;">-</pre>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-info" onclick="convertToCurl()" id="convertToCurlBtn">
-                    <i class="bi bi-terminal"></i> Convert to cURL
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Close
-                </button>
-            </div>
-        </div>
+    <div id="testSuiteResult" class="mt-4" style="display: none;">
+        <!-- Test suite generation result will be shown here -->
     </div>
 </div>
 </div>

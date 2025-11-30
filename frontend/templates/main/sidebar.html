@@ -1,32 +1,16 @@
 {% load static %}
-{% load i18n %}
-<script>
-// Add collapsed class immediately if needed (before DOM renders)
-(function() {
-    try {
-        const savedState = localStorage.getItem('sidebarCollapsed');
-        if (savedState === 'true') {
-            // Set a flag that the sidebar should be collapsed
-            window.__sidebarCollapsed = true;
-        }
-    } catch(e) {}
-})();
-</script>
-<div class="sidebar-chatgpt" id="sidebarElement" data-initial-state="">
+<div class="sidebar-chatgpt">
     <!-- Header -->
     <div class="sidebar-header">
-        <button class="sidebar-toggle-btn" id="sidebarToggle" title="Toggle sidebar">
-            <i class="fa fa-bars"></i>
-        </button>
         <a href="/" class="brand-link">
-            <span class="brand-text">APIT</span>
+            <span>APIT</span>
         </a>
     </div>
 
     <!-- New Project Button -->
-    <a href="{% url 'project_add' %}" class="new-project-btn" data-tooltip="{% trans 'New Project' %}">
+    <a href="{% url 'project_add' %}" class="new-project-btn">
         <i class="fa fa-plus"></i>
-        <span>{% trans "New Project" %}</span>
+        <span>New Project</span>
     </a>
 
     {% if user.is_authenticated %}
@@ -34,34 +18,34 @@
     <div class="nav-container">
         <!-- Navigation Section -->
         <div class="nav-section-header">
-            <span>{% trans "Navigation" %}</span>
+            <span>Navigation</span>
         </div>
         <ul class="nav nav-pills flex-column">
             <li class="nav-item">
-                <a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" data-tooltip="{% trans 'Home' %}">
+                <a href="{% url 'home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
                     <i class="fa fa-home"></i>
-                    <span>{% trans "Home" %}</span>
+                    <span>Home</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}" data-tooltip="{% trans 'Library' %}">
+                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}">
                     <i class="fa fa-book"></i>
-                    <span>{% trans "Library" %}</span>
+                    <span>Thư viện</span>
                 </a>
             </li>
         </ul>
 
         <!-- Projects Section -->
         <div class="nav-section-header">
-            <span>{% trans "Projects" %}</span>
-            <button class="add-btn-header" data-url="{% url 'project_add' %}" title="{% trans 'Add new project' %}">
+            <span>Projects</span>
+            <button class="add-btn-header" onclick="window.location.href='{% url 'project_add' %}'" title="Add new project">
                 <i class="fa fa-plus"></i>
             </button>
         </div>
         
         <ul class="nav nav-pills flex-column">
             {% for project in recent_projects %}
-            <li class="nav-item project-item">
+            <li class="nav-item">
                 <a href="{% url 'project_detail_by_uuid' project_uuid=project.uuid %}" 
                    class="nav-link">
                     <i class="fa fa-folder"></i>
@@ -70,12 +54,12 @@
             </li>
             {% endfor %}
             {% if recent_projects %}
-            <li class="project-divider"><hr class="dropdown-divider"></li>
+            <li><hr class="dropdown-divider"></li>
             {% endif %}
-            <li class="nav-item all-projects-link">
-                <a href="{% url 'project_list' %}" class="nav-link" data-tooltip="{% trans 'All Projects' %}">
+            <li class="nav-item">
+                <a href="{% url 'project_list' %}" class="nav-link">
                     <i class="fa fa-list"></i>
-                    <span>{% trans "All Projects" %}</span>
+                    <span>All Projects</span>
                 </a>
             </li>
         </ul>
@@ -83,8 +67,8 @@
         {% if test_suites_show and test_suites %}
         <!-- Test Suites Section -->
         <div class="nav-section-header">
-            <span>{% trans "Test Suites" %}</span>
-            <button class="add-btn-header" data-url="{% url 'test_suite_add' project_uuid=project.uuid %}" title="{% trans 'Add new test suite' %}">
+            <span>Test Suites</span>
+            <button class="add-btn-header" onclick="window.location.href='{% url 'test_suite_add' project_uuid=project.uuid %}'" title="Add new test suite">
                 <i class="fa fa-plus"></i>
             </button>
         </div>
@@ -110,17 +94,16 @@
                     type="button" 
                     id="dropdownUser1" 
                     data-bs-toggle="dropdown" 
-                    aria-expanded="false"
-                    data-tooltip="{{ user.username }}">
+                    aria-expanded="false">
                 <div class="user-avatar">
                     {{ user.username|first|upper }}
                 </div>
                 <div class="user-info">
                     <div class="user-name">{{ user.username }}</div>
                     {% if user.is_superuser %}
-                    <div class="user-status">{% trans "Admin" %}</div>
+                    <div class="user-status">Admin</div>
                     {% else %}
-                    <div class="user-status">{% trans "User" %}</div>
+                    <div class="user-status">User</div>
                     {% endif %}
                 </div>
                 <i class="fa fa-chevron-up user-chevron"></i>
@@ -128,48 +111,20 @@
             <ul class="dropdown-menu" aria-labelledby="dropdownUser1">
                 <li><a class="dropdown-item" href="{% url 'project_add' %}">
                     <i class="fa fa-plus"></i>
-                    <span>{% trans "New project" %}</span>
+                    <span>New project</span>
                 </a></li>
                 <li><a class="dropdown-item" href="#">
                     <i class="fa fa-cog"></i>
-                    <span>{% trans "Settings" %}</span>
+                    <span>Settings</span>
                 </a></li>
                 <li><a class="dropdown-item" href="#">
                     <i class="fa fa-user"></i>
-                    <span>{% trans "Profile" %}</span>
+                    <span>Profile</span>
                 </a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li class="dropdown-item-text">
-                    <i class="fa fa-language"></i>
-                    <span>{% trans "Language" %}</span>
-                </li>
-                {% get_current_language as current_lang %}
-                <li>
-                    <form method="post" action="{% url 'set_language' %}" style="display: inline;">
-                        {% csrf_token %}
-                        <input type="hidden" name="language" value="en">
-                        <button type="submit" class="dropdown-item {% if current_lang == 'en' %}active{% endif %}" style="border: none; background: none; width: 100%; text-align: left; padding: 0.5rem 1rem;">
-                            <i class="fa fa-globe"></i>
-                            <span>{% trans "English" %}</span>
-                            {% if current_lang == 'en' %}<i class="fa fa-check float-end"></i>{% endif %}
-                        </button>
-                    </form>
-                </li>
-                <li>
-                    <form method="post" action="{% url 'set_language' %}" style="display: inline;">
-                        {% csrf_token %}
-                        <input type="hidden" name="language" value="vi">
-                        <button type="submit" class="dropdown-item {% if current_lang == 'vi' %}active{% endif %}" style="border: none; background: none; width: 100%; text-align: left; padding: 0.5rem 1rem;">
-                            <i class="fa fa-globe"></i>
-                            <span>{% trans "Tiếng Việt" %}</span>
-                            {% if current_lang == 'vi' %}<i class="fa fa-check float-end"></i>{% endif %}
-                        </button>
-                    </form>
-                </li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="{% url 'logout' %}">
                     <i class="fa fa-sign-out-alt"></i>
-                    <span>{% trans "Sign out" %}</span>
+                    <span>Sign out</span>
                 </a></li>
             </ul>
         </div>
@@ -179,16 +134,13 @@
     <!-- Navigation for Non-authenticated Users -->
     <div class="nav-container">
         <div class="nav-section-header">
-            <span>{% trans "Navigation" %}</span>
+            <span>Navigation</span>
         </div>
         <ul class="nav nav-pills flex-column">
             <li class="nav-item">
-                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}" 
-                   data-login-title="{% trans 'Login Required' %}" 
-                   data-login-message="{% trans 'Please log in to access the Library.' %}"
-                   onclick="showNotification('warning', this.dataset.loginTitle, this.dataset.loginMessage); return false;">
+                <a href="{% url 'library' %}" class="nav-link {% if request.resolver_match.url_name == 'library' %}active{% endif %}" onclick="showNotification('warning', 'Login Required', 'Please log in to access the Library.'); return false;">
                     <i class="fa fa-book"></i>
-                    <span>{% trans "Library" %}</span>
+                    <span>Thư viện</span>
                 </a>
             </li>
         </ul>
@@ -196,13 +148,13 @@
 
     <!-- Authentication Section -->
     <div class="auth-section">
-        <a href="{% url 'login' %}" class="auth-btn login" data-tooltip="{% trans 'Login' %}">
+        <a href="{% url 'login' %}" class="auth-btn login">
             <i class="fa fa-sign-in-alt"></i>
-            <span>{% trans "Login" %}</span>
+            <span>Login</span>
         </a>
-        <a href="{% url 'register' %}" class="auth-btn register" data-tooltip="{% trans 'Register' %}">
+        <a href="{% url 'register' %}" class="auth-btn register">
             <i class="fa fa-user-plus"></i>
-            <span>{% trans "Register" %}</span>
+            <span>Register</span>
         </a>
     </div>
     {% endif %}
@@ -210,180 +162,7 @@
 
 <!-- JavaScript for enhanced functionality -->
 <script>
-// Apply state immediately when sidebar element exists (before DOMContentLoaded)
-(function() {
-    let stateApplied = false; // Flag to prevent multiple applications
-    
-    try {
-        const isCollapsed = window.__sidebarCollapsed || localStorage.getItem('sidebarCollapsed') === 'true';
-        
-        function applyState() {
-            if (stateApplied) return; // Already applied, skip
-            
-            const sidebar = document.getElementById('sidebarElement');
-            const mainContent = document.querySelector('main');
-            
-            if (sidebar && isCollapsed) {
-                // Disable ALL transitions immediately
-                const originalTransition = sidebar.style.transition;
-                sidebar.style.setProperty('transition', 'none', 'important');
-                if (mainContent) {
-                    mainContent.style.setProperty('transition', 'none', 'important');
-                }
-                
-                // Apply state immediately
-                if (!sidebar.classList.contains('collapsed')) {
-                    sidebar.classList.add('collapsed');
-                }
-                sidebar.style.setProperty('width', '70px', 'important');
-                sidebar.style.setProperty('min-width', '70px', 'important');
-                sidebar.style.setProperty('max-width', '70px', 'important');
-                
-                if (mainContent) {
-                    if (!mainContent.classList.contains('sidebar-collapsed')) {
-                        mainContent.classList.add('sidebar-collapsed');
-                    }
-                    mainContent.style.setProperty('width', 'calc(100vw - 70px)', 'important');
-                    mainContent.style.setProperty('max-width', 'calc(100vw - 70px)', 'important');
-                }
-                
-                // Force reflow to ensure styles are applied
-                void sidebar.offsetWidth;
-                
-                // Re-enable transitions after styles are applied
-                setTimeout(function() {
-                    sidebar.style.removeProperty('transition');
-                    if (mainContent) {
-                        mainContent.style.removeProperty('transition');
-                    }
-                }, 100);
-                
-                stateApplied = true;
-            }
-        }
-        
-        // Use MutationObserver to catch when sidebar is added to DOM
-        if (document.readyState === 'loading') {
-            const observer = new MutationObserver(function(mutations) {
-                const sidebar = document.getElementById('sidebarElement');
-                if (sidebar) {
-                    observer.disconnect();
-                    applyState();
-                }
-            });
-            observer.observe(document.body || document.documentElement, {
-                childList: true,
-                subtree: true
-            });
-        }
-        
-        // Also try immediately
-        if (document.readyState !== 'loading') {
-            applyState();
-        }
-        
-        // Fallback: try on DOMContentLoaded
-        document.addEventListener('DOMContentLoaded', function() {
-            applyState();
-        }, { once: true });
-        
-    } catch(e) {
-        console.error('Sidebar state application error:', e);
-    }
-})();
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Sidebar toggle functionality
-    const sidebar = document.querySelector('.sidebar-chatgpt');
-    const toggleBtn = document.getElementById('sidebarToggle');
-    const mainContent = document.querySelector('main');
-    
-    // Check if elements exist
-    if (!sidebar || !toggleBtn) {
-        return;
-    }
-    
-    // Load saved sidebar state from localStorage
-    const savedState = localStorage.getItem('sidebarCollapsed');
-    const isCollapsed = savedState === 'true';
-    
-    // Apply initial state immediately
-    function applySidebarState(collapsed) {
-        if (collapsed) {
-            sidebar.classList.add('collapsed');
-            sidebar.style.setProperty('width', '70px', 'important');
-            sidebar.style.setProperty('min-width', '70px', 'important');
-            sidebar.style.setProperty('max-width', '70px', 'important');
-            if (mainContent) {
-                mainContent.classList.add('sidebar-collapsed');
-                mainContent.style.setProperty('width', 'calc(100vw - 70px)', 'important');
-                mainContent.style.setProperty('max-width', 'calc(100vw - 70px)', 'important');
-            }
-        } else {
-            sidebar.classList.remove('collapsed');
-            sidebar.style.setProperty('width', '280px', 'important');
-            sidebar.style.setProperty('min-width', '280px', 'important');
-            sidebar.style.setProperty('max-width', '280px', 'important');
-            if (mainContent) {
-                mainContent.classList.remove('sidebar-collapsed');
-                mainContent.style.setProperty('width', 'calc(100vw - 280px)', 'important');
-                mainContent.style.setProperty('max-width', 'calc(100vw - 280px)', 'important');
-            }
-        }
-    }
-    
-    // Apply saved state - verify it's correct (only if not already applied)
-    if (isCollapsed && !sidebar.classList.contains('collapsed')) {
-        // Disable transition temporarily
-        sidebar.style.setProperty('transition', 'none', 'important');
-        if (mainContent) {
-            mainContent.style.setProperty('transition', 'none', 'important');
-        }
-        applySidebarState(true);
-        // Re-enable transition
-        setTimeout(function() {
-            sidebar.style.removeProperty('transition');
-            if (mainContent) {
-                mainContent.style.removeProperty('transition');
-            }
-        }, 50);
-    } else if (!isCollapsed && sidebar.classList.contains('collapsed')) {
-        // Disable transition temporarily
-        sidebar.style.setProperty('transition', 'none', 'important');
-        if (mainContent) {
-            mainContent.style.setProperty('transition', 'none', 'important');
-        }
-        applySidebarState(false);
-        // Re-enable transition
-        setTimeout(function() {
-            sidebar.style.removeProperty('transition');
-            if (mainContent) {
-                mainContent.style.removeProperty('transition');
-            }
-        }, 50);
-    }
-    
-    // Toggle sidebar
-    toggleBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const isNowCollapsed = !sidebar.classList.contains('collapsed');
-        applySidebarState(isNowCollapsed);
-        
-        // Save state to localStorage
-        localStorage.setItem('sidebarCollapsed', isNowCollapsed.toString());
-    });
-    
-    // Add tooltips to nav links that don't have them yet
-    const navLinksWithoutTooltip = document.querySelectorAll('.sidebar-chatgpt .nav-link:not([data-tooltip])');
-    navLinksWithoutTooltip.forEach(link => {
-        const span = link.querySelector('span');
-        if (span && span.textContent.trim()) {
-            link.setAttribute('data-tooltip', span.textContent.trim());
-        }
-    });
-    
     // Handle active nav links
     const currentPath = window.location.pathname;
     const navLinks = document.querySelectorAll('.sidebar-chatgpt .nav-link');
@@ -399,23 +178,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Smooth scrolling for sidebar
-    const navContainer = document.querySelector('.sidebar-chatgpt .nav-container');
-    if (navContainer) {
-        navContainer.addEventListener('wheel', function(e) {
+    const sidebar = document.querySelector('.sidebar-chatgpt .nav-container');
+    if (sidebar) {
+        sidebar.addEventListener('wheel', function(e) {
             e.stopPropagation();
         });
     }
-
-    // Handle add button clicks
-    const addButtons = document.querySelectorAll('.sidebar-chatgpt .add-btn-header[data-url]');
-    addButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const url = this.getAttribute('data-url');
-            if (url) {
-                window.location.href = url;
-            }
-        });
-    });
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function(e) {

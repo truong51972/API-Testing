@@ -72,9 +72,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-.vscode
-# Media files
-media/
+
 # PyBuilder
 .pybuilder/
 target/

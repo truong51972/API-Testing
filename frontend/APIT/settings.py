@@ -52,7 +52,6 @@ MIDDLEWARE = [
     "APIT.middleware.BlockChromeDevtoolsWellKnown",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -128,24 +127,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en'
+LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'Asia/Ho_Chi_Minh'
 
 USE_I18N = True
 
 USE_TZ = True
-
-# Supported languages
-LANGUAGES = [
-    ('en', 'English'),
-    ('vi', 'Tiếng Việt'),
-]
-
-# Locale paths
-LOCALE_PATHS = [
-    BASE_DIR / 'locale',
-]
 
 # Emailing settings
 if os.getenv('PRODUCTION_ENVIRONMENT', 'False') == 'True':
