@@ -8,6 +8,7 @@ class ProjectTestSuite(models.Model):
     project = models.ForeignKey(UserProject, on_delete=models.CASCADE)
     test_suite_name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    api_test_suite_id = models.CharField(max_length=255, blank=True, null=True, help_text="Test Suite ID from API")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

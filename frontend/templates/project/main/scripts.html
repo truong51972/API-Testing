@@ -1,307 +1,2282 @@
 <script>
-document.getElementById('fileInput').addEventListener('change', function() {
-    if (this.files.length > 0) {
-        // Show loading state for file upload
-        const uploadBox = document.querySelector('.upload-box');
-        const originalContent = uploadBox.innerHTML;
-        const fileCount = this.files.length;
-        const fileText = fileCount === 1 ? 'file' : 'files';
-        uploadBox.innerHTML = `
+    document.getElementById('fileInput').addEventListener('change', function () {
+        if (this.files.length > 0) {
+            // Show loading state for file upload
+            const uploadBox = document.querySelector('.upload-box');
+            const originalContent = uploadBox.innerHTML;
+            const fileCount = this.files.length;
+            const fileText = fileCount === 1 ? 'file' : 'files';
+            uploadBox.innerHTML = `
             <i class="bi bi-hourglass-split" style="font-size: 2rem;"></i>
             <p class="mt-2">Uploading ${fileCount} ${fileText}...</p>
             <small class="text-muted">Please wait while we upload your files</small>
         `;
-        uploadBox.style.pointerEvents = 'none';
+            uploadBox.style.pointerEvents = 'none';
 
-        document.getElementById('uploadForm').submit();
-    }
-});
+            // Show global loading overlay
+            if (window.__loadingOverlay) {
+                window.__loadingOverlay.show();
+            }
 
-// Link upload form loading state
-document.getElementById('linkUploadForm').addEventListener('submit', function(e) {
-    const linkInput = document.getElementById('docLink');
-    const submitBtn = document.getElementById('linkUploadBtn');
+            document.getElementById('uploadForm').submit();
+        }
+    });
 
-    if (!linkInput.value.trim()) {
-        e.preventDefault();
-        showNotification('warning', 'Cảnh báo', 'Vui lòng nhập URL hợp lệ');
-        return;
-    }
+    // Link upload form loading state
+    document.getElementById('linkUploadForm').addEventListener('submit', function (e) {
+        const linkInput = document.getElementById('docLink');
+        const submitBtn = document.getElementById('linkUploadBtn');
 
-    // Show loading state
-    const originalText = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+        if (!linkInput.value.trim()) {
+            e.preventDefault();
+            showNotification('warning', 'Cảnh báo', 'Vui lòng nhập URL hợp lệ');
+            return;
+        }
 
-    // Store original text for restoration if needed
-    submitBtn.setAttribute('data-original-text', originalText);
-});
+        // Show loading state
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+
+        // Show global loading overlay
+        if (window.__loadingOverlay) {
+            window.__loadingOverlay.show();
+        }
+
+        // Store original text for restoration if needed
+        submitBtn.setAttribute('data-original-text', originalText);
+    });
 </script>
 
 <script>
-let currentStep = 1;
-let totalSteps = 5;
+    let currentStep = 1;
+    let totalSteps = 5;
+    const projectUuid = '{{ project.uuid }}';
 
-function setStep(n) {
-const steps = document.querySelectorAll('.step');
-steps.forEach((s, i) => {
-    s.classList.remove('active', 'completed');
-    if (i < n-1) s.classList.add('completed'); // bước đã qua
-    if (i === n-1) s.classList.add('active');  // bước hiện tại
-});
-currentStep = n;
-
-// Ẩn/hiện nội dung theo step
-document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
-const currentPhase = document.getElementById('phase' + n);
-if (currentPhase) currentPhase.classList.remove('d-none');
-}
-
-function nextStep() {
-    if (currentStep === 1) {
-        // Always allow next from step 1 (let backend handle document validation)
-        setStep(2);
-        // Auto start AI processing when entering step 2
-        setTimeout(() => {
-            startAIProcessing('{{ project.uuid }}');
-        }, 500);
-    } else if (currentStep === 2) {
-        // Check if AI processing is completed
-        const aiStatus = document.getElementById('aiStatusText').textContent;
-        if (aiStatus.includes('Completed')) {
-            setStep(3);
-            loadSections();
-        } else {
-            showNotification('warning', 'Cảnh báo', 'Vui lòng chờ AI xử lý hoàn thành.');
+    // Restore current step from localStorage on page load
+    (function() {
+        const savedStep = localStorage.getItem(`project_step_${projectUuid}`);
+        if (savedStep) {
+            const stepNum = parseInt(savedStep, 10);
+            if (stepNum >= 1 && stepNum <= totalSteps) {
+                currentStep = stepNum;
+            }
         }
-    } else if (currentStep === 3) {
-        // Check if FR selections are saved
-        const saveButton = document.querySelector('button[onclick="saveFRSelections()"]');
-        if (saveButton && saveButton.style.display !== 'none') {
-            showNotification('warning', 'Cảnh báo', 'Vui lòng lưu lựa chọn Functional Requirements trước khi tiếp tục.');
-        } else {
+    })();
+
+    function setStep(n) {
+        const steps = document.querySelectorAll('.step');
+        steps.forEach((s, i) => {
+            s.classList.remove('active', 'completed');
+            if (i < n - 1) s.classList.add('completed'); // bước đã qua
+            if (i === n - 1) s.classList.add('active');  // bước hiện tại
+        });
+        currentStep = n;
+        
+        // Save current step to localStorage
+        localStorage.setItem(`project_step_${projectUuid}`, n.toString());
+
+        // Ẩn/hiện nội dung theo step
+        document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
+        const currentPhase = document.getElementById('phase' + n);
+        if (currentPhase) currentPhase.classList.remove('d-none');
+    }
+    
+    // Restore step on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        setStep(currentStep);
+        
+        // If restoring to step 4, automatically load test cases if they exist
+        if (currentStep === 4) {
+            setTimeout(() => {
+                startTestCaseGeneration(projectUuid);
+            }, 500);
+        }
+    });
+
+    function nextStep() {
+        if (currentStep === 1) {
+            // Always allow next from step 1 (let backend handle document validation)
+            setStep(2);
+            // Auto start AI processing when entering step 2
+            setTimeout(() => {
+                startAIProcessing('{{ project.uuid }}');
+            }, 500);
+        } else if (currentStep === 2) {
+            // Check if both AI processing and FR extraction are completed
+            const aiStatus = document.getElementById('aiStatusText').textContent;
+            const isAIComplete = aiStatus.includes('Completed') || window.aiProcessingComplete;
+            const isFRComplete = window.frExtractionComplete || aiStatus.includes('FR Extraction Completed');
+
+            if (isAIComplete && isFRComplete) {
+                setStep(3);
+                loadSections();
+            } else if (!isAIComplete) {
+                showNotification('warning', 'Cảnh báo', 'Vui lòng chờ AI xử lý hoàn thành.');
+            } else if (!isFRComplete) {
+                showNotification('warning', 'Cảnh báo', 'Vui lòng chờ trích xuất Functional Requirements hoàn thành.');
+            }
+        } else if (currentStep === 3) {
+            // Check if at least one FR is selected (either already saved or currently checked)
+            const selectedFRs = Array.from(document.querySelectorAll('.fr-checkbox:checked'));
+            const hasSavedSelections = window.frSelectionsSaved;
+            
+            // If no FRs are currently checked and selections haven't been saved, require selection
+            if (selectedFRs.length === 0 && !hasSavedSelections) {
+                showNotification('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một Functional Requirement (FR) trước khi tiếp tục.');
+                return;
+            }
+            
+            // If FRs are checked but not saved yet, require saving
+            if (selectedFRs.length > 0 && !hasSavedSelections) {
+                showNotification('warning', 'Cảnh báo', 'Vui lòng nhấn nút "Choose FR Selections" để lưu các lựa chọn của bạn trước khi tiếp tục.');
+                return;
+            }
+            
+            // If selections have been saved before, allow next without re-checking
+            // This means user has already selected and saved FRs previously
+            if (hasSavedSelections) {
+                // All validations passed, proceed to next step
+                setStep(4);
+                // Auto start AI test case generation when entering step 4
+                setTimeout(() => {
+                    startTestCaseGeneration('{{ project.uuid }}');
+                }, 500);
+                return;
+            }
+            
+            // All validations passed, proceed to next step
             setStep(4);
-        }
-    } else if (currentStep < totalSteps) {
-        setStep(currentStep + 1);
-    }
-}
-
-function prevStep() {
-    if (currentStep > 1) {
-        setStep(currentStep - 1);
-    }
-}
-
-// init: mở bước theo query param ?step=, mặc định 1
-document.addEventListener("DOMContentLoaded", function() {
-const params = new URLSearchParams(window.location.search);
-const stepParam = parseInt(params.get('step'));
-if (!isNaN(stepParam) && stepParam >= 1 && stepParam <= totalSteps) {
-    setStep(stepParam);
-    if (stepParam === 3) {
-        loadSections();
-    }
-} else {
-    setStep(1);
-}
-});
-
-// AI Processing Functions
-function startAIProcessing(projectUuid) {
-    // Update UI to show processing
-    document.getElementById('aiStatusText').textContent = 'AI Processing Started...';
-    document.getElementById('aiStatusMessage').textContent = 'AI is analyzing your document...';
-
-    // Realistic progress stages
-    const progressStages = [
-        { progress: 5, message: 'Initializing AI processing...', duration: 3000 },
-        { progress: 15, message: 'Reading document content...', duration: 2000 },
-        { progress: 30, message: 'Analyzing document structure...', duration: 2500 },
-        { progress: 45, message: 'Extracting key sections...', duration: 3000 },
-        { progress: 60, message: 'Processing API endpoints...', duration: 5000 },
-        { progress: 75, message: 'Generating section metadata...', duration: 5000 },
-        { progress: 85, message: 'Finalizing analysis...', duration: 2000 },
-        { progress: 95, message: 'Almost complete...', duration: 1000 }
-    ];
-
-    let currentStage = 0;
-    let progressInterval;
-
-    function updateProgress() {
-        if (currentStage < progressStages.length) {
-            const stage = progressStages[currentStage];
-            document.getElementById('aiProgressBar').style.width = stage.progress + '%';
-            document.getElementById('aiStatusMessage').textContent = stage.message;
-
-            currentStage++;
-            setTimeout(updateProgress, stage.duration);
-        } else {
-            // Keep at 95% until actual completion
-            document.getElementById('aiProgressBar').style.width = '95%';
-            document.getElementById('aiStatusMessage').textContent = 'Waiting for completion...';
+            // Auto start AI test case generation when entering step 4
+            setTimeout(() => {
+                startTestCaseGeneration('{{ project.uuid }}');
+            }, 500);
+        } else if (currentStep === 4) {
+            // Check if test cases have been selected
+            if (!window.testCasesSelected) {
+                showNotification('warning', 'Cảnh báo', 'Vui lòng chọn test cases và bấm "Xác Nhận Chọn Test Cases" trước khi tiếp tục.');
+                return;
+            }
+            
+            // Move to step 5 and start executing test suite
+            setStep(5);
+            
+            // Start executing test suite - test_suite_id sẽ được lấy từ DB nếu chưa có
+            setTimeout(() => {
+                const testSuiteId = window.selectedTestSuiteId;
+                if (testSuiteId) {
+                    executeTestSuite('{{ project.uuid }}', testSuiteId);
+                } else {
+                    // Nếu không có test_suite_id, lấy từ database
+                    getTestSuiteIdFromDatabase('{{ project.uuid }}');
+                }
+            }, 500);
+        } else if (currentStep < totalSteps) {
+            setStep(currentStep + 1);
         }
     }
 
-    // Start the staged progress
-    setTimeout(updateProgress, 500);
+    function prevStep() {
+        if (currentStep > 1) {
+            setStep(currentStep - 1);
+        }
+    }
 
-    fetch(`/project/${projectUuid}/ai/start/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        },
-        _timeoutMs: 60000
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Start checking status
-            checkAIStatusLoop(projectUuid);
+    // Initialize flags for tracking processing status
+    window.aiProcessingComplete = false;
+    window.frExtractionComplete = false;
+    window.frSelectionsSaved = false; // Track if FR selections have been saved at least once
+    window.currentProjectUuid = '{{ project.uuid }}'; // Store project UUID globally
+    window.testReportReady = false; // Track if test report is ready
+    window.testCasesSelected = false; // Track if test cases have been selected
+    window.selectedTestSuiteId = null; // Store selected test suite ID
+
+    // init: mở bước theo query param ?step=, mặc định 1
+    document.addEventListener("DOMContentLoaded", function () {
+        const params = new URLSearchParams(window.location.search);
+        const stepParam = parseInt(params.get('step'));
+        if (!isNaN(stepParam) && stepParam >= 1 && stepParam <= totalSteps) {
+            setStep(stepParam);
+            if (stepParam === 2) {
+                // If on step 2, check if we need to start AI processing or FR extraction
+                // This will be handled by startAIProcessing or checkAIStatusLoop
+            } else if (stepParam === 3) {
+                loadSections();
+            }
         } else {
-            // Stop any ongoing progress updates
-            document.getElementById('aiStatusText').textContent = 'Error';
-            document.getElementById('aiStatusMessage').textContent = data.message;
-            document.getElementById('aiStatusIndicator').innerHTML = `
+            setStep(1);
+        }
+    });
+
+    // AI Processing Functions
+    function startAIProcessing(projectUuid) {
+        // Update UI to show processing
+        document.getElementById('aiStatusText').textContent = 'AI Processing Started...';
+        document.getElementById('aiStatusMessage').textContent = 'AI is analyzing your document...';
+
+        // Realistic progress stages
+        const progressStages = [
+            { progress: 5, message: 'Initializing AI processing...', duration: 3000 },
+            { progress: 15, message: 'Reading document content...', duration: 2000 },
+            { progress: 30, message: 'Analyzing document structure...', duration: 2500 },
+            { progress: 45, message: 'Extracting key sections...', duration: 3000 },
+            { progress: 60, message: 'Processing API endpoints...', duration: 5000 },
+            { progress: 75, message: 'Generating section metadata...', duration: 5000 },
+            { progress: 85, message: 'Finalizing analysis...', duration: 2000 },
+            { progress: 95, message: 'Almost complete...', duration: 1000 }
+        ];
+
+        let currentStage = 0;
+        let progressInterval;
+
+        function updateProgress() {
+            if (currentStage < progressStages.length) {
+                const stage = progressStages[currentStage];
+                document.getElementById('aiProgressBar').style.width = stage.progress + '%';
+                document.getElementById('aiStatusMessage').textContent = stage.message;
+
+                currentStage++;
+                setTimeout(updateProgress, stage.duration);
+            } else {
+                // Keep at 95% until actual completion
+                document.getElementById('aiProgressBar').style.width = '95%';
+                document.getElementById('aiStatusMessage').textContent = 'Waiting for completion...';
+            }
+        }
+
+        // Start the staged progress
+        setTimeout(updateProgress, 500);
+
+        fetch(`/project/${projectUuid}/ai/start/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            _noLoading: true,
+            _timeoutMs: 60000
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Start checking status
+                    checkAIStatusLoop(projectUuid);
+                } else {
+                    // Stop any ongoing progress updates
+                    document.getElementById('aiStatusText').textContent = 'Error';
+                    document.getElementById('aiStatusMessage').textContent = data.message;
+                    document.getElementById('aiStatusIndicator').innerHTML = `
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle"></i> ${data.message}
                 </div>
             `;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        document.getElementById('aiStatusText').textContent = 'Error';
-        document.getElementById('aiStatusMessage').textContent = 'An error occurred while starting AI processing.';
-        document.getElementById('aiStatusIndicator').innerHTML = `
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('aiStatusText').textContent = 'Error';
+                document.getElementById('aiStatusMessage').textContent = 'An error occurred while starting AI processing.';
+                document.getElementById('aiStatusIndicator').innerHTML = `
             <div class="alert alert-danger">
                 <i class="bi bi-exclamation-triangle"></i> An error occurred while starting AI processing.
             </div>
         `;
-    });
-}
+            });
+    }
 
-function checkAIStatusLoop(projectUuid) {
-    let checking = false;
-    const checkStatus = () => {
-        if (checking) return; // prevent overlap
-        checking = true;
-        fetch(`/project/${projectUuid}/ai/status/`, { _noLoading: true, _timeoutMs: 15000, _retries: 1 })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'completed') {
-                // Gradually complete the progress bar
-                let finalProgress = 95;
-                const finalInterval = setInterval(() => {
-                    finalProgress += 1;
-                    document.getElementById('aiProgressBar').style.width = finalProgress + '%';
-                    if (finalProgress >= 100) {
-                        clearInterval(finalInterval);
-                        document.getElementById('aiStatusText').textContent = 'AI Processing Completed!';
-                        document.getElementById('aiStatusMessage').textContent = 'Document analysis completed successfully.';
-                        document.getElementById('aiStatusIndicator').innerHTML = `
+    function checkAIStatusLoop(projectUuid) {
+        let checking = false;
+        const checkStatus = () => {
+            if (checking) return; // prevent overlap
+            checking = true;
+            fetch(`/project/${projectUuid}/ai/status/`, { _noLoading: true, _timeoutMs: 15000, _retries: 1 })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'completed') {
+                        // Gradually complete the progress bar
+                        let finalProgress = 95;
+                        const finalInterval = setInterval(() => {
+                            finalProgress += 1;
+                            document.getElementById('aiProgressBar').style.width = finalProgress + '%';
+                            if (finalProgress >= 100) {
+                                clearInterval(finalInterval);
+                                document.getElementById('aiStatusText').textContent = 'AI Processing Completed!';
+                                document.getElementById('aiStatusMessage').textContent = 'Document analysis completed successfully.';
+                                document.getElementById('aiStatusIndicator').innerHTML = `
                             <div class="alert alert-success">
                                 <i class="bi bi-check-circle"></i> Processing completed successfully!
                             </div>
                         `;
-                        // Auto navigate to step 3 with a full reload to refresh document doc_id state
-                         // Include fresh_analysis=1 to trigger FR analysis after AI processing
-                         setTimeout(() => {
-                             window.location.href = `/project/{{ project.uuid }}/?step=3&fresh_analysis=1`;
-                         }, 2000);
-                    }
-                }, 100);
-            } else if (data.status === 'processing') {
-                // Update status message with progress info
-                document.getElementById('aiStatusMessage').textContent = data.message;
-                // Continue checking
-                setTimeout(() => { checking = false; checkStatus(); }, 2000);
-            } else {
-                // Stop progress updates
-                document.getElementById('aiStatusText').textContent = 'Error';
-                document.getElementById('aiStatusMessage').textContent = data.message;
-                document.getElementById('aiStatusIndicator').innerHTML = `
+                                // Store flag that AI processing is complete
+                                window.aiProcessingComplete = true;
+                                // Start FR extraction in step 2 instead of redirecting to step 3
+                                setTimeout(() => {
+                                    extractFRInStep2(projectUuid);
+                                }, 1500);
+                            }
+                        }, 100);
+                    } else if (data.status === 'processing') {
+                        // Update status message with progress info
+                        document.getElementById('aiStatusMessage').textContent = data.message;
+                        // Continue checking
+                        setTimeout(() => { checking = false; checkStatus(); }, 2000);
+                    } else {
+                        // Stop progress updates
+                        document.getElementById('aiStatusText').textContent = 'Error';
+                        document.getElementById('aiStatusMessage').textContent = data.message;
+                        document.getElementById('aiStatusIndicator').innerHTML = `
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle"></i> ${data.message}
                     </div>
                 `;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            document.getElementById('aiStatusText').textContent = 'Error';
-            document.getElementById('aiStatusMessage').textContent = 'An error occurred while checking status.';
-            document.getElementById('aiStatusIndicator').innerHTML = `
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('aiStatusText').textContent = 'Error';
+                    document.getElementById('aiStatusMessage').textContent = 'An error occurred while checking status.';
+                    document.getElementById('aiStatusIndicator').innerHTML = `
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle"></i> An error occurred while checking status.
                 </div>
             `;
+                })
+                .finally(() => { checking = false; });
+        };
+
+        // Start checking after 1 second
+        setTimeout(checkStatus, 1000);
+    }
+
+    // FR Extraction Functions for Step 2
+    function extractFRInStep2(projectUuid) {
+        // Update UI to show FR extraction
+        document.getElementById('aiStatusText').textContent = 'Đang trích xuất Functional Requirements...';
+        document.getElementById('aiStatusMessage').textContent = 'AI đang phân tích và trích xuất các Functional Requirements từ documents...';
+        document.getElementById('aiProgressBar').style.width = '0%';
+
+        // Realistic progress stages for FR extraction
+        const progressStages = [
+            { progress: 10, message: 'Đang khởi tạo quá trình trích xuất FR...', duration: 2000 },
+            { progress: 25, message: 'Đang phân tích table of contents...', duration: 3000 },
+            { progress: 40, message: 'Đang nhóm các Functional Requirements...', duration: 4000 },
+            { progress: 55, message: 'Đang xác định FR trùng lặp...', duration: 3000 },
+            { progress: 70, message: 'Đang tạo mapping FR với documents...', duration: 4000 },
+            { progress: 85, message: 'Đang hoàn thiện FR annotations...', duration: 3000 },
+            { progress: 95, message: 'Sắp hoàn thành...', duration: 2000 }
+        ];
+
+        let currentStage = 0;
+
+        function updateProgress() {
+            if (currentStage < progressStages.length) {
+                const stage = progressStages[currentStage];
+                document.getElementById('aiProgressBar').style.width = stage.progress + '%';
+                document.getElementById('aiStatusMessage').textContent = stage.message;
+
+                currentStage++;
+                setTimeout(updateProgress, stage.duration);
+            } else {
+                // Keep at 95% until actual completion
+                document.getElementById('aiProgressBar').style.width = '95%';
+                document.getElementById('aiStatusMessage').textContent = 'Đang chờ hoàn thành trích xuất FR...';
+            }
+        }
+
+        // Start the staged progress
+        setTimeout(updateProgress, 500);
+
+        // Call the backend API endpoint with analyze=true
+        const apiUrl = `/project/${projectUuid}/annotate-fr/`;
+
+        console.log('Extracting FR in step 2 with analyze=true');
+
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'accept': 'application/json'
+            },
+            body: JSON.stringify({
+                lang: 'vi',
+                analyze: true  // Always use analyze=true in step 2
+            }),
+            _noLoading: true,
+            _timeoutMs: 60000,
+            _retries: 1
         })
-        .finally(() => { checking = false; });
-    };
+            .then(response => {
+                console.log('FR extraction API response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('FR extraction API response data:', data);
 
-    // Start checking after 1 second
-    setTimeout(checkStatus, 1000);
-}
+                if (data.success) {
+                    // Gradually complete the progress bar
+                    let finalProgress = 95;
+                    const finalInterval = setInterval(() => {
+                        finalProgress += 1;
+                        document.getElementById('aiProgressBar').style.width = finalProgress + '%';
+                        if (finalProgress >= 100) {
+                            clearInterval(finalInterval);
+                            document.getElementById('aiStatusText').textContent = 'FR Extraction Completed!';
+                            document.getElementById('aiStatusMessage').textContent = `Đã trích xuất thành công ${data.count || 0} Functional Requirements.`;
+                            document.getElementById('aiStatusIndicator').innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> FR extraction completed successfully!
+                        </div>
+                    `;
 
-function loadSections() {
-    // Load sections from all completed documents
-    fetch(`/project/{{ project.uuid }}/sections/json/`, { _noLoading: true, _timeoutMs: 30000, _retries: 1 })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.sections.length > 0) {
-            const container = document.getElementById('sectionsContainer');
-            container.innerHTML = `
+                            // Store flag that FR extraction is complete
+                            window.frExtractionComplete = true;
+
+                            // Auto navigate to step 3 without fresh_analysis parameter
+                            setTimeout(() => {
+                                window.location.href = `/project/{{ project.uuid }}/?step=3`;
+                            }, 2000);
+                        }
+                    }, 100);
+                } else {
+                    // Error handling
+                    document.getElementById('aiStatusText').textContent = 'FR Extraction Error';
+                    document.getElementById('aiStatusMessage').textContent = data.message || 'Error extracting Functional Requirements.';
+                    document.getElementById('aiStatusIndicator').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> ${data.message || 'Error extracting Functional Requirements.'}
+                </div>
+            `;
+                }
+            })
+            .catch(error => {
+                console.error('Error extracting FR:', error);
+                document.getElementById('aiStatusText').textContent = 'FR Extraction Error';
+                document.getElementById('aiStatusMessage').textContent = 'An error occurred while extracting Functional Requirements.';
+                document.getElementById('aiStatusIndicator').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Failed to extract Functional Requirements: ${error.message}
+            </div>
+        `;
+            });
+    }
+
+    // Test Case Generation Functions
+    // Store progress interval references to prevent overlap
+    let testCaseFinalInterval = null;
+    let testCaseStatusCheckTimeout = null;
+    let testCaseProgressStages = []; // Store all stage timeouts
+    let isTestCaseProgressRunning = false; // Flag to prevent multiple progress bars
+
+    function clearAllTestCaseProgress() {
+        // Clear all progress-related timeouts and intervals
+        if (testCaseFinalInterval) {
+            clearInterval(testCaseFinalInterval);
+            testCaseFinalInterval = null;
+        }
+        if (testCaseStatusCheckTimeout) {
+            clearTimeout(testCaseStatusCheckTimeout);
+            testCaseStatusCheckTimeout = null;
+        }
+        // Clear all stage timeouts
+        testCaseProgressStages.forEach(timeoutId => {
+            if (timeoutId) clearTimeout(timeoutId);
+        });
+        testCaseProgressStages = [];
+        isTestCaseProgressRunning = false;
+    }
+
+    function startTestCaseGeneration(projectUuid) {
+        // Clear any existing progress first
+        clearAllTestCaseProgress();
+        
+        // First, check if testsuite already exists
+        fetch(`/project/${projectUuid}/test-cases/check/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            _noLoading: true,
+            _timeoutMs: 10000
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.exists) {
+                    // Test suite already exists, just load the test cases
+                    document.getElementById('testCaseStatusText').textContent = 'Đang tải Test Cases...';
+                    document.getElementById('testCaseStatusMessage').textContent = `Đang tải ${data.test_cases_count} test cases đã có sẵn...`;
+                    document.getElementById('testCaseProgressBar').style.width = '100%';
+                    
+                    // Load test cases directly
+                    setTimeout(() => {
+                        fetchTestCases(projectUuid);
+                    }, 500);
+                } else {
+                    // No test suite exists, trigger generation as before
+                    // Reset UI to show processing
+                    document.getElementById('testCaseProcessingContainer').style.display = 'block';
+                    document.getElementById('testCaseResultsContainer').style.display = 'none';
+                    document.getElementById('testCaseStatusText').textContent = 'Đang bắt đầu tạo Test Cases...';
+                    document.getElementById('testCaseStatusMessage').textContent = 'AI đang tạo test cases từ các sections đã chọn...';
+                    document.getElementById('testCaseProgressBar').style.width = '0%';
+
+                    // Realistic progress stages for test case generation
+                    const progressStages = [
+                        { progress: 5, message: 'Đang khởi tạo quá trình tạo test cases...', duration: 2000 },
+                        { progress: 15, message: 'Đang phân tích các sections đã chọn...', duration: 2500 },
+                        { progress: 30, message: 'Đang trích xuất functional requirements...', duration: 3000 },
+                        { progress: 45, message: 'Đang tạo test scenarios...', duration: 4000 },
+                        { progress: 60, message: 'Đang tạo test cases...', duration: 5000 },
+                        { progress: 75, message: 'Đang xác thực test cases...', duration: 3000 },
+                        { progress: 85, message: 'Đang hoàn thiện test suite...', duration: 2000 },
+                        { progress: 95, message: 'Sắp hoàn thành...', duration: 1000 }
+                    ];
+
+                    // Prevent multiple progress bars from running
+                    if (isTestCaseProgressRunning) {
+                        console.log('Test case progress already running, skipping...');
+                        return;
+                    }
+                    
+                    isTestCaseProgressRunning = true;
+                    let currentStage = 0;
+                    let accumulatedDelay = 0;
+
+                    // Schedule all progress stages upfront to prevent overlap
+                    progressStages.forEach((stage, index) => {
+                        accumulatedDelay += (index === 0 ? 500 : progressStages[index - 1].duration);
+                        const timeoutId = setTimeout(() => {
+                            // Only update if still running and not cleared
+                            if (isTestCaseProgressRunning && currentStage === index) {
+                                document.getElementById('testCaseProgressBar').style.width = stage.progress + '%';
+                                document.getElementById('testCaseStatusMessage').textContent = stage.message;
+                                currentStage++;
+                                
+                                // If this is the last stage, keep at 95%
+                                if (index === progressStages.length - 1) {
+                                    document.getElementById('testCaseProgressBar').style.width = '95%';
+                                    document.getElementById('testCaseStatusMessage').textContent = 'Đang chờ hoàn thành...';
+                                }
+                            }
+                        }, accumulatedDelay);
+                        testCaseProgressStages.push(timeoutId);
+                    });
+
+                    fetch(`/project/${projectUuid}/test-cases/generate/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            lang: 'en'
+                        }),
+                        _noLoading: true,
+                        _timeoutMs: 120000
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Start checking status
+                                checkTestCaseStatusLoop(projectUuid);
+                            } else {
+                                // Stop any ongoing progress updates
+                                isTestCaseProgressRunning = false;
+                                clearAllTestCaseProgress();
+                                document.getElementById('testCaseStatusText').textContent = 'Error';
+                                document.getElementById('testCaseStatusMessage').textContent = data.message;
+                                document.getElementById('testCaseStatusIndicator').innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle"></i> ${data.message}
+                            </div>
+                        `;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            isTestCaseProgressRunning = false;
+                            clearAllTestCaseProgress();
+                            document.getElementById('testCaseStatusText').textContent = 'Error';
+                            document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while starting test case generation.';
+                            document.getElementById('testCaseStatusIndicator').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> An error occurred while starting test case generation.
+                        </div>
+                    `;
+                        });
+                }
+            })
+            .catch(error => {
+                console.error('Error checking test suite:', error);
+                // Clear any existing progress before starting new one
+                clearAllTestCaseProgress();
+                // If check fails, proceed with generation as fallback
+                document.getElementById('testCaseStatusText').textContent = 'Đang bắt đầu tạo Test Cases...';
+                document.getElementById('testCaseStatusMessage').textContent = 'AI đang tạo test cases từ các sections đã chọn...';
+                document.getElementById('testCaseProgressBar').style.width = '0%';
+                
+                fetch(`/project/${projectUuid}/test-cases/generate/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        lang: 'en'
+                    }),
+                    _noLoading: true,
+                    _timeoutMs: 120000
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            checkTestCaseStatusLoop(projectUuid);
+                        } else {
+                            isTestCaseProgressRunning = false;
+                            clearAllTestCaseProgress();
+                            document.getElementById('testCaseStatusText').textContent = 'Error';
+                            document.getElementById('testCaseStatusMessage').textContent = data.message;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error generating test cases:', err);
+                        isTestCaseProgressRunning = false;
+                        clearAllTestCaseProgress();
+                        document.getElementById('testCaseStatusText').textContent = 'Error';
+                        document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while generating test cases.';
+                    });
+            });
+    }
+
+    function checkTestCaseStatusLoop(projectUuid) {
+        // Clear staged progress (but keep the flag running since we're checking status)
+        // Only clear the staged progress timeouts, not the final interval
+        testCaseProgressStages.forEach(timeoutId => {
+            if (timeoutId) clearTimeout(timeoutId);
+        });
+        testCaseProgressStages = [];
+        
+        // Clear status check timeout if exists
+        if (testCaseStatusCheckTimeout) {
+            clearTimeout(testCaseStatusCheckTimeout);
+            testCaseStatusCheckTimeout = null;
+        }
+        
+        let checking = false;
+        const checkStatus = () => {
+            if (checking) return; // prevent overlap
+            checking = true;
+            fetch(`/project/${projectUuid}/test-cases/status/`, { _noLoading: true, _timeoutMs: 15000, _retries: 1 })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'completed') {
+                        // Stop staged progress
+                        isTestCaseProgressRunning = false;
+                        
+                        // Clear any existing final interval
+                        if (testCaseFinalInterval) {
+                            clearInterval(testCaseFinalInterval);
+                            testCaseFinalInterval = null;
+                        }
+                        
+                        // Gradually complete the progress bar from 95% to 100%
+                        let finalProgress = 95;
+                        testCaseFinalInterval = setInterval(() => {
+                            finalProgress += 1;
+                            document.getElementById('testCaseProgressBar').style.width = finalProgress + '%';
+                            if (finalProgress >= 100) {
+                                clearInterval(testCaseFinalInterval);
+                                testCaseFinalInterval = null;
+                                document.getElementById('testCaseStatusText').textContent = 'Hoàn thành tạo Test Cases!';
+                                document.getElementById('testCaseStatusMessage').textContent = 'Test cases đã được tạo thành công.';
+                                document.getElementById('testCaseStatusIndicator').innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> Tạo test cases hoàn thành thành công!
+                            </div>
+                        `;
+                                // Fetch test cases after completion
+                                setTimeout(() => {
+                                    fetchTestCases(projectUuid);
+                                }, 1000);
+                            }
+                        }, 50);
+                    } else if (data.status === 'processing') {
+                        // Update status message with progress info
+                        document.getElementById('testCaseStatusMessage').textContent = data.message;
+                        // Continue checking - use 5 seconds after 1 minute wait
+                        // Check message to determine polling interval
+                        const pollingInterval = data.message && data.message.includes('polling') ? 5000 : 2000;
+                        testCaseStatusCheckTimeout = setTimeout(() => { checking = false; checkStatus(); }, pollingInterval);
+                    } else {
+                        // Stop all progress updates
+                        isTestCaseProgressRunning = false;
+                        clearAllTestCaseProgress();
+                        document.getElementById('testCaseStatusText').textContent = 'Error';
+                        document.getElementById('testCaseStatusMessage').textContent = data.message;
+                        document.getElementById('testCaseStatusIndicator').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> ${data.message}
+                    </div>
+                `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Stop all progress on error
+                    isTestCaseProgressRunning = false;
+                    clearAllTestCaseProgress();
+                    document.getElementById('testCaseStatusText').textContent = 'Error';
+                    document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while checking status.';
+                    document.getElementById('testCaseStatusIndicator').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> An error occurred while checking status.
+                </div>
+            `;
+                })
+                .finally(() => { checking = false; });
+        };
+
+        // Start checking after 1 second
+        testCaseStatusCheckTimeout = setTimeout(checkStatus, 1000);
+    }
+
+    function fetchTestCases(projectUuid) {
+        // Fetch test cases from API
+        fetch(`/project/${projectUuid}/test-cases/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            _timeoutMs: 30000,
+            _retries: 1
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    // Handle dataframe format: data.data.rows contains array of test cases
+                    const testCases = data.data.rows || [];
+                    displayTestCases(testCases);
+                } else {
+                    console.error('Error fetching test cases:', data.message);
+                    displayTestCases([]);
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể tải test cases.');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching test cases:', error);
+                displayTestCases([]);
+                showNotification('error', 'Lỗi!', 'Không thể tải test cases từ server.');
+            });
+    }
+
+    // Store test cases globally for detail view
+    let allTestCases = [];
+    let currentTestCasesPage = 1;
+    const TEST_CASES_PER_PAGE = 7;
+
+    function displayTestCases(testCases) {
+        // Hide processing container and show results
+        document.getElementById('testCaseProcessingContainer').style.display = 'none';
+        document.getElementById('testCaseResultsContainer').style.display = 'block';
+
+        // Store test cases globally
+        allTestCases = testCases || [];
+        
+        // Check if any test cases are selected (from database)
+        const hasSelectedTestCases = allTestCases.some(tc => tc.is_selected === true);
+        if (hasSelectedTestCases) {
+            window.testCasesSelected = true;
+        }
+
+        // Reset to first page
+        currentTestCasesPage = 1;
+
+        // Render table with pagination
+        renderTestCasesPage();
+    }
+
+    function renderTestCasesPage() {
+        const tbody = document.getElementById('testCasesTableBody');
+        tbody.innerHTML = '';
+
+        if (!allTestCases || allTestCases.length === 0) {
+            tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i><br>
+                    Không có test cases nào được tạo.
+                </td>
+            </tr>
+        `;
+            document.getElementById('testCasesCount').innerHTML = '<i class="bi bi-info-circle"></i> Tổng: <strong>0</strong> test cases';
+            document.getElementById('testCasesPaginationList').innerHTML = '';
+            updateSelectedTestCasesCount();
+            return;
+        }
+
+        // Calculate pagination
+        const totalPages = Math.ceil(allTestCases.length / TEST_CASES_PER_PAGE);
+        const startIndex = (currentTestCasesPage - 1) * TEST_CASES_PER_PAGE;
+        const endIndex = Math.min(startIndex + TEST_CASES_PER_PAGE, allTestCases.length);
+        const currentPageTestCases = allTestCases.slice(startIndex, endIndex);
+
+        // Render current page test cases
+        currentPageTestCases.forEach((testCase, localIndex) => {
+            const row = document.createElement('tr');
+            const globalIndex = startIndex + localIndex;
+
+            // Get category badge color
+            const category = testCase.test_category || 'N/A';
+            const categoryClass = category === 'Basic Validation' ? 'bg-primary' :
+                category === 'Business Logic' ? 'bg-success' : 'bg-secondary';
+
+            // Get status code badge color
+            const statusCode = testCase.expected_statuscode || 'N/A';
+            const statusClass = statusCode === 200 ? 'bg-success' :
+                statusCode >= 400 && statusCode < 500 ? 'bg-warning' :
+                    statusCode >= 500 ? 'bg-danger' : 'bg-secondary';
+
+            // Truncate test case name if too long
+            const testCaseName = testCase.test_case_name || 'N/A';
+            const shortName = testCaseName.length > 80 ? testCaseName.substring(0, 80) + '...' : testCaseName;
+
+            // Truncate endpoint if too long
+            const endpoint = testCase.endpoint || 'N/A';
+            const shortEndpoint = endpoint.length > 30 ? endpoint.substring(0, 30) + '...' : endpoint;
+            
+            // Format headers for display
+            const headers = testCase.header || {};
+            const headersText = Object.keys(headers).length > 0 
+                ? Object.entries(headers).map(([key, value]) => `${key}: ${value}`).join('; ')
+                : 'N/A';
+            const shortHeaders = headersText.length > 40 ? headersText.substring(0, 40) + '...' : headersText;
+
+            // Get test case ID from full_test_case_data.id or uuid
+            const testCaseApiId = (testCase.full_test_case_data && testCase.full_test_case_data.id) 
+                ? testCase.full_test_case_data.id 
+                : (testCase.uuid || `test-case-${globalIndex}`);
+            const checkboxId = `testCaseCheckbox_${globalIndex}`;
+            
+            // Check if test case is selected (from database)
+            const isSelected = testCase.is_selected === true;
+
+            row.innerHTML = `
+            <td class="text-center">
+                <input type="checkbox" 
+                       class="form-check-input test-case-checkbox" 
+                       id="${checkboxId}"
+                       data-test-case-id="${testCaseApiId}"
+                       data-index="${globalIndex}"
+                       ${isSelected ? 'checked' : ''}
+                       onchange="updateSelectedTestCasesCount()">
+            </td>
+            <td class="text-center">${globalIndex + 1}</td>
+            <td><code class="text-primary">${testCase.test_case_id || `TC-${String(globalIndex + 1).padStart(3, '0')}`}</code></td>
+            <td><code class="text-info" title="${endpoint}">${shortEndpoint}</code></td>
+            <td><small class="text-muted" title="${headersText}">${shortHeaders}</small></td>
+            <td title="${testCaseName}"><strong>${shortName}</strong></td>
+            <td><span class="badge ${categoryClass}">${category}</span></td>
+            <td class="text-center">
+                <span class="badge ${statusClass}">${statusCode}</span>
+            </td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewTestCaseDetails(${globalIndex})" title="Xem chi tiết">
+                    <i class="bi bi-eye"></i> Details
+                </button>
+            </td>
+        `;
+            tbody.appendChild(row);
+        });
+
+        // Update count text
+        document.getElementById('testCasesCount').innerHTML = `
+        <i class="bi bi-info-circle"></i> 
+        Hiển thị <strong>${startIndex + 1}-${endIndex}</strong> / <strong>${allTestCases.length}</strong> test cases
+    `;
+
+        // Render pagination
+        renderTestCasesPagination(totalPages);
+        
+        // Update selected count
+        updateSelectedTestCasesCount();
+    }
+
+    function renderTestCasesPagination(totalPages) {
+        const paginationList = document.getElementById('testCasesPaginationList');
+        paginationList.innerHTML = '';
+
+        if (totalPages <= 1) {
+            return; // Don't show pagination if only one page or less
+        }
+
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentTestCasesPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `
+        <a class="page-link" href="#" onclick="goToTestCasesPage(${currentTestCasesPage - 1}); return false;" aria-label="Previous">
+            <span aria-hidden="true">&laquo;</span>
+        </a>
+    `;
+        paginationList.appendChild(prevLi);
+
+        // Page numbers
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentTestCasesPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage < maxVisiblePages - 1) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        // First page
+        if (startPage > 1) {
+            const firstLi = document.createElement('li');
+            firstLi.className = 'page-item';
+            firstLi.innerHTML = `<a class="page-link" href="#" onclick="goToTestCasesPage(1); return false;">1</a>`;
+            paginationList.appendChild(firstLi);
+
+            if (startPage > 2) {
+                const ellipsisLi = document.createElement('li');
+                ellipsisLi.className = 'page-item disabled';
+                ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+                paginationList.appendChild(ellipsisLi);
+            }
+        }
+
+        // Page range
+        for (let i = startPage; i <= endPage; i++) {
+            const pageLi = document.createElement('li');
+            pageLi.className = `page-item ${i === currentTestCasesPage ? 'active' : ''}`;
+            pageLi.innerHTML = `<a class="page-link" href="#" onclick="goToTestCasesPage(${i}); return false;">${i}</a>`;
+            paginationList.appendChild(pageLi);
+        }
+
+        // Last page
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const ellipsisLi = document.createElement('li');
+                ellipsisLi.className = 'page-item disabled';
+                ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+                paginationList.appendChild(ellipsisLi);
+            }
+
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            lastLi.innerHTML = `<a class="page-link" href="#" onclick="goToTestCasesPage(${totalPages}); return false;">${totalPages}</a>`;
+            paginationList.appendChild(lastLi);
+        }
+
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentTestCasesPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `
+        <a class="page-link" href="#" onclick="goToTestCasesPage(${currentTestCasesPage + 1}); return false;" aria-label="Next">
+            <span aria-hidden="true">&raquo;</span>
+        </a>
+    `;
+        paginationList.appendChild(nextLi);
+    }
+
+    function goToTestCasesPage(page) {
+        const totalPages = Math.ceil(allTestCases.length / TEST_CASES_PER_PAGE);
+        if (page < 1 || page > totalPages) {
+            return;
+        }
+        currentTestCasesPage = page;
+        renderTestCasesPage();
+
+        // Scroll to top of table
+        document.getElementById('testCasesTable').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function refreshTestCases() {
+        const projectUuid = '{{ project.uuid }}';
+        const btn = document.getElementById('refreshTestCasesBtn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Đang tải...';
+        btn.disabled = true;
+
+        fetchTestCases(projectUuid);
+
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            showNotification('success', 'Thành công!', 'Đã làm mới danh sách test cases.');
+        }, 1000);
+    }
+
+    function quickSelectTestCases() {
+        // Scroll to test cases section and select all
+        const testCasesContainer = document.getElementById('testCaseResultsContainer');
+        
+        if (!testCasesContainer || testCasesContainer.style.display === 'none') {
+            // If results container is not visible, fetch test cases first
+            const projectUuid = '{{ project.uuid }}';
+            fetchTestCases(projectUuid);
+            setTimeout(() => {
+                const container = document.getElementById('testCaseResultsContainer');
+                if (container) {
+                    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Select all after loading
+                    setTimeout(() => {
+                        const selectAllCheckbox = document.getElementById('selectAllTestCases');
+                        if (selectAllCheckbox) {
+                            selectAllCheckbox.checked = true;
+                            toggleAllTestCases(selectAllCheckbox);
+                        }
+                    }, 500);
+                    showNotification('info', 'Đã tải!', 'Đã tải và chọn tất cả test cases.');
+                }
+            }, 1000);
+        } else {
+            testCasesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Highlight the container briefly
+            testCasesContainer.style.transition = 'box-shadow 0.3s ease';
+            testCasesContainer.style.boxShadow = '0 0 20px rgba(13, 202, 240, 0.5)';
+            setTimeout(() => {
+                testCasesContainer.style.boxShadow = '';
+            }, 2000);
+            
+            // Select all test cases
+            const selectAllCheckbox = document.getElementById('selectAllTestCases');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = true;
+                toggleAllTestCases(selectAllCheckbox);
+                showNotification('success', 'Đã chọn tất cả!', `Đã chọn tất cả ${allTestCases.length} test cases.`);
+            }
+        }
+    }
+
+    // Test Case Selection Functions
+    function updateSelectedTestCasesCount() {
+        const checkboxes = document.querySelectorAll('.test-case-checkbox:checked');
+        const count = checkboxes.length;
+        const countElement = document.getElementById('selectedTestCasesCount');
+        if (countElement) {
+            countElement.textContent = count;
+        }
+        
+        // Update select all checkbox state
+        const selectAllCheckbox = document.getElementById('selectAllTestCases');
+        if (selectAllCheckbox) {
+            const allCheckboxes = document.querySelectorAll('.test-case-checkbox');
+            const checkedCount = document.querySelectorAll('.test-case-checkbox:checked').length;
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && checkedCount === allCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+        }
+    }
+
+    function toggleAllTestCases(checkbox) {
+        const checkboxes = document.querySelectorAll('.test-case-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = checkbox.checked;
+        });
+        updateSelectedTestCasesCount();
+    }
+
+    function clearSelectedTestCases() {
+        const checkboxes = document.querySelectorAll('.test-case-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        const selectAllCheckbox = document.getElementById('selectAllTestCases');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        }
+        updateSelectedTestCasesCount();
+        showNotification('info', 'Đã bỏ chọn', 'Đã bỏ chọn tất cả test cases.');
+    }
+
+    function submitSelectedTestCases() {
+        const checkboxes = document.querySelectorAll('.test-case-checkbox:checked');
+        
+        if (checkboxes.length === 0) {
+            showNotification('warning', 'Chưa chọn test case', 'Vui lòng chọn ít nhất một test case trước khi xác nhận.');
+            return;
+        }
+
+        // Collect selected test case IDs
+        const testCaseIds = [];
+        checkboxes.forEach(checkbox => {
+            const testCaseId = checkbox.getAttribute('data-test-case-id');
+            if (testCaseId) {
+                testCaseIds.push(testCaseId);
+            }
+        });
+
+        if (testCaseIds.length === 0) {
+            showNotification('error', 'Lỗi', 'Không tìm thấy ID của test cases đã chọn.');
+            return;
+        }
+
+        const projectUuid = '{{ project.uuid }}';
+        const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+        const originalHtml = submitBtn.innerHTML;
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
+
+        // Prepare payload - set execute: true to mark test cases for execution
+        const payload = {
+            test_case_ids: testCaseIds,
+            execute: true  // Set to true to mark test cases as selected for execution
+        };
+
+        // Send request
+        fetch(`/project/${projectUuid}/test-cases/select/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(payload),
+            _timeoutMs: 30000,
+            _retries: 1
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('success', 'Thành công!', data.message || `Đã chọn ${testCaseIds.length} test case(s) thành công.`);
+                
+                // Extract test_suite_id from response and save it for later execution
+                let testSuiteId = null;
+                
+                // Try multiple possible locations for test_suite_id
+                if (data.test_suite_id) {
+                    testSuiteId = data.test_suite_id;
+                } else if (data.response) {
+                    if (data.response.data) {
+                        if (data.response.data.test_suite_id) {
+                            testSuiteId = data.response.data.test_suite_id;
+                        } else if (typeof data.response.data === 'string') {
+                            // Sometimes data might be a string ID
+                            testSuiteId = data.response.data;
+                        } else if (data.response.data.id) {
+                            testSuiteId = data.response.data.id;
+                        }
+                    }
+                    if (!testSuiteId && data.response.test_suite_id) {
+                        testSuiteId = data.response.test_suite_id;
+                    }
+                    if (!testSuiteId && data.response.id) {
+                        testSuiteId = data.response.id;
+                    }
+                }
+                
+                // Log for debugging
+                console.log('Extracted test_suite_id:', testSuiteId);
+                console.log('Full response data:', data);
+                
+                if (testSuiteId) {
+                    // Lưu test_suite_id để dùng khi bấm Next sang step 5
+                    window.selectedTestSuiteId = testSuiteId;
+                    window.testCasesSelected = true;
+                    showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
+                } else {
+                    // Nếu không có test_suite_id, vẫn cho phép chọn (test_suite_id sẽ được lấy từ DB khi execute)
+                    window.testCasesSelected = true;
+                    showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
+                    console.warn('No test_suite_id in response, will try to get from database when executing');
+                }
+                
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+            } else {
+                showNotification('error', 'Lỗi!', data.message || 'Không thể chọn test cases.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+            }
+        })
+        .catch(error => {
+            console.error('Error selecting test cases:', error);
+            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi chọn test cases. Vui lòng thử lại.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHtml;
+        });
+    }
+
+    function getTestSuiteIdFromDatabase(projectUuid) {
+        // Show loading
+        showReportLoading('Đang lấy test suite ID từ database...');
+        
+        // Call backend to get test suite ID from database
+        fetch(`/project/${projectUuid}/test-suite/get-id/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            _timeoutMs: 10000,
+            _retries: 1
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.test_suite_id) {
+                // Lưu test_suite_id và execute
+                window.selectedTestSuiteId = data.test_suite_id;
+                executeTestSuite(projectUuid, data.test_suite_id);
+            } else {
+                showNotification('error', 'Lỗi!', data.message || 'Không tìm thấy test_suite_id trong database. Vui lòng đảm bảo test cases đã được generate.');
+                hideReportLoading();
+                console.error('No test_suite_id found in database:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error getting test_suite_id from database:', error);
+            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lấy test_suite_id từ database.');
+            hideReportLoading();
+        });
+    }
+
+    function executeTestSuite(projectUuid, testSuiteId) {
+        const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-play-circle"></i> Đang chạy test suite...';
+            submitBtn.disabled = true;
+        }
+        
+        // Show execution status
+        showTestExecutionStatus('Đang khởi động chạy test suite...');
+        
+        // Move to step 5 and show loading
+        setStep(5);
+        showReportLoading('Đang khởi động chạy test suite...');
+        
+        // First, call execute API
+        fetch(`/project/${projectUuid}/test-suite/execute/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                test_suite_id: testSuiteId
+            }),
+            _timeoutMs: 30000,
+            _retries: 1
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // API trả về test_suite_report_id ngay trong data.test_suite_report_id
+                if (data.test_suite_report_id) {
+                    // Nhận được test_suite_report_id, bắt đầu polling GET_TEST_REPORT_ENDPOINT
+                    showNotification('success', 'Thành công!', 'Đã khởi động chạy test suite. Đang lấy report...');
+                    console.log('Got test_suite_report_id from execute API:', data.test_suite_report_id);
+                    // Bắt đầu polling get_test_report với test_suite_report_id (chỉ gọi GET_TEST_REPORT_ENDPOINT)
+                    pollTestReport(projectUuid, data.test_suite_report_id);
+                } else {
+                    // Nếu không có test_suite_report_id trong response
+                    showNotification('error', 'Lỗi!', 'Không nhận được test_suite_report_id từ execute API.');
+                    hideReportLoading();
+                    hideTestExecutionStatus();
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                    }
+                    console.error('No test_suite_report_id in execute response:', data);
+                }
+            } else {
+                showNotification('error', 'Lỗi!', data.message || 'Không thể chạy test suite.');
+                hideReportLoading();
+                hideTestExecutionStatus();
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error executing test suite:', error);
+            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi chạy test suite. Vui lòng thử lại.');
+            hideReportLoading();
+            hideTestExecutionStatus();
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+            }
+        });
+    }
+
+
+    function pollTestReport(projectUuid, testSuiteReportId) {
+        const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+        let attempts = 0;
+        const pollInterval = 5000; // Poll every 5 seconds
+        
+        // Ensure we're on step 5 and show loading state
+        setStep(5);
+        showReportLoading(`Đang chờ report sẵn sàng... (Lần thử: ${attempts}/${maxAttempts})`);
+        
+        console.log('Starting to poll GET_TEST_REPORT_ENDPOINT with test_suite_report_id:', testSuiteReportId);
+        
+        const poll = () => {
+            attempts++;
+            
+            if (attempts > maxAttempts) {
+                showNotification('error', 'Timeout', 'Đã hết thời gian chờ report. Vui lòng thử lại.');
+                hideReportLoading();
+                hideTestExecutionStatus();
+                const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                }
+                return;
+            }
+            
+            // Update loading message
+            const progressPercent = Math.min((attempts / maxAttempts) * 90, 90); // 0-90% range
+            updateReportLoading(`Đang lấy report từ GET_TEST_REPORT_ENDPOINT... (Lần thử: ${attempts}/${maxAttempts})`, progressPercent);
+            updateTestExecutionStatus(`Đang lấy report... (Lần thử: ${attempts}/${maxAttempts})`);
+            
+            console.log(`[${attempts}/${maxAttempts}] Calling GET_TEST_REPORT_ENDPOINT with test_suite_report_id: ${testSuiteReportId}`);
+            
+            // Chỉ gọi GET_TEST_REPORT_ENDPOINT, không gọi lại execute API
+            fetch(`/project/${projectUuid}/test-report/${testSuiteReportId}/`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                _timeoutMs: 10000,
+                _retries: 1
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(`[${attempts}/${maxAttempts}] GET_TEST_REPORT_ENDPOINT response:`, data);
+                
+                if (data.success) {
+                    // Report is ready, display it in phase5
+                    console.log('✅ Report is ready! Displaying...');
+                    window.testReportReady = true;
+                    displayTestReport(data, testSuiteReportId);
+                    hideReportLoading();
+                    hideTestExecutionStatus();
+                    const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                    }
+                } else {
+                    // Report not ready yet, continue polling
+                    if (data.message && (
+                        data.message.includes('not found') || 
+                        data.message.includes('chưa sẵn sàng') || 
+                        data.message.includes('chưa hoàn thành') || 
+                        data.message.includes('chưa có') || 
+                        data.message.includes('not ready') ||
+                        data.message.includes('chưa có dữ liệu')
+                    )) {
+                        // Report not ready, continue polling after 5 seconds
+                        console.log(`⏳ Report not ready yet (attempt ${attempts}), will retry in ${pollInterval}ms...`);
+                        setTimeout(poll, pollInterval);
+                    } else {
+                        // Some other error, stop polling
+                        console.error('❌ Error getting report:', data.message);
+                        showNotification('error', 'Lỗi!', data.message || 'Không thể lấy report.');
+                        hideReportLoading();
+                        hideTestExecutionStatus();
+                        const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error(`❌ Error polling report (attempt ${attempts}):`, error);
+                // Continue polling on network errors
+                if (attempts < maxAttempts) {
+                    console.log(`🔄 Network error, will retry in ${pollInterval}ms...`);
+                    setTimeout(poll, pollInterval);
+                } else {
+                    showNotification('error', 'Lỗi!', 'Đã hết thời gian chờ report.');
+                    hideReportLoading();
+                    hideTestExecutionStatus();
+                    const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                    }
+                }
+            });
+        };
+        
+        // Start polling immediately (first attempt)
+        poll();
+    }
+
+    function showTestExecutionStatus(message) {
+        let statusContainer = document.getElementById('testExecutionStatusContainer');
+        if (!statusContainer) {
+            // Create status container
+            statusContainer = document.createElement('div');
+            statusContainer.id = 'testExecutionStatusContainer';
+            statusContainer.className = 'card mt-3 shadow-sm';
+            statusContainer.innerHTML = `
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="bi bi-play-circle"></i> Đang chạy Test Suite</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-primary me-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div>
+                            <p class="mb-0" id="testExecutionStatusMessage">${message}</p>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="testExecutionProgressBar" 
+                                     role="progressbar" 
+                                     style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Insert after test case results container
+            const resultsContainer = document.getElementById('testCaseResultsContainer');
+            if (resultsContainer && resultsContainer.parentNode) {
+                resultsContainer.parentNode.insertBefore(statusContainer, resultsContainer.nextSibling);
+            } else {
+                // Fallback: insert in phase4 card body
+                const phase4 = document.getElementById('phase4');
+                if (phase4) {
+                    phase4.querySelector('.card-body').appendChild(statusContainer);
+                }
+            }
+        } else {
+            document.getElementById('testExecutionStatusMessage').textContent = message;
+            statusContainer.style.display = 'block';
+        }
+    }
+
+    function updateTestExecutionStatus(message) {
+        const messageEl = document.getElementById('testExecutionStatusMessage');
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
+    }
+
+    function hideTestExecutionStatus() {
+        const statusContainer = document.getElementById('testExecutionStatusContainer');
+        if (statusContainer) {
+            statusContainer.style.display = 'none';
+        }
+    }
+
+    // Report Loading Functions
+    function showReportLoading(message) {
+        const loadingContainer = document.getElementById('reportLoadingContainer');
+        const contentContainer = document.getElementById('reportContentContainer');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'block';
+            document.getElementById('reportLoadingText').textContent = message || 'Đang chờ test suite thực thi...';
+            document.getElementById('reportLoadingMessage').textContent = 'Vui lòng chờ trong giây lát...';
+        }
+        if (contentContainer) {
+            contentContainer.style.display = 'none';
+        }
+    }
+
+    function updateReportLoading(message, progress) {
+        const loadingText = document.getElementById('reportLoadingText');
+        const loadingMessage = document.getElementById('reportLoadingMessage');
+        const progressBar = document.getElementById('reportLoadingProgressBar');
+        if (loadingText) loadingText.textContent = message || 'Đang chờ test suite thực thi...';
+        if (loadingMessage) loadingMessage.textContent = 'Vui lòng chờ trong giây lát...';
+        if (progressBar && progress !== undefined) {
+            progressBar.style.width = progress + '%';
+        }
+    }
+
+    function hideReportLoading() {
+        const loadingContainer = document.getElementById('reportLoadingContainer');
+        if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+        }
+    }
+
+    function displayTestReport(reportData, testSuiteReportId) {
+        // Hide loading, show content
+        hideReportLoading();
+        const contentContainer = document.getElementById('reportContentContainer');
+        if (contentContainer) {
+            contentContainer.style.display = 'block';
+        }
+
+        // Extract report data - format: {result: {...}, data: [...]}
+        const reportDataArray = reportData.data || reportData.response?.data || [];
+        const result = reportData.result || reportData.response?.result || {};
+        
+        // Store report data globally for refresh
+        window.currentReportData = reportData;
+        window.currentTestSuiteReportId = testSuiteReportId;
+
+        // Parse test results - data is an array directly
+        let testResults = [];
+        let totalTests = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+        let pendingTests = 0;
+
+        // Check if data is an array
+        if (Array.isArray(reportDataArray)) {
+            testResults = reportDataArray;
+        } else if (reportDataArray && Array.isArray(reportDataArray.data)) {
+            testResults = reportDataArray.data;
+        } else if (reportDataArray && Array.isArray(reportDataArray.test_results)) {
+            testResults = reportDataArray.test_results;
+        }
+
+        console.log('Parsed test results:', testResults);
+        console.log('Total test results:', testResults.length);
+
+        // Calculate statistics
+        totalTests = testResults.length;
+        testResults.forEach(test => {
+            const status = (test.status || '').toLowerCase();
+            if (status === 'passed' || status === 'pass') {
+                passedTests++;
+            } else if (status === 'failed' || status === 'fail') {
+                failedTests++;
+            } else {
+                pendingTests++;
+            }
+        });
+
+        // Update summary statistics
+        document.getElementById('totalTestsCount').textContent = totalTests;
+        document.getElementById('passedTestsCount').textContent = passedTests;
+        document.getElementById('failedTestsCount').textContent = failedTests;
+        document.getElementById('pendingTestsCount').textContent = pendingTests;
+
+        // Update status alert
+        const statusAlert = document.getElementById('reportStatusAlert');
+        if (statusAlert) {
+            if (result.code) {
+                const code = Array.isArray(result.code) ? result.code.join(', ') : result.code;
+                const codeClass = code === '0000' || code === '0' ? 'success' : 'danger';
+                statusAlert.className = `alert alert-${codeClass} mb-4`;
+                statusAlert.style.display = 'block';
+                document.getElementById('reportStatusTitle').textContent = `Result Code: ${code}`;
+                document.getElementById('reportStatusMessage').textContent = result.description || '';
+                statusAlert.querySelector('i').className = code === '0000' || code === '0' 
+                    ? 'bi bi-check-circle-fill me-2' 
+                    : 'bi bi-exclamation-triangle-fill me-2';
+            } else if (failedTests === 0 && totalTests > 0) {
+                statusAlert.className = 'alert alert-success mb-4';
+                statusAlert.style.display = 'block';
+                document.getElementById('reportStatusTitle').textContent = 'All Tests Passed!';
+                document.getElementById('reportStatusMessage').textContent = `Successfully executed ${totalTests} test(s).`;
+                statusAlert.querySelector('i').className = 'bi bi-check-circle-fill me-2';
+            } else if (failedTests > 0) {
+                statusAlert.className = 'alert alert-danger mb-4';
+                statusAlert.style.display = 'block';
+                document.getElementById('reportStatusTitle').textContent = 'Some Tests Failed';
+                document.getElementById('reportStatusMessage').textContent = `${failedTests} out of ${totalTests} test(s) failed.`;
+                statusAlert.querySelector('i').className = 'bi bi-exclamation-triangle-fill me-2';
+            } else {
+                statusAlert.style.display = 'none';
+            }
+        }
+
+        // Populate test results table
+        const tableBody = document.getElementById('testResultsTableBody');
+        const emptyState = document.getElementById('reportEmptyState');
+        
+        if (tableBody) {
+            tableBody.innerHTML = '';
+            
+            if (testResults.length === 0) {
+                if (emptyState) emptyState.style.display = 'block';
+            } else {
+                if (emptyState) emptyState.style.display = 'none';
+                
+                testResults.forEach((test, index) => {
+                    const status = (test.status || 'pending').toLowerCase();
+                    const statusBadge = getStatusBadge(status);
+                    const responseCode = test.response_status_code || '-';
+                    
+                    // Calculate duration from start_time and end_time
+                    let duration = '-';
+                    if (test.start_time && test.end_time) {
+                        try {
+                            const start = new Date(test.start_time);
+                            const end = new Date(test.end_time);
+                            const durationMs = end - start;
+                            duration = formatDuration(durationMs);
+                        } catch (e) {
+                            console.error('Error calculating duration:', e);
+                        }
+                    }
+                    
+                    // Format executed time (use end_time or start_time)
+                    const executedAt = test.end_time || test.start_time || '-';
+                    
+                    // Get test case name (might need to get from test_case_id or use a default)
+                    const testCaseName = test.test_case_name || `Test Case ${index + 1}`;
+                    
+                    // Get endpoint from request (if available in headers or request_body)
+                    const endpoint = test.endpoint || test.url || 'N/A';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td><code class="small">${test.test_case_id || test.id || '-'}</code></td>
+                        <td>${testCaseName}</td>
+                        <td><code class="text-info small">${endpoint}</code></td>
+                        <td>${statusBadge}</td>
+                        <td><span class="badge ${getStatusCodeBadgeClass(responseCode)}">${responseCode}</span></td>
+                        <td>${duration}</td>
+                        <td>${formatDateTime(executedAt)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewTestResultDetail(${index})" title="View Details">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                // Store test results globally for detail modal
+                window.testResults = testResults;
+            }
+        }
+
+        // Update report details
+        const detailsSection = document.getElementById('reportDetailsSection');
+        if (detailsSection) {
+            if (testSuiteReportId || testResults.length > 0) {
+                detailsSection.style.display = 'block';
+                if (testSuiteReportId) {
+                    document.getElementById('reportSuiteId').textContent = testSuiteReportId;
+                }
+                
+                // Calculate total duration from first and last test
+                let totalDuration = '-';
+                if (testResults.length > 0) {
+                    const firstTest = testResults[0];
+                    const lastTest = testResults[testResults.length - 1];
+                    if (firstTest.start_time && lastTest.end_time) {
+                        try {
+                            const start = new Date(firstTest.start_time);
+                            const end = new Date(lastTest.end_time);
+                            const durationMs = end - start;
+                            totalDuration = formatDuration(durationMs);
+                        } catch (e) {
+                            console.error('Error calculating total duration:', e);
+                        }
+                    }
+                }
+                
+                document.getElementById('reportStartTime').textContent = testResults.length > 0 && testResults[0].start_time 
+                    ? formatDateTime(testResults[0].start_time) 
+                    : '-';
+                document.getElementById('reportEndTime').textContent = testResults.length > 0 && testResults[testResults.length - 1].end_time 
+                    ? formatDateTime(testResults[testResults.length - 1].end_time) 
+                    : '-';
+                document.getElementById('reportTotalDuration').textContent = totalDuration;
+                
+                const successRate = totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0;
+                document.getElementById('reportSuccessRate').textContent = successRate + '%';
+                document.getElementById('reportOverallStatus').innerHTML = failedTests === 0 && totalTests > 0
+                    ? '<span class="badge bg-success">Success</span>' 
+                    : '<span class="badge bg-danger">Failed</span>';
+            } else {
+                detailsSection.style.display = 'none';
+            }
+        }
+
+        // Update raw data
+        const rawDataEl = document.getElementById('rawReportData');
+        if (rawDataEl) {
+            rawDataEl.textContent = JSON.stringify(reportData, null, 2);
+        }
+
+        // Scroll to report
+        setTimeout(() => {
+            const phase5 = document.getElementById('phase5');
+            if (phase5) {
+                phase5.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+        
+        showNotification('success', 'Hoàn thành!', 'Đã lấy report thành công.');
+    }
+
+    function getStatusBadge(status) {
+        const statusLower = (status || '').toLowerCase();
+        if (statusLower === 'passed' || statusLower === 'pass' || statusLower === 'success') {
+            return '<span class="badge bg-success">Passed</span>';
+        } else if (statusLower === 'failed' || statusLower === 'fail' || statusLower === 'error') {
+            return '<span class="badge bg-danger">Failed</span>';
+        } else {
+            return '<span class="badge bg-warning">Pending</span>';
+        }
+    }
+
+    function formatDuration(duration) {
+        if (!duration || duration === '-') return '-';
+        if (typeof duration === 'number') {
+            if (duration < 1000) {
+                return duration + 'ms';
+            } else if (duration < 60000) {
+                return (duration / 1000).toFixed(2) + 's';
+            } else {
+                return (duration / 60000).toFixed(2) + 'm';
+            }
+        }
+        return duration;
+    }
+
+    function formatDateTime(dateTime) {
+        if (!dateTime || dateTime === '-') return '-';
+        try {
+            const date = new Date(dateTime);
+            return date.toLocaleString('vi-VN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } catch (e) {
+            return dateTime;
+        }
+    }
+
+    function getStatusCodeBadgeClass(statusCode) {
+        if (!statusCode || statusCode === '-') return 'bg-secondary';
+        const code = parseInt(statusCode);
+        if (code >= 200 && code < 300) return 'bg-success';
+        if (code >= 300 && code < 400) return 'bg-info';
+        if (code >= 400 && code < 500) return 'bg-warning';
+        if (code >= 500) return 'bg-danger';
+        return 'bg-secondary';
+    }
+
+    function viewTestResultDetail(index) {
+        if (!window.testResults || !window.testResults[index]) {
+            showNotification('error', 'Lỗi', 'Không tìm thấy test result');
+            return;
+        }
+
+        const test = window.testResults[index];
+        const status = (test.status || 'pending').toLowerCase();
+        
+        // Calculate duration
+        let duration = '-';
+        if (test.start_time && test.end_time) {
+            try {
+                const start = new Date(test.start_time);
+                const end = new Date(test.end_time);
+                const durationMs = end - start;
+                duration = formatDuration(durationMs);
+            } catch (e) {
+                console.error('Error calculating duration:', e);
+            }
+        }
+        
+        // Populate modal
+        document.getElementById('resultDetailId').textContent = test.test_case_id || test.id || 'N/A';
+        document.getElementById('resultDetailName').textContent = test.test_case_name || `Test Case ${index + 1}`;
+        document.getElementById('resultDetailEndpoint').textContent = test.endpoint || test.url || 'N/A';
+        document.getElementById('resultDetailStatus').innerHTML = getStatusBadge(status);
+        document.getElementById('resultDetailResponseCode').innerHTML = `<span class="badge ${getStatusCodeBadgeClass(test.response_status_code)}">${test.response_status_code || 'N/A'}</span>`;
+        document.getElementById('resultDetailDuration').textContent = duration;
+        document.getElementById('resultDetailStartTime').textContent = formatDateTime(test.start_time);
+        document.getElementById('resultDetailExecutedAt').textContent = formatDateTime(test.end_time || test.start_time);
+        
+        // Request Body
+        const requestBody = test.request_body || {};
+        document.getElementById('resultDetailRequest').textContent = typeof requestBody === 'string' 
+            ? requestBody 
+            : JSON.stringify(requestBody, null, 2);
+        
+        // Request Headers
+        const requestHeader = test.request_header || {};
+        let requestInfo = 'Request Headers:\n' + JSON.stringify(requestHeader, null, 2);
+        if (Object.keys(requestBody).length > 0) {
+            requestInfo += '\n\nRequest Body:\n' + JSON.stringify(requestBody, null, 2);
+        }
+        document.getElementById('resultDetailRequest').textContent = requestInfo;
+        
+        // Response Body
+        const responseBody = test.response_body || {};
+        document.getElementById('resultDetailResponse').textContent = typeof responseBody === 'string' 
+            ? responseBody 
+            : JSON.stringify(responseBody, null, 2);
+        
+        // Response Headers (add to response display)
+        const responseHeader = test.response_header || {};
+        let responseInfo = 'Response Headers:\n' + JSON.stringify(responseHeader, null, 2);
+        if (Object.keys(responseBody).length > 0) {
+            responseInfo += '\n\nResponse Body:\n' + JSON.stringify(responseBody, null, 2);
+        }
+        document.getElementById('resultDetailResponse').textContent = responseInfo;
+        
+        // Error section - show if status is failed
+        const errorSection = document.getElementById('resultDetailErrorSection');
+        if (status === 'failed' || status === 'fail') {
+            errorSection.style.display = 'block';
+            let errorMessage = `Test failed with status code: ${test.response_status_code || 'N/A'}`;
+            if (test.error || test.error_message) {
+                errorMessage += '\n\n' + (test.error || test.error_message);
+            }
+            document.getElementById('resultDetailError').textContent = errorMessage;
+        } else {
+            errorSection.style.display = 'none';
+        }
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('testResultDetailModal'));
+        modal.show();
+    }
+
+    function refreshReport() {
+        if (!window.currentTestSuiteReportId || !window.currentProjectUuid) {
+            showNotification('warning', 'Cảnh báo', 'Không có report để refresh.');
+            return;
+        }
+
+        const refreshBtn = document.getElementById('refreshReportBtn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing...';
+        }
+
+        showReportLoading('Đang làm mới report...');
+        
+        fetch(`/project/${window.currentProjectUuid}/test-report/${window.currentTestSuiteReportId}/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            _timeoutMs: 10000,
+            _retries: 1
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTestReport(data, window.currentTestSuiteReportId);
+                showNotification('success', 'Thành công', 'Đã làm mới report.');
+            } else {
+                showNotification('error', 'Lỗi!', data.message || 'Không thể làm mới report.');
+                hideReportLoading();
+            }
+        })
+        .catch(error => {
+            console.error('Error refreshing report:', error);
+            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi làm mới report.');
+            hideReportLoading();
+        })
+        .finally(() => {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+            }
+        });
+    }
+
+    function exportReport() {
+        if (!window.currentReportData) {
+            showNotification('warning', 'Cảnh báo', 'Không có dữ liệu để export.');
+            return;
+        }
+
+        const dataStr = JSON.stringify(window.currentReportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `test-report-${window.currentTestSuiteReportId || Date.now()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showNotification('success', 'Thành công', 'Đã export report.');
+    }
+
+    function viewTestCaseDetails(index) {
+        const testCase = allTestCases[index];
+        if (!testCase) {
+            showNotification('error', 'Lỗi', 'Không tìm thấy test case');
+            return;
+        }
+
+        // Populate modal with test case details
+        document.getElementById('testCaseDetailId').textContent = testCase.test_case_id || 'N/A';
+        document.getElementById('testCaseDetailName').textContent = testCase.test_case_name || 'N/A';
+        document.getElementById('testCaseDetailEndpoint').textContent = testCase.endpoint || 'N/A';
+        document.getElementById('testCaseDetailCategory').textContent = testCase.test_category || 'N/A';
+        document.getElementById('testCaseDetailStatus').textContent = testCase.expected_statuscode || 'N/A';
+
+        // Format and display headers
+        const header = testCase.header || {};
+        const headerElement = document.getElementById('testCaseDetailHeader');
+        if (header && typeof header === 'object' && Object.keys(header).length > 0) {
+            try {
+                const formatted = JSON.stringify(header, null, 2);
+                headerElement.textContent = formatted;
+                headerElement.className = 'bg-light p-3 rounded border mb-0';
+            } catch (e) {
+                headerElement.textContent = JSON.stringify(header, null, 2);
+                headerElement.className = 'bg-light p-3 rounded border mb-0';
+            }
+        } else if (header && typeof header === 'string') {
+            try {
+                const headerObj = JSON.parse(header);
+                const formatted = JSON.stringify(headerObj, null, 2);
+                headerElement.textContent = formatted;
+                headerElement.className = 'bg-light p-3 rounded border mb-0';
+            } catch (e) {
+                headerElement.textContent = header;
+                headerElement.className = 'bg-light p-3 rounded border mb-0';
+            }
+        } else {
+            headerElement.textContent = 'N/A';
+            headerElement.className = 'text-muted mb-0';
+        }
+
+        // Format and display request body
+        const requestBody = testCase.request_body || 'N/A';
+        const requestBodyElement = document.getElementById('testCaseDetailRequestBody');
+        if (requestBody !== 'N/A') {
+            try {
+                const formatted = JSON.stringify(JSON.parse(requestBody), null, 2);
+                requestBodyElement.textContent = formatted;
+                requestBodyElement.className = 'bg-light p-3 rounded border';
+            } catch (e) {
+                requestBodyElement.textContent = requestBody;
+                requestBodyElement.className = 'bg-light p-3 rounded border';
+            }
+        } else {
+            requestBodyElement.textContent = 'N/A';
+            requestBodyElement.className = 'text-muted';
+        }
+
+        // Format and display expected response
+        const expectedResponse = testCase.expected_response || 'N/A';
+        const expectedResponseElement = document.getElementById('testCaseDetailExpectedResponse');
+        if (expectedResponse !== 'N/A') {
+            try {
+                const formatted = JSON.stringify(JSON.parse(expectedResponse), null, 2);
+                expectedResponseElement.textContent = formatted;
+                expectedResponseElement.className = 'bg-light p-3 rounded border';
+            } catch (e) {
+                expectedResponseElement.textContent = expectedResponse;
+                expectedResponseElement.className = 'bg-light p-3 rounded border';
+            }
+        } else {
+            expectedResponseElement.textContent = 'N/A';
+            expectedResponseElement.className = 'text-muted';
+        }
+
+        // Hide cURL section initially
+        document.getElementById('curlCommandSection').style.display = 'none';
+        
+        // Store current test case index for cURL conversion
+        window.currentTestCaseIndex = index;
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('testCaseDetailModal'));
+        modal.show();
+    }
+
+    // Store current test case for cURL conversion
+    let currentTestCaseForCurl = null;
+
+    function convertToCurl() {
+        // Get current test case from modal or stored index
+        const index = window.currentTestCaseIndex;
+        if (index === undefined || !allTestCases[index]) {
+            showNotification('error', 'Lỗi', 'Không tìm thấy test case để convert');
+            return;
+        }
+        
+        const testCase = allTestCases[index];
+        currentTestCaseForCurl = testCase;
+        
+        // Get data from test case
+        let endpoint = testCase.endpoint || '';
+        let method = testCase.http_method || 'GET'; // Default to GET if not specified
+        
+        // If method is not provided, try to infer from endpoint or API name
+        if (!method || method === 'N/A') {
+            const apiName = (testCase.api_name || '').toLowerCase();
+            const endpointLower = endpoint.toLowerCase();
+            
+            if (apiName.includes('create') || apiName.includes('add') || endpointLower.includes('create') || endpointLower.includes('add')) {
+                method = 'POST';
+            } else if (apiName.includes('update') || apiName.includes('edit') || endpointLower.includes('update') || endpointLower.includes('edit')) {
+                method = 'PUT';
+            } else if (apiName.includes('delete') || apiName.includes('remove') || endpointLower.includes('delete') || endpointLower.includes('remove')) {
+                method = 'DELETE';
+            } else {
+                method = 'GET';
+            }
+        }
+        
+        const headers = testCase.header || {};
+        let requestBody = testCase.request_body || null;
+        
+        // Get request_mapping from full_test_case_data if available (for URL placeholder replacement)
+        let requestMapping = {};
+        if (testCase.full_test_case_data && testCase.full_test_case_data.request_mapping) {
+            requestMapping = testCase.full_test_case_data.request_mapping;
+        }
+        
+        // Replace URL placeholders (e.g., {project_id}) with values from request_mapping
+        if (endpoint && endpoint !== 'N/A') {
+            // Find all placeholders in URL (format: {placeholder_name})
+            const placeholderRegex = /\{(\w+)\}/g;
+            let match;
+            const placeholders = [];
+            while ((match = placeholderRegex.exec(endpoint)) !== null) {
+                placeholders.push(match[1]);
+            }
+            
+            // Replace each placeholder
+            placeholders.forEach(placeholderName => {
+                const placeholderValue = requestMapping[placeholderName];
+                
+                if (placeholderValue !== undefined && placeholderValue !== null) {
+                    // Replace placeholder with actual value
+                    // Handle special test values
+                    let replacementValue = placeholderValue;
+                    
+                    if (typeof replacementValue === 'string') {
+                        // For special test values, use a descriptive placeholder
+                        if (replacementValue === 'ABSENT' || replacementValue === 'NULL' || replacementValue === 'N/A') {
+                            replacementValue = `{${placeholderName}}`; // Keep placeholder for invalid values
+                        } else if (replacementValue.startsWith('CHARS(')) {
+                            // Extract length if possible, otherwise keep placeholder
+                            const charsMatch = replacementValue.match(/CHARS\((\d+)\)/);
+                            if (charsMatch) {
+                                replacementValue = `{${placeholderName}}`; // Keep placeholder for generated strings
+                            } else {
+                                replacementValue = `{${placeholderName}}`;
+                            }
+                        } else {
+                            // Use the actual value (could be UUID, ID, etc.)
+                            replacementValue = String(replacementValue);
+                        }
+                    } else {
+                        // Convert non-string to string
+                        replacementValue = String(replacementValue);
+                    }
+                    
+                    // Replace all occurrences of this placeholder
+                    endpoint = endpoint.replace(new RegExp(`\\{${placeholderName}\\}`, 'g'), replacementValue);
+                }
+            })
+        }
+        
+        // Validate endpoint
+        if (!endpoint || endpoint === 'N/A') {
+            showNotification('error', 'Lỗi', 'Endpoint không hợp lệ, không thể tạo cURL command');
+            return;
+        }
+        
+        // Build cURL command
+        let curlCommand = 'curl';
+        
+        // Add method
+        if (method.toUpperCase() !== 'GET') {
+            curlCommand += ` -X ${method.toUpperCase()}`;
+        }
+        
+        // Add headers
+        let hasContentType = false;
+        if (headers && typeof headers === 'object' && Object.keys(headers).length > 0) {
+            Object.entries(headers).forEach(([key, value]) => {
+                if (key.toLowerCase() === 'content-type') {
+                    hasContentType = true;
+                }
+                // Escape special characters in header values
+                const escapedValue = String(value).replace(/"/g, '\\"');
+                curlCommand += ` \\\n  -H "${key}: ${escapedValue}"`;
+            });
+        } else if (headers && typeof headers === 'string') {
+            try {
+                const headerObj = JSON.parse(headers);
+                Object.entries(headerObj).forEach(([key, value]) => {
+                    if (key.toLowerCase() === 'content-type') {
+                        hasContentType = true;
+                    }
+                    const escapedValue = String(value).replace(/"/g, '\\"');
+                    curlCommand += ` \\\n  -H "${key}: ${escapedValue}"`;
+                });
+            } catch (e) {
+                // If parsing fails, skip headers
+            }
+        }
+        
+        // Add Content-Type header if not present and we have a body
+        if (!hasContentType && requestBody && requestBody !== 'N/A' && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+            curlCommand += ` \\\n  -H "Content-Type: application/json"`;
+        }
+        
+        // Add request body for POST, PUT, PATCH methods
+        if (requestBody && requestBody !== 'N/A' && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+            try {
+                // Try to parse as JSON to ensure it's valid
+                let bodyStr;
+                if (typeof requestBody === 'string') {
+                    // Try to parse as JSON
+                    try {
+                        const bodyObj = JSON.parse(requestBody);
+                        bodyStr = JSON.stringify(bodyObj);
+                    } catch (e) {
+                        // If not valid JSON, use as is
+                        bodyStr = requestBody;
+                    }
+                } else {
+                    bodyStr = JSON.stringify(requestBody);
+                }
+                
+                // Escape for shell: escape single quotes and backslashes
+                const escapedBody = bodyStr
+                    .replace(/\\/g, '\\\\')  // Escape backslashes first
+                    .replace(/'/g, "'\\''")  // Escape single quotes
+                    .replace(/\n/g, '\\n')    // Escape newlines
+                    .replace(/\r/g, '\\r');    // Escape carriage returns
+                
+                curlCommand += ` \\\n  -d '${escapedBody}'`;
+            } catch (e) {
+                // If not JSON, treat as plain text
+                const escapedBody = String(requestBody)
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "'\\''")
+                    .replace(/\n/g, '\\n')
+                    .replace(/\r/g, '\\r');
+                curlCommand += ` \\\n  -d '${escapedBody}'`;
+            }
+        }
+        
+        // Add URL (must be last or properly quoted)
+        // Escape special characters in URL
+        const escapedUrl = endpoint.replace(/"/g, '\\"');
+        curlCommand += ` \\\n  "${escapedUrl}"`;
+        
+        // Display cURL command
+        const curlElement = document.getElementById('testCaseDetailCurl');
+        curlElement.textContent = curlCommand;
+        
+        // Show cURL section
+        document.getElementById('curlCommandSection').style.display = 'block';
+        
+        // Scroll to cURL section
+        setTimeout(() => {
+            document.getElementById('curlCommandSection').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }, 100);
+        
+        showNotification('success', 'Thành công!', 'Đã convert test case sang cURL command');
+    }
+
+    function copyCurlCommand() {
+        const curlElement = document.getElementById('testCaseDetailCurl');
+        const curlCommand = curlElement.textContent;
+        
+        if (!curlCommand || curlCommand === '-') {
+            showNotification('error', 'Lỗi', 'Không có cURL command để copy');
+            return;
+        }
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(curlCommand).then(() => {
+            // Update button to show success
+            const copyBtn = document.getElementById('copyCurlBtn');
+            const originalHtml = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            copyBtn.classList.remove('btn-outline-primary');
+            copyBtn.classList.add('btn-success');
+            
+            showNotification('success', 'Đã copy!', 'cURL command đã được copy vào clipboard');
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-outline-primary');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            showNotification('error', 'Lỗi', 'Không thể copy cURL command');
+        });
+    }
+
+    function loadSections() {
+        // Load sections from all completed documents
+        fetch(`/project/{{ project.uuid }}/sections/json/`, { _noLoading: true, _timeoutMs: 30000, _retries: 1 })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.sections.length > 0) {
+                    const container = document.getElementById('sectionsContainer');
+                    container.innerHTML = `
                 <div class="alert alert-info mb-3">
                     <i class="bi bi-info-circle"></i>
                     <strong>${data.total_sections || data.sections.length} sections</strong> extracted from <strong>${data.documents_count || 'all processed'} documents</strong>.
                 </div>
                 <div class="row"></div>
             `;
-            const row = container.querySelector('.row');
+                    const row = container.querySelector('.row');
 
-            data.sections.forEach(section => {
-                const sectionCard = createSectionCard(section);
-                row.appendChild(sectionCard);
-            });
+                    data.sections.forEach(section => {
+                        const sectionCard = createSectionCard(section);
+                        row.appendChild(sectionCard);
+                    });
 
-            // Hide sections and show FR annotations instead
-            document.getElementById('sectionsContainer').style.display = 'none';
+                    // Hide sections and show FR annotations instead
+                    document.getElementById('sectionsContainer').style.display = 'none';
 
-            // Reset the first load flag to ensure analyze=true for fresh data when coming from step 2
-            localStorage.removeItem('fr_first_load_done');
+                    // Reset the first load flag to ensure analyze=true for fresh data when coming from step 2
+                    localStorage.removeItem('fr_first_load_done');
 
-            // Load FR annotations after sections
-            loadFRAnnotations();
-        } else {
-            document.getElementById('sectionsContainer').innerHTML = `
+                    // Load FR annotations after sections
+                    loadFRAnnotations();
+                } else {
+                    document.getElementById('sectionsContainer').innerHTML = `
                 <div class="text-center py-5">
                     <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
                     <h5 class="mt-3 text-muted">No sections found</h5>
                     <p class="text-muted">AI processing may not have extracted any sections from the uploaded documents.</p>
                 </div>
             `;
-        }
-    })
-    .catch(error => {
-        console.error('Error loading sections:', error);
-        document.getElementById('sectionsContainer').innerHTML = `
+                }
+            })
+            .catch(error => {
+                console.error('Error loading sections:', error);
+                document.getElementById('sectionsContainer').innerHTML = `
             <div class="text-center py-5">
                 <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: #dc3545;"></i>
                 <h5 class="mt-3 text-muted">Error loading sections</h5>
                 <p class="text-muted">An error occurred while loading sections.</p>
             </div>
         `;
-    });
-}
+            });
+    }
 
-function loadFRAnnotations(analyzeOverride = null) {
-    const frList = document.getElementById('frList');
-    if (!frList) return;
+    function loadFRAnnotations(analyzeOverride = null) {
+        const frList = document.getElementById('frList');
+        if (!frList) return;
 
-    // Show loading state
-    frList.innerHTML = `
+        // Show loading state
+        frList.innerHTML = `
         <div class="col-12">
             <div class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
@@ -312,312 +2287,322 @@ function loadFRAnnotations(analyzeOverride = null) {
         </div>
     `;
 
-    // Determine analyze parameter
-    let analyze = false; // Default to cached mode
+        // Determine analyze parameter
+        // Default to cached mode since FR extraction is now done in step 2
+        let analyze = false;
 
-    // Check if fresh analysis is needed (e.g., after AI processing completion)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('fresh_analysis') === '1') {
-        analyze = true;
-        console.log('Fresh analysis triggered after AI processing completion');
-        // Remove the parameter from URL to prevent re-analysis on refresh
-        const newUrl = window.location.href.replace('&fresh_analysis=1', '').replace('?fresh_analysis=1', '');
-        window.history.replaceState({}, document.title, newUrl);
-    }
-
-    // Check saved preference if no fresh analysis trigger
-    if (!urlParams.get('fresh_analysis')) {
+        // Check saved preference from toggle (if user wants to re-analyze)
         const savedPreference = localStorage.getItem('fr_analyze_preference');
         if (savedPreference !== null) {
             analyze = JSON.parse(savedPreference);
         }
-    }
 
-    // Call the backend API endpoint
-    const apiUrl = `/project/{{ project.uuid }}/annotate-fr/`;
+        // Call the backend API endpoint
+        const apiUrl = `/project/{{ project.uuid }}/annotate-fr/`;
 
-    console.log('Loading FR annotations with analyze=', analyze);
+        console.log('Loading FR annotations with analyze=', analyze);
 
-    fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'accept': 'application/json'
-        },
-        body: JSON.stringify({
-            lang: 'vi',
-            analyze: analyze
-        }),
-        _timeoutMs: 60000,
-        _retries: 1
-    })
-    .then(response => {
-        console.log('FR API response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('FR API response data:', data);
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'accept': 'application/json'
+            },
+            body: JSON.stringify({
+                lang: 'vi',
+                analyze: analyze
+            }),
+            _timeoutMs: 60000,
+            _retries: 1
+        })
+            .then(response => {
+                console.log('FR API response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('FR API response data:', data);
 
-        // Handle both wrapped response (success: true, fr_annotations: [...]) and direct array response
-        let frArray = [];
-        if (data.success && data.fr_annotations && Array.isArray(data.fr_annotations)) {
-            frArray = data.fr_annotations;
-            // Show cache status if applicable
-            if (data.cached) {
-                const cacheAlert = document.createElement('div');
-                cacheAlert.className = 'alert alert-info alert-dismissible fade show mb-3';
-                cacheAlert.innerHTML = `
+                // Handle both wrapped response (success: true, fr_annotations: [...]) and direct array response
+                let frArray = [];
+                if (data.success && data.fr_annotations && Array.isArray(data.fr_annotations)) {
+                    frArray = data.fr_annotations;
+                    // Show cache status if applicable
+                    if (data.cached) {
+                        const cacheAlert = document.createElement('div');
+                        cacheAlert.className = 'alert alert-info alert-dismissible fade show mb-3';
+                        cacheAlert.innerHTML = `
                     <i class="bi bi-info-circle"></i>
                     <strong>Using cached data.</strong> Toggle "Fresh" and reload to re-analyze documents.
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
-                frList.appendChild(cacheAlert);
-            }
-        } else if (Array.isArray(data)) {
-            // Direct array response from API
-            frArray = data;
-        }
-
-        if (frArray.length > 0) {
-            // Show the FR container
-            document.getElementById('frContainer').style.display = 'block';
-            document.getElementById('sectionsContainer').style.display = 'none';
-
-            frList.innerHTML = '';
-
-            frArray.forEach(fr => {
-                const col = document.createElement('div');
-                col.className = 'col-md-6 col-lg-4 mb-3';
-
-                const card = document.createElement('div');
-                card.className = 'card h-100 border';
-
-                const cardBody = document.createElement('div');
-                cardBody.className = 'card-body d-flex flex-column';
-
-                // Checkbox
-                const checkboxDiv = document.createElement('div');
-                checkboxDiv.className = 'form-check mb-2';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'form-check-input fr-checkbox';
-                checkbox.value = fr.fr_info_id;
-                checkbox.id = `fr_${fr.fr_info_id}`;
-                // Restore selection state from cached data
-                checkbox.checked = fr.is_selected || false;
-
-                const checkboxLabel = document.createElement('label');
-                checkboxLabel.className = 'form-check-label fw-bold';
-                checkboxLabel.htmlFor = `fr_${fr.fr_info_id}`;
-                checkboxLabel.textContent = fr.fr_group;
-
-                checkboxDiv.appendChild(checkbox);
-                checkboxDiv.appendChild(checkboxLabel);
-
-                // Description
-                const description = document.createElement('p');
-                description.className = 'card-text text-muted small flex-grow-1';
-                description.textContent = fr.description || 'No description available';
-
-                // Document locations
-                if (fr.documents && fr.documents.length > 0) {
-                    const docInfo = document.createElement('div');
-                    docInfo.className = 'mt-2';
-                    fr.documents.forEach(doc => {
-                        const docBadge = document.createElement('span');
-                        docBadge.className = 'badge bg-info me-1 mb-1';
-                        docBadge.textContent = `Doc ${doc.doc}, §${doc.heading}`;
-                        docInfo.appendChild(docBadge);
-                    });
-                    cardBody.appendChild(docInfo);
+                        frList.appendChild(cacheAlert);
+                    }
+                } else if (Array.isArray(data)) {
+                    // Direct array response from API
+                    frArray = data;
                 }
 
-                // Info row
-                const infoRow = document.createElement('div');
-                infoRow.className = 'mt-auto';
-                infoRow.appendChild(description);
+                if (frArray.length > 0) {
+                    // Show the FR container
+                    document.getElementById('frContainer').style.display = 'block';
+                    document.getElementById('sectionsContainer').style.display = 'none';
 
-                // Controls row
-                const controlsRow = document.createElement('div');
-                controlsRow.className = 'd-flex justify-content-between align-items-center mt-2';
+                    frList.innerHTML = '';
 
-                const frId = document.createElement('small');
-                frId.className = 'text-muted';
-                frId.textContent = `ID: ${fr.fr_info_id}`;
+                    frArray.forEach(fr => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6 col-lg-4 mb-3';
 
-                const controlsRight = document.createElement('div');
-                controlsRight.className = 'd-flex align-items-center gap-2';
+                        const card = document.createElement('div');
+                        card.className = 'card h-100 border';
 
-                const statusBadge = document.createElement('span');
-                statusBadge.className = `badge ${fr.is_selected ? 'bg-success' : 'bg-secondary'}`;
-                statusBadge.textContent = fr.is_selected ? 'Selected' : 'Not Selected';
+                        const cardBody = document.createElement('div');
+                        cardBody.className = 'card-body d-flex flex-column';
 
-                const viewDetailsBtn = document.createElement('button');
-                viewDetailsBtn.className = 'btn btn-sm btn-outline-info';
-                viewDetailsBtn.innerHTML = '<i class="bi bi-eye"></i>';
-                viewDetailsBtn.title = 'View FR Details';
-                viewDetailsBtn.onclick = () => showFRDetails(fr, fr.fr_info_id);
+                        // Checkbox
+                        const checkboxDiv = document.createElement('div');
+                        checkboxDiv.className = 'form-check mb-2';
 
-                controlsRight.appendChild(statusBadge);
-                controlsRight.appendChild(viewDetailsBtn);
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'form-check-input fr-checkbox';
+                        checkbox.value = fr.fr_info_id;
+                        checkbox.id = `fr_${fr.fr_info_id}`;
+                        // Restore selection state from cached data
+                        checkbox.checked = fr.is_selected || false;
 
-                controlsRow.appendChild(frId);
-                controlsRow.appendChild(controlsRight);
+                        const checkboxLabel = document.createElement('label');
+                        checkboxLabel.className = 'form-check-label fw-bold';
+                        checkboxLabel.htmlFor = `fr_${fr.fr_info_id}`;
+                        checkboxLabel.textContent = fr.fr_group;
 
-                cardBody.appendChild(checkboxDiv);
-                cardBody.appendChild(infoRow);
-                cardBody.appendChild(controlsRow);
-                card.appendChild(cardBody);
-                col.appendChild(card);
+                        checkboxDiv.appendChild(checkbox);
+                        checkboxDiv.appendChild(checkboxLabel);
 
-                frList.appendChild(col);
-            });
+                        // Description
+                        const description = document.createElement('p');
+                        description.className = 'card-text text-muted small flex-grow-1';
+                        description.textContent = fr.description || 'No description available';
 
-            // Add event listeners to update badge status when checkboxes change
-            document.querySelectorAll('.fr-checkbox').forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    const badge = this.closest('.card-body').querySelector('.badge');
-                    if (badge) {
-                        if (this.checked) {
-                            badge.className = 'badge bg-success';
-                            badge.textContent = 'Selected';
-                        } else {
-                            badge.className = 'badge bg-secondary';
-                            badge.textContent = 'Not Selected';
+                        // Document locations
+                        if (fr.documents && fr.documents.length > 0) {
+                            const docInfo = document.createElement('div');
+                            docInfo.className = 'mt-2';
+                            fr.documents.forEach(doc => {
+                                const docBadge = document.createElement('span');
+                                docBadge.className = 'badge bg-info me-1 mb-1';
+                                docBadge.textContent = `Doc ${doc.doc}, §${doc.heading}`;
+                                docInfo.appendChild(docBadge);
+                            });
+                            cardBody.appendChild(docInfo);
                         }
-                    }
-                });
-            });
 
-            // Show the Save FR Selections button after loading
-            document.getElementById('saveFRSelectionContainer').style.display = 'block';
-        } else {
-            frList.innerHTML = `
+                        // Info row
+                        const infoRow = document.createElement('div');
+                        infoRow.className = 'mt-auto';
+                        infoRow.appendChild(description);
+
+                        // Controls row
+                        const controlsRow = document.createElement('div');
+                        controlsRow.className = 'd-flex justify-content-between align-items-center mt-2';
+
+                        const frId = document.createElement('small');
+                        frId.className = 'text-muted';
+                        frId.textContent = `ID: ${fr.fr_info_id}`;
+
+                        const controlsRight = document.createElement('div');
+                        controlsRight.className = 'd-flex align-items-center gap-2';
+
+                        const statusBadge = document.createElement('span');
+                        statusBadge.className = `badge ${fr.is_selected ? 'bg-success' : 'bg-secondary'}`;
+                        statusBadge.textContent = fr.is_selected ? 'Selected' : 'Not Selected';
+
+                        // const viewDetailsBtn = document.createElement('button');
+                        // viewDetailsBtn.className = 'btn btn-sm btn-outline-info';
+                        // viewDetailsBtn.innerHTML = '<i class="bi bi-eye"></i>';
+                        // viewDetailsBtn.title = 'View FR Details';
+                        // viewDetailsBtn.onclick = () => showFRDetails(fr, fr.fr_info_id);
+
+                        controlsRight.appendChild(statusBadge);
+                        // controlsRight.appendChild(viewDetailsBtn);
+
+                        controlsRow.appendChild(frId);
+                        controlsRow.appendChild(controlsRight);
+
+                        cardBody.appendChild(checkboxDiv);
+                        cardBody.appendChild(infoRow);
+                        cardBody.appendChild(controlsRow);
+                        card.appendChild(cardBody);
+                        col.appendChild(card);
+
+                        frList.appendChild(col);
+                    });
+
+                    // Add event listeners to update badge status when checkboxes change
+                    document.querySelectorAll('.fr-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', function () {
+                            const badge = this.closest('.card-body').querySelector('.badge');
+                            if (badge) {
+                                if (this.checked) {
+                                    badge.className = 'badge bg-success';
+                                    badge.textContent = 'Selected';
+                                } else {
+                                    badge.className = 'badge bg-secondary';
+                                    badge.textContent = 'Not Selected';
+                                }
+                            }
+                        });
+                    });
+
+                    // Check if any FRs are already selected
+                    const hasSelectedFRs = frArray.some(fr => fr.is_selected === true);
+                    
+                    // Set flag if FRs are already selected (but keep button visible for additional selections)
+                    if (hasSelectedFRs) {
+                        window.frSelectionsSaved = true;
+                    }
+                    
+                    // Always show Save button so user can add more selections
+                    document.getElementById('saveFRSelectionContainer').style.display = 'block';
+                } else {
+                    frList.innerHTML = `
                 <div class="col-12">
                     <div class="alert alert-danger">
                         <i class="bi bi-exclamation-triangle"></i> ${data.message || 'Error loading Functional Requirements.'}
                     </div>
                 </div>
             `;
-        }
-    })
-    .catch(error => {
-        console.error('Error loading FR annotations:', error);
-        frList.innerHTML = `
+                }
+            })
+            .catch(error => {
+                console.error('Error loading FR annotations:', error);
+                frList.innerHTML = `
             <div class="col-12">
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle"></i> Failed to load Functional Requirements: ${error.message}
                 </div>
             </div>
         `;
-    });
-}
-
-
-function updateAnalyzeLabel() {
-    const toggle = document.getElementById('analyzeToggle');
-    const label = document.getElementById('analyzeLabel');
-    if (toggle && label) {
-        label.textContent = toggle.checked ? 'Fresh' : 'Cached';
-        // Save preference to localStorage
-        localStorage.setItem('fr_analyze_preference', toggle.checked);
-    }
-}
-
-function loadAnalyzePreference() {
-    const toggle = document.getElementById('analyzeToggle');
-    if (toggle) {
-        // Load from localStorage, default to false (cached mode) for performance
-        const savedPreference = localStorage.getItem('fr_analyze_preference');
-        toggle.checked = savedPreference !== null ? JSON.parse(savedPreference) : false;
-        updateAnalyzeLabel();
-    }
-}
-
-// Set up analyze toggle event listener
-document.addEventListener('DOMContentLoaded', function() {
-    const analyzeToggle = document.getElementById('analyzeToggle');
-    if (analyzeToggle) {
-        analyzeToggle.addEventListener('change', updateAnalyzeLabel);
-        loadAnalyzePreference(); // Load saved preference
-    }
-});
-
-function reloadFRs() {
-    // Get current toggle state
-    const analyzeToggle = document.getElementById('analyzeToggle');
-    const shouldAnalyze = analyzeToggle ? analyzeToggle.checked : false;
-
-    // Reload FRs with current analyze setting
-    loadFRAnnotations(shouldAnalyze);
-}
-
-
-
-
-function saveFRSelections() {
-    const selectedFRs = Array.from(document.querySelectorAll('.fr-checkbox:checked'))
-        .map(checkbox => checkbox.value);
-
-    if (selectedFRs.length === 0) {
-        alert('Vui lòng chọn ít nhất một Functional Requirement');
-        return;
+            });
     }
 
-    const button = document.getElementById('saveFRSelectionContainer').querySelector('button');
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
-    button.disabled = true;
 
-    // Call the backend select API with all selected FRs
-    console.log('Saving FR selections:', selectedFRs);
-    fetch(`/project/{{ project.uuid }}/select-fr/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'accept': 'application/json'
-        },
-        body: JSON.stringify({
-            fr_info_ids: selectedFRs,
-            is_selected: true
-        }),
-        _timeoutMs: 30000,
-        _retries: 1
-    })
-    .then(response => {
-        console.log('API response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('API response data:', data);
-        if (data.success) {
-            showNotification('success', 'Thành công!', `Đã lưu ${selectedFRs.length} Functional Requirements thành công (${data.updated_count} bản ghi được cập nhật).`);
-            // Hide save button and allow proceeding to next step
-            document.getElementById('saveFRSelectionContainer').style.display = 'none';
-
-            // Ensure cached data is marked as fresh after saving selections
-            // This prevents unnecessary re-analysis on page refresh
-            localStorage.setItem('fr_cache_fresh', Date.now().toString());
-        } else {
-            showNotification('error', 'Lỗi!', data.message || 'Failed to save FR selections.');
+    function updateAnalyzeLabel() {
+        const toggle = document.getElementById('analyzeToggle');
+        const label = document.getElementById('analyzeLabel');
+        if (toggle && label) {
+            label.textContent = toggle.checked ? 'Fresh' : 'Cached';
+            // Save preference to localStorage
+            localStorage.setItem('fr_analyze_preference', toggle.checked);
+            
+            // Show/hide refresh button based on toggle state
+            if (refreshBtn) {
+                refreshBtn.style.display = toggle.checked ? 'inline-block' : 'none';
+            }
         }
-    })
-    .catch(error => {
-        console.error('Error saving FR selections:', error);
-        showNotification('error', 'Lỗi!', 'Failed to save FR selections.');
-    })
-    .finally(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
+    }
 
-function showFRDetails(fr, frInfoId) {
-    // Create modal for FR details
-    const modalHtml = `
+    function loadAnalyzePreference() {
+        const toggle = document.getElementById('analyzeToggle');
+        if (toggle) {
+            // Load from localStorage, default to false (cached mode) for performance
+            const savedPreference = localStorage.getItem('fr_analyze_preference');
+            toggle.checked = savedPreference !== null ? JSON.parse(savedPreference) : false;
+            updateAnalyzeLabel();
+        }
+    }
+
+    // Set up analyze toggle event listener
+    document.addEventListener('DOMContentLoaded', function () {
+        const analyzeToggle = document.getElementById('analyzeToggle');
+        if (analyzeToggle) {
+            analyzeToggle.addEventListener('change', updateAnalyzeLabel);
+            loadAnalyzePreference(); // Load saved preference
+        }
+    });
+
+    function reloadFRs() {
+        // Get current toggle state
+        const analyzeToggle = document.getElementById('analyzeToggle');
+        const shouldAnalyze = analyzeToggle ? analyzeToggle.checked : false;
+
+        // Reload FRs with current analyze setting
+        loadFRAnnotations(shouldAnalyze);
+    }
+
+
+
+
+    function saveFRSelections() {
+        const selectedFRs = Array.from(document.querySelectorAll('.fr-checkbox:checked'))
+            .map(checkbox => checkbox.value);
+
+        if (selectedFRs.length === 0) {
+            alert('Vui lòng chọn ít nhất một Functional Requirement');
+            return;
+        }
+
+        const button = document.getElementById('saveFRSelectionContainer').querySelector('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+        button.disabled = true;
+
+        // Call the backend select API with all selected FRs
+        console.log('Saving FR selections:', selectedFRs);
+        fetch(`/project/{{ project.uuid }}/select-fr/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'accept': 'application/json'
+            },
+            body: JSON.stringify({
+                fr_info_ids: selectedFRs,
+                is_selected: true
+            }),
+            _timeoutMs: 30000,
+            _retries: 1
+        })
+            .then(response => {
+                console.log('API response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('API response data:', data);
+                if (data.success) {
+                    showNotification('success', 'Thành công!', `Đã lưu ${selectedFRs.length} Functional Requirements thành công (${data.updated_count} bản ghi được cập nhật).`);
+                    // Mark that selections have been saved (but keep button visible for additional selections)
+                    window.frSelectionsSaved = true;
+
+                    // Ensure cached data is marked as fresh after saving selections
+                    // This prevents unnecessary re-analysis on page refresh
+                    localStorage.setItem('fr_cache_fresh', Date.now().toString());
+                } else {
+                    showNotification('error', 'Lỗi!', data.message || 'Failed to save FR selections.');
+                    // Restore button on error
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error saving FR selections:', error);
+                showNotification('error', 'Lỗi!', 'An error occurred while saving FR selections.');
+                // Restore button on error
+                button.innerHTML = originalText;
+                button.disabled = false;
+                console.error('Error saving FR selections:', error);
+                showNotification('error', 'Lỗi!', 'Failed to save FR selections.');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+    }
+
+    function showFRDetails(fr, frInfoId) {
+        // Create modal for FR details
+        const modalHtml = `
         <div class="modal fade" id="frDetailModal" tabindex="-1" aria-labelledby="frDetailModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -694,240 +2679,240 @@ function showFRDetails(fr, frInfoId) {
         </div>
     `;
 
-    // Remove existing modal if any
-    const existingModal = document.getElementById('frDetailModal');
-    if (existingModal) {
-        existingModal.remove();
+        // Remove existing modal if any
+        const existingModal = document.getElementById('frDetailModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('frDetailModal'));
+        modal.show();
     }
 
-    // Add modal to body
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    function toggleFRSelection(frId, select) {
+        // Update checkbox state
+        const checkbox = document.querySelector(`input[type="checkbox"][value="${frId}"]`);
+        if (checkbox) {
+            checkbox.checked = select;
 
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('frDetailModal'));
-    modal.show();
-}
-
-function toggleFRSelection(frId, select) {
-    // Update checkbox state
-    const checkbox = document.querySelector(`input[type="checkbox"][value="${frId}"]`);
-    if (checkbox) {
-        checkbox.checked = select;
-
-        // Update badge
-        const badge = checkbox.closest('.card-body').querySelector('.badge');
-        if (badge) {
-            if (select) {
-                badge.className = 'badge bg-success';
-                badge.textContent = 'Selected';
-            } else {
-                badge.className = 'badge bg-secondary';
-                badge.textContent = 'Not Selected';
+            // Update badge
+            const badge = checkbox.closest('.card-body').querySelector('.badge');
+            if (badge) {
+                if (select) {
+                    badge.className = 'badge bg-success';
+                    badge.textContent = 'Selected';
+                } else {
+                    badge.className = 'badge bg-secondary';
+                    badge.textContent = 'Not Selected';
+                }
             }
         }
-    }
 
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('frDetailModal'));
-    if (modal) {
-        modal.hide();
-    }
-
-    // Show success message
-    showNotification('success', 'FR Updated', `FR has been ${select ? 'selected' : 'deselected'}. Remember to save your selections!`);
-}
-
-
-function createSectionCard(section) {
-    const col = document.createElement('div');
-    col.className = 'col-md-6 mb-3';
-
-    const card = document.createElement('div');
-    card.className = 'card section-card';
-
-    const cardBody = document.createElement('div');
-    cardBody.className = 'card-body';
-
-    const formCheck = document.createElement('div');
-    formCheck.className = 'form-check';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'form-check-input section-checkbox';
-    checkbox.value = section.id;
-    checkbox.id = `section_${section.id}`;
-    checkbox.checked = section.is_selected;
-
-    const label = document.createElement('label');
-    label.className = 'form-check-label w-100';
-    label.htmlFor = `section_${section.id}`;
-
-    const flexDiv = document.createElement('div');
-    flexDiv.className = 'd-flex justify-content-between align-items-start';
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'flex-grow-1';
-
-    const badgeClass = section.section_type ? `bg-${section.section_type}` : 'bg-secondary';
-    const displayTitle = section.section_title || section.title;
-    const displayContent = section.section_content || section.content;
-    const truncatedContent = displayContent.split(' ').slice(0,20).join(' ') + (displayContent.split(' ').length > 20 ? '...' : '');
-
-    const title = document.createElement('h6');
-    title.className = 'card-title mb-2';
-
-    const badge = document.createElement('span');
-    badge.className = `badge ${badgeClass} me-2`;
-    badge.textContent = section.get_section_type_display || section.type_display;
-
-    const titleText = document.createElement('span');
-    titleText.textContent = displayTitle;
-
-    title.appendChild(badge);
-    title.appendChild(titleText);
-
-    const content = document.createElement('p');
-    content.className = 'card-text text-muted small';
-    content.textContent = truncatedContent;
-
-    contentDiv.appendChild(title);
-    contentDiv.appendChild(content);
-
-    if (section.document_name) {
-        const small = document.createElement('small');
-        small.className = 'text-muted';
-        const icon = document.createElement('i');
-        icon.className = 'bi bi-file-earmark';
-        small.appendChild(icon);
-        small.appendChild(document.createTextNode(' From: ' + section.document_name));
-        contentDiv.appendChild(small);
-    }
-    flexDiv.appendChild(contentDiv);
-    label.appendChild(flexDiv);
-
-    formCheck.appendChild(checkbox);
-    formCheck.appendChild(label);
-    cardBody.appendChild(formCheck);
-    card.appendChild(cardBody);
-    col.appendChild(card);
-
-    // Add click handler
-    card.addEventListener('click', function(e) {
-        if (e.target.type !== 'checkbox') {
-            checkbox.checked = !checkbox.checked;
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('frDetailModal'));
+        if (modal) {
+            modal.hide();
         }
-    });
 
-    return col;
-}
-
-function selectAllSections() {
-    document.querySelectorAll('.section-checkbox').forEach(checkbox => {
-        checkbox.checked = true;
-    });
-}
-
-function deselectAllSections() {
-    document.querySelectorAll('.section-checkbox').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-}
-
-// Save Section Selection
-function saveSectionSelection() {
-    const selectedSections = Array.from(document.querySelectorAll('.section-checkbox:checked'))
-        .map(checkbox => parseInt(checkbox.value));
-
-    if (selectedSections.length === 0) {
-        showNotification('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một section');
-        return;
+        // Show success message
+        showNotification('success', 'FR Updated', `FR has been ${select ? 'selected' : 'deselected'}. Remember to save your selections!`);
     }
 
-    const button = document.querySelector('button[onclick="saveSectionSelection()"]');
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
-    button.disabled = true;
 
-    fetch(`/project/{{ project.uuid }}/sections/update/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            selected_sections: selectedSections
-        }),
-        _timeoutMs: 60000
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('success', 'Thành công!', data.message);
-            // Hide save button and show next step option
-            document.getElementById('saveSelectionContainer').style.display = 'none';
-            // Enable next button
-            document.getElementById('nextButton').disabled = false;
-        } else {
-            showNotification('error', 'Lỗi!', data.message);
+    function createSectionCard(section) {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 mb-3';
+
+        const card = document.createElement('div');
+        card.className = 'card section-card';
+
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body';
+
+        const formCheck = document.createElement('div');
+        formCheck.className = 'form-check';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input section-checkbox';
+        checkbox.value = section.id;
+        checkbox.id = `section_${section.id}`;
+        checkbox.checked = section.is_selected;
+
+        const label = document.createElement('label');
+        label.className = 'form-check-label w-100';
+        label.htmlFor = `section_${section.id}`;
+
+        const flexDiv = document.createElement('div');
+        flexDiv.className = 'd-flex justify-content-between align-items-start';
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'flex-grow-1';
+
+        const badgeClass = section.section_type ? `bg-${section.section_type}` : 'bg-secondary';
+        const displayTitle = section.section_title || section.title;
+        const displayContent = section.section_content || section.content;
+        const truncatedContent = displayContent.split(' ').slice(0, 20).join(' ') + (displayContent.split(' ').length > 20 ? '...' : '');
+
+        const title = document.createElement('h6');
+        title.className = 'card-title mb-2';
+
+        const badge = document.createElement('span');
+        badge.className = `badge ${badgeClass} me-2`;
+        badge.textContent = section.get_section_type_display || section.type_display;
+
+        const titleText = document.createElement('span');
+        titleText.textContent = displayTitle;
+
+        title.appendChild(badge);
+        title.appendChild(titleText);
+
+        const content = document.createElement('p');
+        content.className = 'card-text text-muted small';
+        content.textContent = truncatedContent;
+
+        contentDiv.appendChild(title);
+        contentDiv.appendChild(content);
+
+        if (section.document_name) {
+            const small = document.createElement('small');
+            small.className = 'text-muted';
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-file-earmark';
+            small.appendChild(icon);
+            small.appendChild(document.createTextNode(' From: ' + section.document_name));
+            contentDiv.appendChild(small);
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + error.message);
-    })
-    .finally(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
+        flexDiv.appendChild(contentDiv);
+        label.appendChild(flexDiv);
 
-// Generate Test Suite
-function generateTestSuite() {
-    const button = document.getElementById('generateTestSuiteBtn');
-    const originalText = button.innerHTML;
+        formCheck.appendChild(checkbox);
+        formCheck.appendChild(label);
+        cardBody.appendChild(formCheck);
+        card.appendChild(cardBody);
+        col.appendChild(card);
 
-    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
-    button.disabled = true;
+        // Add click handler
+        card.addEventListener('click', function (e) {
+            if (e.target.type !== 'checkbox') {
+                checkbox.checked = !checkbox.checked;
+            }
+        });
 
-    fetch(`/project/{{ project.uuid }}/test-suite/create/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        },
-        _timeoutMs: 120000
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showTestSuiteResult(true, data.message, data);
-        } else {
-            showTestSuiteResult(false, data.message, null);
+        return col;
+    }
+
+    function selectAllSections() {
+        document.querySelectorAll('.section-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+        });
+    }
+
+    function deselectAllSections() {
+        document.querySelectorAll('.section-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    }
+
+    // Save Section Selection
+    function saveSectionSelection() {
+        const selectedSections = Array.from(document.querySelectorAll('.section-checkbox:checked'))
+            .map(checkbox => parseInt(checkbox.value));
+
+        if (selectedSections.length === 0) {
+            showNotification('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một section');
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showTestSuiteResult(false, 'Network error: ' + error.message, null);
-    })
-    .finally(() => {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
 
-function showTestSuiteResult(success, message, data) {
-    const resultContainer = document.getElementById('testSuiteResult');
-    const alertClass = success ? 'alert-success' : 'alert-danger';
-    const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+        const button = document.querySelector('button[onclick="saveSectionSelection()"]');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+        button.disabled = true;
 
-    let resultHtml = `
+        fetch(`/project/{{ project.uuid }}/sections/update/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                selected_sections: selectedSections
+            }),
+            _timeoutMs: 60000
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('success', 'Thành công!', data.message);
+                    // Hide save button and show next step option
+                    document.getElementById('saveSelectionContainer').style.display = 'none';
+                    // Enable next button
+                    document.getElementById('nextButton').disabled = false;
+                } else {
+                    showNotification('error', 'Lỗi!', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + error.message);
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+    }
+
+    // Generate Test Suite
+    function generateTestSuite() {
+        const button = document.getElementById('generateTestSuiteBtn');
+        const originalText = button.innerHTML;
+
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Generating...';
+        button.disabled = true;
+
+        fetch(`/project/{{ project.uuid }}/test-suite/create/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            _timeoutMs: 120000
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTestSuiteResult(true, data.message, data);
+                } else {
+                    showTestSuiteResult(false, data.message, null);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showTestSuiteResult(false, 'Network error: ' + error.message, null);
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+    }
+
+    function showTestSuiteResult(success, message, data) {
+        const resultContainer = document.getElementById('testSuiteResult');
+        const alertClass = success ? 'alert-success' : 'alert-danger';
+        const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+
+        let resultHtml = `
         <div class="alert ${alertClass}">
             <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
         </div>
     `;
 
-    if (success && data) {
-        resultHtml += `
+        if (success && data) {
+            resultHtml += `
             <div class="mt-3">
                 <h6>Test Suite Created:</h6>
                 <div class="card">
@@ -939,72 +2924,72 @@ function showTestSuiteResult(success, message, data) {
                 </div>
             </div>
         `;
+        }
+
+        resultContainer.innerHTML = resultHtml;
+        resultContainer.style.display = 'block';
     }
 
-    resultContainer.innerHTML = resultHtml;
-    resultContainer.style.display = 'block';
-}
+    // Legacy showAlert function - now redirects to showNotification
+    function showAlert(type, title, message) {
+        // Map old alert types to new notification types
+        const typeMap = {
+            'success': 'success',
+            'error': 'error',
+            'warning': 'warning',
+            'info': 'info',
+            'danger': 'error'
+        };
 
-// Legacy showAlert function - now redirects to showNotification
-function showAlert(type, title, message) {
-    // Map old alert types to new notification types
-    const typeMap = {
-        'success': 'success',
-        'error': 'error',
-        'warning': 'warning', 
-        'info': 'info',
-        'danger': 'error'
-    };
-    
-    const notificationType = typeMap[type] || 'info';
-    showNotification(notificationType, title, message);
-}
+        const notificationType = typeMap[type] || 'info';
+        showNotification(notificationType, title, message);
+    }
 
-// Test API Integration Function
-function testApiIntegration() {
-    const button = document.querySelector('button[onclick="testApiIntegration()"]');
-    const originalText = button.innerHTML;
+    // Test API Integration Function
+    function testApiIntegration() {
+        const button = document.querySelector('button[onclick="testApiIntegration()"]');
+        const originalText = button.innerHTML;
 
-    // Show loading state
-    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing API...';
-    button.disabled = true;
+        // Show loading state
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing API...';
+        button.disabled = true;
 
-    fetch(`/project/{{ project.uuid }}/ai/test/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show success message
-            showApiTestResult(true, data.message, data.api_response);
-        } else {
-            // Show error message
-            showApiTestResult(false, data.message, null);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showApiTestResult(false, 'Network error: ' + error.message, null);
-    })
-    .finally(() => {
-        // Reset button state
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
-}
+        fetch(`/project/{{ project.uuid }}/ai/test/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    showApiTestResult(true, data.message, data.api_response);
+                } else {
+                    // Show error message
+                    showApiTestResult(false, data.message, null);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showApiTestResult(false, 'Network error: ' + error.message, null);
+            })
+            .finally(() => {
+                // Reset button state
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+    }
 
-function showApiTestResult(success, message, apiResponse) {
-    // Create modal or alert to show result
-    const alertClass = success ? 'alert-success' : 'alert-danger';
-    const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
+    function showApiTestResult(success, message, apiResponse) {
+        // Create modal or alert to show result
+        const alertClass = success ? 'alert-success' : 'alert-danger';
+        const icon = success ? 'bi-check-circle' : 'bi-exclamation-triangle';
 
-    let responseHtml = '';
-    if (apiResponse && success) {
-        responseHtml = `
+        let responseHtml = '';
+        if (apiResponse && success) {
+            responseHtml = `
             <div class="mt-3">
                 <h6>API Response:</h6>
                 <pre class="bg-light p-2 rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">
@@ -1012,9 +2997,9 @@ ${JSON.stringify(apiResponse, null, 2)}
                 </pre>
             </div>
         `;
-    }
+        }
 
-    const alertHtml = `
+        const alertHtml = `
         <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
             <i class="bi ${icon}"></i> <strong>${success ? 'Success!' : 'Error!'}</strong> ${message}
             ${responseHtml}
@@ -1022,158 +3007,159 @@ ${JSON.stringify(apiResponse, null, 2)}
         </div>
     `;
 
-    // Insert alert before the test button
-    const testButtonContainer = document.querySelector('button[onclick="testApiIntegration()"]').parentElement;
-    testButtonContainer.insertAdjacentHTML('beforebegin', alertHtml);
+        // Insert alert before the test button
+        const testButtonContainer = document.querySelector('button[onclick="testApiIntegration()"]').parentElement;
+        testButtonContainer.insertAdjacentHTML('beforebegin', alertHtml);
 
-    // Auto dismiss after 10 seconds
-    setTimeout(() => {
-        const alert = testButtonContainer.previousElementSibling;
-        if (alert && alert.classList.contains('alert')) {
-            alert.remove();
-        }
-    }, 10000);
-}
+        // Auto dismiss after 10 seconds
+        setTimeout(() => {
+            const alert = testButtonContainer.previousElementSibling;
+            if (alert && alert.classList.contains('alert')) {
+                alert.remove();
+            }
+        }, 10000);
+    }
 </script>
 
 <script>
-// Delete preprocessed document by doc_id via backend endpoint that calls external API
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
-function deletePreprocessedDocument(projectUuid, docId, fallbackUrl, btnEl) {
-    // Prefer API delete when docId exists; otherwise fall back to legacy URL (server will also attempt API if possible)
-    if (!docId) {
-        if (fallbackUrl) {
-            window.location.href = fallbackUrl;
-        }
-        return;
+    // Delete preprocessed document by doc_id via backend endpoint that calls external API
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
     }
 
-    if (!confirm('Bạn có chắc muốn xoá tài liệu này?')) {
-        return;
-    }
-
-    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken') || '';
-
-    // UI: disable button without spinner; keep icon intact
-    if (btnEl) {
-        if (btnEl.dataset.deleting === '1') return; // prevent double delete
-        btnEl.dataset.deleting = '1';
-        btnEl.disabled = true;
-        btnEl.classList.add('disabled');
-        btnEl.setAttribute('aria-disabled', 'true');
-        btnEl.style.opacity = '0.7';
-    }
-
-    fetch(`/project/${projectUuid}/preprocessed-document/${encodeURIComponent(docId)}/delete/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': csrftoken,
-            'Accept': 'application/json'
-        },
-        _noLoading: true,
-        _timeoutMs: 30000
-    })
-    .then(async res => {
-        try { return await res.json(); } catch (_) {
-            return { success: res.ok, message: res.ok ? 'Deleted' : 'Delete failed' };
-        }
-    })
-    .then(data => {
-        if (data.success) {
-            // Remove the nearest list/card element without full page reload
-            if (btnEl) {
-                const container = btnEl.closest('.list-group-item, .card');
-                if (container) {
-                    // If it's a card inside grid, remove the column wrapper for clean layout
-                    const col = container.closest('.col-md-6, .col-lg-4, .col-12');
-                    (col || container).remove();
-                } else {
-                    btnEl.remove();
-                }
+    function deletePreprocessedDocument(projectUuid, docId, fallbackUrl, btnEl) {
+        // Prefer API delete when docId exists; otherwise fall back to legacy URL (server will also attempt API if possible)
+        if (!docId) {
+            if (fallbackUrl) {
+                window.location.href = fallbackUrl;
             }
-            // Update sections if on step 3
-            try { loadSections(); } catch (e) {}
-            showNotification('success', 'Đã xóa!', data.message || 'Tài liệu đã được xóa thành công.');
-            // Refresh back to step 1 after successful deletion
-            window.location.href = `/project/{{ project.uuid }}/?step=1`;
-        } else {
-            showNotification('error', 'Lỗi!', data.message || 'Không thể xóa tài liệu.');
-            if (btnEl) {
-                btnEl.disabled = false;
-                btnEl.classList.remove('disabled');
-                btnEl.removeAttribute('aria-disabled');
-                btnEl.style.opacity = '';
-                delete btnEl.dataset.deleting;
-            }
+            return;
         }
-    })
-    .catch(err => {
-        console.error('Delete error:', err);
-        showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + (err?.message || err));
+
+        if (!confirm('Bạn có chắc muốn xoá tài liệu này?')) {
+            return;
+        }
+
+        const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken') || '';
+
+        // UI: disable button without spinner; keep icon intact
         if (btnEl) {
-            btnEl.disabled = false;
-            btnEl.classList.remove('disabled');
-            btnEl.removeAttribute('aria-disabled');
-            btnEl.style.opacity = '';
-            delete btnEl.dataset.deleting;
+            if (btnEl.dataset.deleting === '1') return; // prevent double delete
+            btnEl.dataset.deleting = '1';
+            btnEl.disabled = true;
+            btnEl.classList.add('disabled');
+            btnEl.setAttribute('aria-disabled', 'true');
+            btnEl.style.opacity = '0.7';
         }
-    });
-}
+
+        fetch(`/project/${projectUuid}/preprocessed-document/${encodeURIComponent(docId)}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'Accept': 'application/json'
+            },
+            _noLoading: true,
+            _timeoutMs: 30000
+        })
+            .then(async res => {
+                try { return await res.json(); } catch (_) {
+                    return { success: res.ok, message: res.ok ? 'Deleted' : 'Delete failed' };
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    // Remove the nearest list/card element without full page reload
+                    if (btnEl) {
+                        const container = btnEl.closest('.list-group-item, .card');
+                        if (container) {
+                            // If it's a card inside grid, remove the column wrapper for clean layout
+                            const col = container.closest('.col-md-6, .col-lg-4, .col-12');
+                            (col || container).remove();
+                        } else {
+                            btnEl.remove();
+                        }
+                    }
+                    // Update sections if on step 3
+                    try { loadSections(); } catch (e) { }
+                    showNotification('success', 'Đã xóa!', data.message || 'Tài liệu đã được xóa thành công.');
+                    // Refresh back to step 1 after successful deletion
+                    window.location.href = `/project/{{ project.uuid }}/?step=1`;
+                } else {
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể xóa tài liệu.');
+                    if (btnEl) {
+                        btnEl.disabled = false;
+                        btnEl.classList.remove('disabled');
+                        btnEl.removeAttribute('aria-disabled');
+                        btnEl.style.opacity = '';
+                        delete btnEl.dataset.deleting;
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Delete error:', err);
+                showNotification('error', 'Lỗi!', 'Lỗi mạng: ' + (err?.message || err));
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.classList.remove('disabled');
+                    btnEl.removeAttribute('aria-disabled');
+                    btnEl.style.opacity = '';
+                    delete btnEl.dataset.deleting;
+                }
+            });
+    }
 </script>
 
 <!-- Document View Modal -->
-<div class="modal fade" id="documentViewModal" tabindex="-1" aria-labelledby="documentViewModalLabel" aria-hidden="true">
-<div class="modal-dialog modal-xl">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h5 class="modal-title" id="documentViewModalLabel">Viewing Document</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <div id="documentViewer" style="height: 70vh;">
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+<div class="modal fade" id="documentViewModal" tabindex="-1" aria-labelledby="documentViewModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="documentViewModalLabel">Viewing Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="documentViewer" style="height: 70vh;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading document...</p>
                     </div>
-                    <p class="mt-2">Loading document...</p>
                 </div>
             </div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="button" class="btn btn-primary" id="downloadBtn">Download</button>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="downloadBtn">Download</button>
+            </div>
         </div>
     </div>
 </div>
-</div>
 
 <script>
-function viewDocument(fileId, filename, link) {
-    let fileUrl;
+    function viewDocument(fileId, filename, link) {
+        let fileUrl;
 
-    if (fileId) {
-        const minioBaseUrl = "https://minio-api.truong51972.id.vn";
-        const bucketName = "apit-project";
-        fileUrl = `${minioBaseUrl}/${bucketName}/${fileId}`;
-    } else if (link) {
-        fileUrl = link;
-    } else {
-        showNotification('warning', 'Cảnh báo', 'File không khả dụng để xem');
-        return;
-    }
+        if (fileId) {
+            const minioBaseUrl = "https://minio-api.truong51972.id.vn";
+            const bucketName = "apit-project";
+            fileUrl = `${minioBaseUrl}/${bucketName}/${fileId}`;
+        } else if (link) {
+            fileUrl = link;
+        } else {
+            showNotification('warning', 'Cảnh báo', 'File không khả dụng để xem');
+            return;
+        }
 
-    const safeFilename = filename || (fileId ? fileId.split('/').pop() : (link ? link.split('/').pop() : 'Document'));
-    document.getElementById('documentViewModalLabel').textContent = `Viewing: ${safeFilename}`;
+        const safeFilename = filename || (fileId ? fileId.split('/').pop() : (link ? link.split('/').pop() : 'Document'));
+        document.getElementById('documentViewModalLabel').textContent = `Viewing: ${safeFilename}`;
 
-    const downloadBtn = document.getElementById('downloadBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
 
-    const viewer = document.getElementById('documentViewer');
-    viewer.innerHTML = `
+        const viewer = document.getElementById('documentViewer');
+        viewer.innerHTML = `
         <div class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
@@ -1182,65 +3168,65 @@ function viewDocument(fileId, filename, link) {
         </div>
     `;
 
-    const modal = new bootstrap.Modal(document.getElementById('documentViewModal'));
-    modal.show();
+        const modal = new bootstrap.Modal(document.getElementById('documentViewModal'));
+        modal.show();
 
-    setTimeout(() => {
-        // Special handling for Google Drive sharing links
-        try {
-            const urlObj = new URL(fileUrl);
-            if (urlObj.hostname.includes('drive.google.com')) {
-                // Match /file/d/<id>/...
-                const match = fileUrl.match(/\/file\/d\/([^\/]+)/);
-                const fileIdGg = match && match[1] ? match[1] : null;
-                if (fileIdGg) {
-                    const previewUrl = `https://drive.google.com/file/d/${fileIdGg}/preview`;
-                    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileIdGg}`;
-                    viewer.innerHTML = `<iframe src="${previewUrl}" width="100%" height="100%" style="border: none;"></iframe>`;
-                    downloadBtn.onclick = function() { window.open(downloadUrl, '_blank'); };
-                    return;
+        setTimeout(() => {
+            // Special handling for Google Drive sharing links
+            try {
+                const urlObj = new URL(fileUrl);
+                if (urlObj.hostname.includes('drive.google.com')) {
+                    // Match /file/d/<id>/...
+                    const match = fileUrl.match(/\/file\/d\/([^\/]+)/);
+                    const fileIdGg = match && match[1] ? match[1] : null;
+                    if (fileIdGg) {
+                        const previewUrl = `https://drive.google.com/file/d/${fileIdGg}/preview`;
+                        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileIdGg}`;
+                        viewer.innerHTML = `<iframe src="${previewUrl}" width="100%" height="100%" style="border: none;"></iframe>`;
+                        downloadBtn.onclick = function () { window.open(downloadUrl, '_blank'); };
+                        return;
+                    }
                 }
+            } catch (e) { /* ignore URL parse errors */ }
+
+            const lower = safeFilename.toLowerCase();
+            const hasExt = lower.includes('.')
+            const ext = hasExt ? lower.split('.').pop() : '';
+            const encodedUrl = encodeURIComponent(fileUrl);
+
+            // Prefer Office viewer for Word docs (works around CORS/X-Frame-Options for many hosts)
+            if (ext === 'doc' || ext === 'docx') {
+                const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+                viewer.innerHTML = `<iframe src="${officeSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
+                downloadBtn.onclick = function () { window.open(fileUrl, '_blank'); };
+                return;
             }
-        } catch (e) { /* ignore URL parse errors */ }
 
-        const lower = safeFilename.toLowerCase();
-        const hasExt = lower.includes('.')
-        const ext = hasExt ? lower.split('.').pop() : '';
-        const encodedUrl = encodeURIComponent(fileUrl);
+            // PDF: try direct, else Google viewer fallback
+            if (ext === 'pdf' || (!hasExt && !fileId)) {
+                const iframe = document.createElement('iframe');
+                iframe.width = '100%';
+                iframe.height = '100%';
+                iframe.style.border = 'none';
+                iframe.src = fileUrl;
 
-        // Prefer Office viewer for Word docs (works around CORS/X-Frame-Options for many hosts)
-        if (ext === 'doc' || ext === 'docx') {
-            const officeSrc = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
-            viewer.innerHTML = `<iframe src="${officeSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
-            downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
-            return;
-        }
+                let loaded = false;
+                const fallbackTimer = setTimeout(() => {
+                    if (!loaded) {
+                        const googleSrc = `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodedUrl}`;
+                        viewer.innerHTML = `<iframe src="${googleSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
+                    }
+                }, 2000);
 
-        // PDF: try direct, else Google viewer fallback
-        if (ext === 'pdf' || (!hasExt && !fileId)) {
-            const iframe = document.createElement('iframe');
-            iframe.width = '100%';
-            iframe.height = '100%';
-            iframe.style.border = 'none';
-            iframe.src = fileUrl;
+                iframe.onload = function () { loaded = true; clearTimeout(fallbackTimer); };
+                viewer.innerHTML = '';
+                viewer.appendChild(iframe);
+                downloadBtn.onclick = function () { window.open(fileUrl, '_blank'); };
+                return;
+            }
 
-            let loaded = false;
-            const fallbackTimer = setTimeout(() => {
-                if (!loaded) {
-                    const googleSrc = `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodedUrl}`;
-                    viewer.innerHTML = `<iframe src="${googleSrc}" width="100%" height="100%" style="border: none;"></iframe>`;
-                }
-            }, 2000);
-
-            iframe.onload = function() { loaded = true; clearTimeout(fallbackTimer); };
-            viewer.innerHTML = '';
-            viewer.appendChild(iframe);
-            downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
-            return;
-        }
-
-        // Default: no inline preview, provide open button
-        viewer.innerHTML = `
+            // Default: no inline preview, provide open button
+            viewer.innerHTML = `
             <div class="text-center py-5">
                 <i class="bi bi-file-earmark" style="font-size: 3rem; color: #6c757d;"></i>
                 <h5 class="mt-3">File Preview Not Available</h5>
@@ -1248,7 +3234,7 @@ function viewDocument(fileId, filename, link) {
                 <button class="btn btn-primary" onclick="window.open('${fileUrl}', '_blank')">Open in New Tab</button>
             </div>
         `;
-        downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
-    }, 300);
-}
+            downloadBtn.onclick = function () { window.open(fileUrl, '_blank'); };
+        }, 300);
+    }
 </script>

@@ -38,7 +38,9 @@ class DocsPreProcessingStateModel(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
+                "doc_name": "Sample Document",
                 "doc_url": "https://example.com/document.pdf",
+                "lang": "en",
                 "project_id": "00000000-0000-0000-0000-000000000000",
             }
         }

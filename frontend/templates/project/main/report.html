@@ -1,0 +1,262 @@
+<!-- Step 5: Test Report -->
+<style>
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    #testResultsTable tbody tr:hover {
+        background-color: #f8f9fa;
+        cursor: pointer;
+    }
+    .badge {
+        font-size: 0.85em;
+        padding: 0.35em 0.65em;
+    }
+</style>
+<div class="card mt-4 shadow-sm phase d-none" id="phase5">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Test Execution Report</h5>
+        <div>
+            <button class="btn btn-sm btn-light" onclick="refreshReport()" id="refreshReportBtn" title="Refresh Report">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Loading State -->
+        <div id="reportLoadingContainer" class="text-center py-5">
+            <div class="mb-4">
+                <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+            <h4 id="reportLoadingText">Đang chờ test suite thực thi...</h4>
+            <div class="progress mb-3 mx-auto" style="max-width: 500px; height: 8px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                     id="reportLoadingProgressBar" 
+                     role="progressbar" 
+                     style="width: 0%"></div>
+            </div>
+            <p id="reportLoadingMessage" class="text-muted">Vui lòng chờ trong giây lát...</p>
+        </div>
+
+        <!-- Report Content -->
+        <div id="reportContentContainer" style="display: none;">
+            <!-- Summary Statistics -->
+            <div class="row mb-4" id="reportSummaryContainer">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-2">
+                                <i class="bi bi-list-check" style="font-size: 2rem; color: #0d6efd;"></i>
+                            </div>
+                            <h3 class="mb-1" id="totalTestsCount">0</h3>
+                            <p class="text-muted mb-0 small">Total Tests</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-2">
+                                <i class="bi bi-check-circle-fill" style="font-size: 2rem; color: #198754;"></i>
+                            </div>
+                            <h3 class="mb-1 text-success" id="passedTestsCount">0</h3>
+                            <p class="text-muted mb-0 small">Passed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-2">
+                                <i class="bi bi-x-circle-fill" style="font-size: 2rem; color: #dc3545;"></i>
+                            </div>
+                            <h3 class="mb-1 text-danger" id="failedTestsCount">0</h3>
+                            <p class="text-muted mb-0 small">Failed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-2">
+                                <i class="bi bi-hourglass-split" style="font-size: 2rem; color: #ffc107;"></i>
+                            </div>
+                            <h3 class="mb-1 text-warning" id="pendingTestsCount">0</h3>
+                            <p class="text-muted mb-0 small">Pending</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Status Alert -->
+            <div id="reportStatusAlert" class="alert mb-4" style="display: none;">
+                <div class="d-flex align-items-center">
+                    <i class="bi me-2" style="font-size: 1.5rem;"></i>
+                    <div>
+                        <strong id="reportStatusTitle"></strong>
+                        <p class="mb-0" id="reportStatusMessage"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Results Table -->
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-table"></i> Test Results</h6>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="exportReport()" id="exportReportBtn">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped table-bordered" id="testResultsTable">
+                    <thead class="table-success">
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th style="width: 150px;">Test Case ID</th>
+                            <th style="width: 200px;">Test Case Name</th>
+                            <th style="width: 150px;">Endpoint</th>
+                            <th style="width: 100px;">Status</th>
+                            <th style="width: 100px;">Response Code</th>
+                            <th style="width: 120px;">Duration</th>
+                            <th style="width: 150px;">End Time</th>
+                            <th style="width: 100px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="testResultsTableBody">
+                        <!-- Test results will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="reportEmptyState" class="text-center py-5" style="display: none;">
+                <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                <p class="text-muted mt-3">Chưa có dữ liệu test results. Vui lòng chờ test suite hoàn thành.</p>
+            </div>
+
+            <!-- Report Details Section -->
+            <div class="mt-4" id="reportDetailsSection" style="display: none;">
+                <h6 class="mb-3"><i class="bi bi-info-circle"></i> Report Details</h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Test Suite Report ID:</strong> <code id="reportSuiteId">-</code></p>
+                                <p class="mb-2"><strong>Execution Start:</strong> <span id="reportStartTime">-</span></p>
+                                <p class="mb-2"><strong>Execution End:</strong> <span id="reportEndTime">-</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Total Duration:</strong> <span id="reportTotalDuration">-</span></p>
+                                <p class="mb-2"><strong>Success Rate:</strong> <span id="reportSuccessRate">-</span></p>
+                                <p class="mb-2"><strong>Status:</strong> <span id="reportOverallStatus">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw Data Section (Collapsible) -->
+            <div class="mt-4">
+                <details>
+                    <summary class="text-muted" style="cursor: pointer;">
+                        <i class="bi bi-code-slash"></i> Raw Report Data (Debug)
+                    </summary>
+                    <div class="mt-2">
+                        <pre class="bg-light p-3 rounded border" id="rawReportData" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem;">-</pre>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Result Detail Modal -->
+<div class="modal fade" id="testResultDetailModal" tabindex="-1" aria-labelledby="testResultDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="testResultDetailModalLabel">
+                    <i class="bi bi-file-text"></i> Test Result Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-tag"></i> Test Case ID:</strong>
+                        <p class="mb-0"><code id="resultDetailId">-</code></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-check-circle"></i> Status:</strong>
+                        <p class="mb-0"><span class="badge" id="resultDetailStatus">-</span></p>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong><i class="bi bi-card-heading"></i> Test Case Name:</strong>
+                    <p class="mb-0" id="resultDetailName">-</p>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-link-45deg"></i> Endpoint:</strong>
+                        <p class="mb-0"><code class="text-info" id="resultDetailEndpoint">-</code></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-check-circle"></i> Status:</strong>
+                        <p class="mb-0" id="resultDetailStatus">-</p>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-123"></i> Response Status Code:</strong>
+                        <p class="mb-0" id="resultDetailResponseCode">-</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-stopwatch"></i> Duration:</strong>
+                        <p class="mb-0" id="resultDetailDuration">-</p>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-play-circle"></i> Start Time:</strong>
+                        <p class="mb-0" id="resultDetailStartTime">-</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-calendar"></i> End Time:</strong>
+                        <p class="mb-0" id="resultDetailExecutedAt">-</p>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong><i class="bi bi-send"></i> Request:</strong>
+                    <pre id="resultDetailRequest" class="mb-0 bg-light p-3 rounded border" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                </div>
+                
+                <div class="mb-3">
+                    <strong><i class="bi bi-reply"></i> Response:</strong>
+                    <pre id="resultDetailResponse" class="mb-0 bg-light p-3 rounded border" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                </div>
+
+                <div class="mb-3" id="resultDetailErrorSection" style="display: none;">
+                    <strong><i class="bi bi-exclamation-triangle text-danger"></i> Error Details:</strong>
+                    <pre id="resultDetailError" class="mb-0 bg-danger text-white p-3 rounded border" style="max-height: 200px; overflow-y: auto; font-size: 0.9rem;">-</pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

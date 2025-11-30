@@ -26,30 +26,184 @@
              <th scope="col">Actions</th>
          </tr>
      </thead>
-     <tbody>
-         {% for project in projects %}
-         <tr>
-             <td>{{ project.project_name }}</td>
-             <td>{{ project.description }}</td>
-             <td>{{ project.created_at|default:"N/A" }}</td>
-             <td>{{ project.updated_at|default:"N/A" }}</td>
-             <td>{{ project.user_id|default:"N/A" }}</td>
-            <td>
+    <tbody>
+        {% for project in projects %}
+        <tr>
+            <td>{{ project.project_name }}</td>
+            <td>{{ project.description }}</td>
+            <td>{{ project.created_at|default:"N/A" }}</td>
+            <td>{{ project.updated_at|default:"N/A" }}</td>
+            <td>{{ project.user_id|default:"N/A" }}</td>
+           <td>
                 <a href="{% url 'project_detail_by_uuid' project_uuid=project.project_id %}" class="btn btn-primary btn-sm me-2">
                      View
-                 </a>
-                 <a href="{% url 'project_delete' project_uuid=project.project_id %}" class="btn btn-danger btn-sm"
-                    onclick="return confirm('Are you sure you want to delete this project?');">
-                     Delete
-                 </a>
-             </td>
-         </tr>
-         {% endfor %}
+                </a>
+                <form action="{% url 'project_delete' project_uuid=project.project_id %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Are you sure you want to delete this project?');">
+                        Delete
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center py-4">
+                <p class="text-muted mb-0">Không có dự án nào.</p>
+            </td>
+        </tr>
+        {% endfor %}
 
- </table>
+</table>
+
+<!-- Pagination -->
+{% if paginator and paginator.num_pages > 1 %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <!-- First Page -->
+        {% if projects.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">
+                    <i class="bi bi-chevron-double-left"></i> Đầu
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ projects.previous_page_number }}">
+                    Trước
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">
+                    <i class="bi bi-chevron-double-left"></i> Đầu
+                </span>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">Trước</span>
+            </li>
+        {% endif %}
+
+        <!-- Page Numbers -->
+        {% with page_obj=projects %}
+            {% if paginator.num_pages <= 7 %}
+                {% for page_num in paginator.page_range %}
+                    {% if page_num == page_obj.number %}
+                        <li class="page-item active">
+                            <span class="page-link">
+                                {{ page_num }}
+                                <span class="visually-hidden">(current)</span>
+                            </span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <!-- Show first 3 pages -->
+                {% for page_num in paginator.page_range|slice:":3" %}
+                    {% if page_num == page_obj.number %}
+                        <li class="page-item active">
+                            <span class="page-link">
+                                {{ page_num }}
+                                <span class="visually-hidden">(current)</span>
+                            </span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- Ellipsis if needed -->
+                {% if page_obj.number > 5 %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+
+                <!-- Show pages around current -->
+                {% with start=page_obj.number|add:"-2" end=page_obj.number|add:"3" %}
+                    {% for page_num in paginator.page_range %}
+                        {% if page_num >= start and page_num < end and page_num > 3 and page_num < paginator.num_pages %}
+                            {% if page_num == page_obj.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        {{ page_num }}
+                                        <span class="visually-hidden">(current)</span>
+                                    </span>
+                                </li>
+                            {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endwith %}
+
+                <!-- Ellipsis if needed -->
+                {% if page_obj.number < paginator.num_pages|add:"-4" %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+
+                <!-- Show last 3 pages -->
+                {% for page_num in paginator.page_range|slice:"-3:" %}
+                    {% if page_num == page_obj.number %}
+                        <li class="page-item active">
+                            <span class="page-link">
+                                {{ page_num }}
+                                <span class="visually-hidden">(current)</span>
+                            </span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Next Page -->
+        {% if projects.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ projects.next_page_number }}">
+                    Tiếp
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ paginator.num_pages }}">
+                    Cuối <i class="bi bi-chevron-double-right"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Tiếp</span>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">
+                    Cuối <i class="bi bi-chevron-double-right"></i>
+                </span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+<!-- Pagination Info -->
+<div class="text-center text-muted small mt-2">
+    Trang <strong>{{ projects.number }}</strong> của <strong>{{ paginator.num_pages }}</strong>
+    | Hiển thị <strong>{{ projects.start_index|default:0 }}-{{ projects.end_index|default:0 }}</strong> của <strong>{{ paginator.count }}</strong> dự án
+</div>
+{% endif %}
 
  <div class="mt-3">
-     <a href="{% url 'project_add' %}" class="btn btn-primary">Add New Project</a>
+     <!-- <a href="{% url 'project_add' %}" class="btn btn-primary">Add New Project</a> -->
      <!-- <button type="button" class="btn btn-success ms-2" onclick="createProjectViaAPI()">Quick Create</button> -->
  </div>
  {% endblock %}

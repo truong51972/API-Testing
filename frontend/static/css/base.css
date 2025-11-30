@@ -13,14 +13,31 @@ main {
     width: calc(100vw - 280px); /* trừ đi width của sidebar */
     max-width: calc(100vw - 280px);
     flex: 1;
+    transition: width 0.3s ease, max-width 0.3s ease;
+}
+
+main.sidebar-collapsed {
+    width: calc(100vw - 70px); /* trừ đi width của sidebar khi collapsed */
+    max-width: calc(100vw - 70px);
 }
 
 /* Đảm bảo sidebar không bị ảnh hưởng bởi các CSS khác */
-.sidebar-chatgpt {
+.sidebar-chatgpt:not(.collapsed) {
     flex-shrink: 0 !important;
     width: 280px !important;
     min-width: 280px !important;
     max-width: 280px !important;
+    transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease !important;
+}
+
+/* Collapsed state - must override base styles with higher specificity */
+.sidebar-chatgpt.collapsed,
+div.sidebar-chatgpt.collapsed {
+    flex-shrink: 0 !important;
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease !important;
 }
 
 /* Đảm bảo main content có width nhất quán */
