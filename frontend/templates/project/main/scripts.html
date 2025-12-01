@@ -82,12 +82,66 @@
         if (currentPhase) currentPhase.classList.remove('d-none');
     }
     
+    // Function to load report directly from report_id (without polling)
+    function loadReportFromId(projectUuid, testSuiteReportId) {
+        console.log('Loading report directly from ID:', testSuiteReportId);
+        
+        // Set step to 5 (report phase)
+        setStep(5);
+        
+        // Show loading state
+        showTestExecutionStatus();
+        updateTestExecutionStatus('Đang tải report...');
+        
+        // Fetch report directly
+        fetch(`/project/${projectUuid}/test-report/${testSuiteReportId}/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Report data received:', data);
+            
+            if (data.success) {
+                // Report is ready, display it
+                console.log('✅ Report loaded successfully!');
+                window.testReportReady = true;
+                displayTestReport(data, testSuiteReportId);
+                hideTestExecutionStatus();
+                showNotification('success', 'Thành công', 'Đã tải report thành công.');
+            } else {
+                // Report not found or error
+                console.error('❌ Error loading report:', data.message);
+                showNotification('error', 'Lỗi!', data.message || 'Không thể tải report.');
+                hideTestExecutionStatus();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading report:', error);
+            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi tải report.');
+            hideTestExecutionStatus();
+        });
+    }
+
     // Restore step on page load
     document.addEventListener('DOMContentLoaded', function() {
         setStep(currentStep);
         
+        // Check if report_id is in URL query params and auto-load report
+        const params = new URLSearchParams(window.location.search);
+        const reportId = params.get('report_id');
+        if (reportId) {
+            // Set step to 5 (report phase) and load the report
+            setTimeout(() => {
+                loadReportFromId(projectUuid, reportId);
+            }, 500);
+        }
+        
         // If restoring to step 4, automatically load test cases if they exist
-        if (currentStep === 4) {
+        if (currentStep === 4 && !reportId) {
             setTimeout(() => {
                 startTestCaseGeneration(projectUuid);
             }, 500);
@@ -775,6 +829,15 @@
     let allTestCases = [];
     let currentTestCasesPage = 1;
     const TEST_CASES_PER_PAGE = 7;
+    // Store selected test case IDs globally (across all pages)
+    let selectedTestCasesSet = new Set();
+    
+    // Helper function to get test case ID from test case object
+    function getTestCaseId(testCase) {
+        return (testCase.full_test_case_data && testCase.full_test_case_data.id) 
+            ? testCase.full_test_case_data.id 
+            : (testCase.uuid || '');
+    }
 
     function displayTestCases(testCases) {
         // Hide processing container and show results
@@ -784,8 +847,19 @@
         // Store test cases globally
         allTestCases = testCases || [];
         
+        // Initialize selectedTestCasesSet with test cases that are already selected in database
+        selectedTestCasesSet.clear();
+        allTestCases.forEach(tc => {
+            if (tc.is_selected === true) {
+                const testCaseId = getTestCaseId(tc);
+                if (testCaseId) {
+                    selectedTestCasesSet.add(testCaseId);
+                }
+            }
+        });
+        
         // Check if any test cases are selected (from database)
-        const hasSelectedTestCases = allTestCases.some(tc => tc.is_selected === true);
+        const hasSelectedTestCases = selectedTestCasesSet.size > 0;
         if (hasSelectedTestCases) {
             window.testCasesSelected = true;
         }
@@ -853,14 +927,17 @@
                 : 'N/A';
             const shortHeaders = headersText.length > 40 ? headersText.substring(0, 40) + '...' : headersText;
 
-            // Get test case ID from full_test_case_data.id or uuid
-            const testCaseApiId = (testCase.full_test_case_data && testCase.full_test_case_data.id) 
-                ? testCase.full_test_case_data.id 
-                : (testCase.uuid || `test-case-${globalIndex}`);
+            // Get test case ID using helper function for consistency
+            const testCaseApiId = getTestCaseId(testCase) || `test-case-${globalIndex}`;
             const checkboxId = `testCaseCheckbox_${globalIndex}`;
             
-            // Check if test case is selected (from database)
-            const isSelected = testCase.is_selected === true;
+            // Check if test case is selected (from database or user selection)
+            const isSelected = testCase.is_selected === true || selectedTestCasesSet.has(testCaseApiId);
+            
+            // If selected from database, add to Set
+            if (testCase.is_selected === true && testCaseApiId) {
+                selectedTestCasesSet.add(testCaseApiId);
+            }
 
             row.innerHTML = `
             <td class="text-center">
@@ -870,7 +947,7 @@
                        data-test-case-id="${testCaseApiId}"
                        data-index="${globalIndex}"
                        ${isSelected ? 'checked' : ''}
-                       onchange="updateSelectedTestCasesCount()">
+                       onchange="handleTestCaseCheckboxChange(this)">
             </td>
             <td class="text-center">${globalIndex + 1}</td>
             <td><code class="text-primary">${testCase.test_case_id || `TC-${String(globalIndex + 1).padStart(3, '0')}`}</code></td>
@@ -1021,11 +1098,29 @@
                     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     // Select all after loading
                     setTimeout(() => {
+                        // Select all test cases across all pages
+                        allTestCases.forEach(tc => {
+                            const testCaseId = getTestCaseId(tc);
+                            if (testCaseId) {
+                                selectedTestCasesSet.add(testCaseId);
+                            }
+                        });
+                        
+                        // Update UI
                         const selectAllCheckbox = document.getElementById('selectAllTestCases');
                         if (selectAllCheckbox) {
                             selectAllCheckbox.checked = true;
-                            toggleAllTestCases(selectAllCheckbox);
+                            selectAllCheckbox.indeterminate = false;
                         }
+                        
+                        // Update visible checkboxes
+                        const checkboxes = document.querySelectorAll('.test-case-checkbox');
+                        checkboxes.forEach(cb => {
+                            const testCaseId = cb.getAttribute('data-test-case-id');
+                            cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
+                        });
+                        
+                        updateSelectedTestCasesCount();
                     }, 500);
                     showNotification('info', 'Đã tải!', 'Đã tải và chọn tất cả test cases.');
                 }
@@ -1040,76 +1135,124 @@
                 testCasesContainer.style.boxShadow = '';
             }, 2000);
             
-            // Select all test cases
+            // Select all test cases across all pages
+            allTestCases.forEach(tc => {
+                const testCaseId = getTestCaseId(tc);
+                if (testCaseId) {
+                    selectedTestCasesSet.add(testCaseId);
+                }
+            });
+            
+            // Update UI
             const selectAllCheckbox = document.getElementById('selectAllTestCases');
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = true;
-                toggleAllTestCases(selectAllCheckbox);
-                showNotification('success', 'Đã chọn tất cả!', `Đã chọn tất cả ${allTestCases.length} test cases.`);
+                selectAllCheckbox.indeterminate = false;
             }
+            
+            // Update visible checkboxes on current page
+            const checkboxes = document.querySelectorAll('.test-case-checkbox');
+            checkboxes.forEach(cb => {
+                const testCaseId = cb.getAttribute('data-test-case-id');
+                cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
+            });
+            
+            updateSelectedTestCasesCount();
+            showNotification('success', 'Đã chọn tất cả!', `Đã chọn tất cả ${allTestCases.length} test cases.`);
         }
     }
 
     // Test Case Selection Functions
     function updateSelectedTestCasesCount() {
-        const checkboxes = document.querySelectorAll('.test-case-checkbox:checked');
-        const count = checkboxes.length;
+        // Count from global Set, not just visible checkboxes
+        const count = selectedTestCasesSet.size;
         const countElement = document.getElementById('selectedTestCasesCount');
         if (countElement) {
             countElement.textContent = count;
         }
         
-        // Update select all checkbox state
+        // Update select all checkbox state based on all test cases
         const selectAllCheckbox = document.getElementById('selectAllTestCases');
-        if (selectAllCheckbox) {
-            const allCheckboxes = document.querySelectorAll('.test-case-checkbox');
-            const checkedCount = document.querySelectorAll('.test-case-checkbox:checked').length;
-            selectAllCheckbox.checked = allCheckboxes.length > 0 && checkedCount === allCheckboxes.length;
-            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+        if (selectAllCheckbox && allTestCases.length > 0) {
+            const allTestCasesIds = allTestCases.map(tc => {
+                return (tc.full_test_case_data && tc.full_test_case_data.id) 
+                    ? tc.full_test_case_data.id 
+                    : (tc.uuid || '');
+            }).filter(id => id); // Filter out empty IDs
+            
+            const allSelected = allTestCasesIds.length > 0 && 
+                allTestCasesIds.every(id => selectedTestCasesSet.has(id));
+            const someSelected = allTestCasesIds.some(id => selectedTestCasesSet.has(id));
+            
+            selectAllCheckbox.checked = allSelected;
+            selectAllCheckbox.indeterminate = someSelected && !allSelected;
+        }
+    }
+    
+    // Update selection state when checkbox is clicked
+    function handleTestCaseCheckboxChange(checkbox) {
+        const testCaseId = checkbox.getAttribute('data-test-case-id');
+        if (testCaseId) {
+            if (checkbox.checked) {
+                selectedTestCasesSet.add(testCaseId);
+            } else {
+                selectedTestCasesSet.delete(testCaseId);
+            }
+            updateSelectedTestCasesCount();
         }
     }
 
     function toggleAllTestCases(checkbox) {
+        // Select/deselect ALL test cases across all pages, not just current page
+        if (checkbox.checked) {
+            // Add all test case IDs to the Set
+            allTestCases.forEach(tc => {
+                const testCaseId = getTestCaseId(tc);
+                if (testCaseId) {
+                    selectedTestCasesSet.add(testCaseId);
+                }
+            });
+        } else {
+            // Remove all test case IDs from the Set
+            selectedTestCasesSet.clear();
+        }
+        
+        // Update visible checkboxes on current page
         const checkboxes = document.querySelectorAll('.test-case-checkbox');
         checkboxes.forEach(cb => {
-            cb.checked = checkbox.checked;
+            const testCaseId = cb.getAttribute('data-test-case-id');
+            cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
         });
+        
         updateSelectedTestCasesCount();
     }
 
     function clearSelectedTestCases() {
+        // Clear all selections from the Set
+        selectedTestCasesSet.clear();
+        
+        // Update visible checkboxes on current page
         const checkboxes = document.querySelectorAll('.test-case-checkbox');
         checkboxes.forEach(cb => {
             cb.checked = false;
         });
+        
         const selectAllCheckbox = document.getElementById('selectAllTestCases');
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = false;
             selectAllCheckbox.indeterminate = false;
         }
+        
         updateSelectedTestCasesCount();
         showNotification('info', 'Đã bỏ chọn', 'Đã bỏ chọn tất cả test cases.');
     }
 
     function submitSelectedTestCases() {
-        const checkboxes = document.querySelectorAll('.test-case-checkbox:checked');
+        // Get all selected test case IDs from the Set (across all pages)
+        const testCaseIds = Array.from(selectedTestCasesSet);
         
-        if (checkboxes.length === 0) {
-            showNotification('warning', 'Chưa chọn test case', 'Vui lòng chọn ít nhất một test case trước khi xác nhận.');
-            return;
-        }
-
-        // Collect selected test case IDs
-        const testCaseIds = [];
-        checkboxes.forEach(checkbox => {
-            const testCaseId = checkbox.getAttribute('data-test-case-id');
-            if (testCaseId) {
-                testCaseIds.push(testCaseId);
-            }
-        });
-
         if (testCaseIds.length === 0) {
-            showNotification('error', 'Lỗi', 'Không tìm thấy ID của test cases đã chọn.');
+            showNotification('warning', 'Chưa chọn test case', 'Vui lòng chọn ít nhất một test case trước khi xác nhận.');
             return;
         }
 
@@ -1201,8 +1344,8 @@
     }
 
     function getTestSuiteIdFromDatabase(projectUuid) {
-        // Show loading
-        showReportLoading('Đang lấy test suite ID từ database...');
+        // Show execution status with progress bar instead of loading page
+        showTestExecutionStatus('Đang lấy test suite ID từ database...');
         
         // Call backend to get test suite ID from database
         fetch(`/project/${projectUuid}/test-suite/get-id/`, {
@@ -1240,12 +1383,12 @@
             submitBtn.disabled = true;
         }
         
-        // Show execution status
+        // Show execution status with progress bar
         showTestExecutionStatus('Đang khởi động chạy test suite...');
         
-        // Move to step 5 and show loading
+        // Move to step 5 (don't show loading page, use progress bar instead)
         setStep(5);
-        showReportLoading('Đang khởi động chạy test suite...');
+        // showReportLoading is removed - we use testExecutionStatusContainer with progress bar instead
         
         // First, call execute API
         fetch(`/project/${projectUuid}/test-suite/execute/`, {
@@ -1308,12 +1451,15 @@
         const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
         let attempts = 0;
         const pollInterval = 5000; // Poll every 5 seconds
+        const initialDelay = 10000; // Wait 10 seconds before first request
         
-        // Ensure we're on step 5 and show loading state
+        // Ensure we're on step 5
         setStep(5);
-        showReportLoading(`Đang chờ report sẵn sàng... (Lần thử: ${attempts}/${maxAttempts})`);
+        // Don't show report loading page, use progress bar instead
+        // showReportLoading is removed because we already have testExecutionStatusContainer with progress bar
         
         console.log('Starting to poll GET_TEST_REPORT_ENDPOINT with test_suite_report_id:', testSuiteReportId);
+        console.log(`Will wait ${initialDelay/1000} seconds before first request...`);
         
         const poll = () => {
             attempts++;
@@ -1330,9 +1476,7 @@
                 return;
             }
             
-            // Update loading message
-            const progressPercent = Math.min((attempts / maxAttempts) * 90, 90); // 0-90% range
-            updateReportLoading(`Đang lấy report từ GET_TEST_REPORT_ENDPOINT... (Lần thử: ${attempts}/${maxAttempts})`, progressPercent);
+            // Update progress bar message (not loading page)
             updateTestExecutionStatus(`Đang lấy report... (Lần thử: ${attempts}/${maxAttempts})`);
             
             console.log(`[${attempts}/${maxAttempts}] Calling GET_TEST_REPORT_ENDPOINT with test_suite_report_id: ${testSuiteReportId}`);
@@ -1409,8 +1553,12 @@
             });
         };
         
-        // Start polling immediately (first attempt)
-        poll();
+        // Wait 10 seconds before starting first poll request
+        updateTestExecutionStatus(`Đang chờ ${initialDelay/1000} giây trước khi bắt đầu lấy report...`);
+        setTimeout(() => {
+            console.log('Initial delay completed, starting first poll request...');
+            poll();
+        }, initialDelay);
     }
 
     function showTestExecutionStatus(message) {
@@ -1854,7 +2002,8 @@
             refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing...';
         }
 
-        showReportLoading('Đang làm mới report...');
+        // Don't show loading page, just show notification
+        // showReportLoading is removed - we don't need loading page for refresh
         
         fetch(`/project/${window.currentProjectUuid}/test-report/${window.currentTestSuiteReportId}/`, {
             method: 'GET',

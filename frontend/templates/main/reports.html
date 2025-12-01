@@ -1,0 +1,273 @@
+{% extends "main/base.html" %}
+{% load static %}
+
+{% block title %}Test Reports{% endblock %}
+
+{% block content %}
+
+<!-- Content wrapper -->
+<div class="content-wrapper">
+    <!-- Content -->
+    <div class="container-xxl flex-grow-1 container-p-y">
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Báo cáo Test Suite</h5>
+                        <small class="text-muted">Xem các report đã chạy của dự án</small>
+                    </div>
+                    <div class="card-body">
+                        <!-- Filter by Project -->
+                        <div class="mb-3">
+                            <label for="projectFilter" class="form-label">Lọc theo dự án:</label>
+                            <select class="form-select" id="projectFilter" onchange="filterByProject(this.value)" style="max-width: 300px;">
+                                <option value="">Tất cả dự án</option>
+                                {% for project in projects %}
+                                <option value="{{ project.uuid }}" {% if selected_project_uuid == project.uuid %}selected{% endif %}>
+                                    {{ project.project_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {% if reports %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Report ID</th>
+                                        <th>Dự án</th>
+                                        <th>Test Suite</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thời gian chạy</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in reports %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fa fa-file-alt me-2"></i>
+                                                <span class="font-monospace small">{{ report.test_suite_report_id|truncatechars:20 }}</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ report.project.project_name }}</td>
+                                        <td>
+                                            {% if report.test_suite %}
+                                                {{ report.test_suite.test_suite_name }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if report.status == 'pending' %}
+                                                <span class="badge bg-warning">Chờ xử lý</span>
+                                            {% elif report.status == 'running' %}
+                                                <span class="badge bg-info">Đang chạy</span>
+                                            {% elif report.status == 'completed' %}
+                                                <span class="badge bg-success">Hoàn thành</span>
+                                            {% elif report.status == 'failed' %}
+                                                <span class="badge bg-danger">Lỗi</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ report.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.executed_at|date:"d/m/Y H:i" }}</td>
+                                        <td>
+                                            <a href="{% url 'project_detail_by_uuid' report.project.uuid %}?report_id={{ report.test_suite_report_id }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Xem report">
+                                                <i class="fa fa-eye"></i> Xem Report
+                                            </a>
+                                            <a href="{% url 'project_detail_by_uuid' report.project.uuid %}" 
+                                               class="btn btn-sm btn-outline-secondary ms-1" 
+                                               title="Xem dự án">
+                                                <i class="fa fa-folder"></i> Dự án
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if paginator.num_pages > 1 %}
+                        <nav aria-label="Page navigation" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                <!-- First Page -->
+                                {% if reports.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page=1">
+                                            <i class="fa fa-chevron-left"></i> Đầu
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ reports.previous_page_number }}">
+                                            Trước
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            <i class="fa fa-chevron-left"></i> Đầu
+                                        </span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Trước</span>
+                                    </li>
+                                {% endif %}
+
+                                <!-- Page Numbers -->
+                                {% with page_obj=reports %}
+                                    {% if paginator.num_pages <= 7 %}
+                                        {% for page_num in paginator.page_range %}
+                                            {% if page_num == page_obj.number %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">
+                                                        {{ page_num }}
+                                                        <span class="visually-hidden">(current)</span>
+                                                    </span>
+                                                </li>
+                                            {% else %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <!-- Show first 3 pages -->
+                                        {% for page_num in paginator.page_range|slice:":3" %}
+                                            {% if page_num == page_obj.number %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">
+                                                        {{ page_num }}
+                                                        <span class="visually-hidden">(current)</span>
+                                                    </span>
+                                                </li>
+                                            {% else %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <!-- Ellipsis if needed -->
+                                        {% if page_obj.number > 5 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+
+                                        <!-- Show pages around current -->
+                                        {% with start=page_obj.number|add:"-2" end=page_obj.number|add:"3" %}
+                                            {% for page_num in paginator.page_range %}
+                                                {% if page_num >= start and page_num < end and page_num > 3 and page_num < paginator.num_pages %}
+                                                    {% if page_num == page_obj.number %}
+                                                        <li class="page-item active">
+                                                            <span class="page-link">
+                                                                {{ page_num }}
+                                                                <span class="visually-hidden">(current)</span>
+                                                            </span>
+                                                        </li>
+                                                    {% else %}
+                                                        <li class="page-item">
+                                                            <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                                                        </li>
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endwith %}
+
+                                        <!-- Ellipsis if needed -->
+                                        {% if page_obj.number < paginator.num_pages|add:"-4" %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+
+                                        <!-- Show last 3 pages -->
+                                        {% for page_num in paginator.page_range|slice:"-3:" %}
+                                            {% if page_num == page_obj.number %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">
+                                                        {{ page_num }}
+                                                        <span class="visually-hidden">(current)</span>
+                                                    </span>
+                                                </li>
+                                            {% else %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endwith %}
+
+                                <!-- Next Page -->
+                                {% if reports.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ reports.next_page_number }}">
+                                            Tiếp
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if selected_project_uuid %}project_uuid={{ selected_project_uuid }}&{% endif %}page={{ paginator.num_pages }}">
+                                            Cuối <i class="fa fa-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Tiếp</span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">
+                                            Cuối <i class="fa fa-chevron-right"></i>
+                                        </span>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+
+                        <!-- Pagination Info -->
+                        <div class="text-center text-muted small mt-2">
+                            Trang <strong>{{ reports.number }}</strong> của <strong>{{ paginator.num_pages }}</strong>
+                            | Hiển thị <strong>{{ reports.start_index|default:0 }}-{{ reports.end_index|default:0 }}</strong> của <strong>{{ paginator.count }}</strong> report
+                        </div>
+                        {% endif %}
+
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fa fa-file-alt fa-3x text-muted mb-3"></i>
+                            <h5>Chưa có report nào</h5>
+                            <p class="text-muted">Hãy chạy test suite trong các dự án của bạn để tạo report</p>
+                            <a href="{% url 'project_list' %}" class="btn btn-primary">
+                                <i class="fa fa-list"></i> Xem dự án
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function filterByProject(projectUuid) {
+    const url = new URL(window.location.href);
+    if (projectUuid) {
+        url.searchParams.set('project_uuid', projectUuid);
+    } else {
+        url.searchParams.delete('project_uuid');
+    }
+    url.searchParams.delete('page'); // Reset to first page when filtering
+    window.location.href = url.toString();
+}
+</script>
+
+{% endblock %}
+

@@ -49,6 +49,12 @@
                     <span>{% trans "Library" %}</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" data-tooltip="{% trans 'Reports' %}">
+                    <i class="fa fa-file-alt"></i>
+                    <span>{% trans "Reports" %}</span>
+                </a>
+            </li>
         </ul>
 
         <!-- Projects Section -->
@@ -189,6 +195,15 @@
                    onclick="showNotification('warning', this.dataset.loginTitle, this.dataset.loginMessage); return false;">
                     <i class="fa fa-book"></i>
                     <span>{% trans "Library" %}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" 
+                   data-login-title="{% trans 'Login Required' %}" 
+                   data-login-message="{% trans 'Please log in to access the Reports.' %}"
+                   onclick="showNotification('warning', this.dataset.loginTitle, this.dataset.loginMessage); return false;">
+                    <i class="fa fa-file-alt"></i>
+                    <span>{% trans "Reports" %}</span>
                 </a>
             </li>
         </ul>

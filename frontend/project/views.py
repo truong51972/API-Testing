@@ -29,6 +29,7 @@ from django.views.decorators.http import require_http_methods
 
 # Local imports
 from main.decorators import set_test_suites_show
+from main.models import TestSuiteReport
 from testcase_history.models import TestCaseHistory
 from test_suite.models import ProjectTestSuite
 
@@ -3659,6 +3660,36 @@ def execute_test_suite(request, project_uuid):
                 print(f"Extracted test_suite_report_id: {test_suite_report_id}")
             
             if test_suite_report_id:
+                # Save report to database
+                try:
+                    # Try to find test_suite by api_test_suite_id
+                    test_suite = None
+                    if test_suite_id:
+                        test_suite = ProjectTestSuite.objects.filter(
+                            project=project,
+                            api_test_suite_id=test_suite_id
+                        ).first()
+                    
+                    # Create TestSuiteReport record
+                    TestSuiteReport.objects.create(
+                        project=project,
+                        test_suite=test_suite,
+                        test_suite_report_id=test_suite_report_id,
+                        api_test_suite_id=test_suite_id or '',
+                        status='running'
+                    )
+                    if DEBUG:
+                        print(f"\n--- Saved TestSuiteReport to database ---")
+                        print(f"Report ID: {test_suite_report_id}")
+                        print(f"Project: {project.project_name}")
+                        print(f"Test Suite: {test_suite.test_suite_name if test_suite else 'None'}")
+                except Exception as e:
+                    if DEBUG:
+                        print(f"\n--- Error saving TestSuiteReport ---")
+                        print(f"Error: {str(e)}")
+                    # Don't fail the request if saving report fails
+                    pass
+                
                 response_json = {
                     'success': True,
                     'message': 'Đã khởi động chạy test suite thành công.',
@@ -3679,6 +3710,35 @@ def execute_test_suite(request, project_uuid):
                     if DEBUG:
                         print(f"\n--- Found test_suite_report_id at root level ---")
                         print(f"test_suite_report_id: {test_suite_report_id}")
+                    
+                    # Save report to database
+                    try:
+                        # Try to find test_suite by api_test_suite_id
+                        test_suite = None
+                        if test_suite_id:
+                            test_suite = ProjectTestSuite.objects.filter(
+                                project=project,
+                                api_test_suite_id=test_suite_id
+                            ).first()
+                        
+                        # Create TestSuiteReport record
+                        TestSuiteReport.objects.create(
+                            project=project,
+                            test_suite=test_suite,
+                            test_suite_report_id=test_suite_report_id,
+                            api_test_suite_id=test_suite_id or '',
+                            status='running'
+                        )
+                        if DEBUG:
+                            print(f"\n--- Saved TestSuiteReport to database (root level) ---")
+                            print(f"Report ID: {test_suite_report_id}")
+                    except Exception as e:
+                        if DEBUG:
+                            print(f"\n--- Error saving TestSuiteReport (root level) ---")
+                            print(f"Error: {str(e)}")
+                        # Don't fail the request if saving report fails
+                        pass
+                    
                     response_json = {
                         'success': True,
                         'message': 'Đã khởi động chạy test suite thành công.',
