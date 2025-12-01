@@ -68,7 +68,7 @@ class TestCaseRepository(SQLModel, table=True):
     )
 
     execute: bool = Field(
-        default=True,
+        default=False,
         description="Indicates whether the test case should be executed.",
     )
 
@@ -76,12 +76,16 @@ class TestCaseRepository(SQLModel, table=True):
     def get_all_by_test_suite_id(
         cls,
         test_suite_id: str,
+        execute: Optional[bool] = None,
         session: Optional[Session] = None,
     ) -> list["TestCaseRepository"]:
         session = session or Session(get_db_engine())
 
         with session:
-            statement = select(cls).where(cls.test_suite_id == test_suite_id)
+            statement = select(cls).where(
+                (cls.test_suite_id == test_suite_id)
+                & ((cls.execute == execute) if execute is not None else True)
+            )
             results = session.exec(statement).all()
         return results
 
@@ -94,7 +98,7 @@ class TestCaseRepository(SQLModel, table=True):
 
             session.exec(
                 cls.__table__.update()
-                .where(cls.test_case_id.in_(test_case_ids))
+                .where(cls.id.in_(test_case_ids))
                 .values(execute=execute)
             )
             session.commit()
