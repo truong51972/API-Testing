@@ -1,8 +1,6 @@
 services:
   db:
     image: postgres:17
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -14,6 +12,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - local_net
 
   django-dev:
     build:
@@ -23,8 +23,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8001:8001"
     volumes:
       - .:/app
       - ./static:/app/staticfiles
@@ -35,10 +33,27 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - PRODUCTION_ENVIRONMENT
     env_file:
       - .env
     stdin_open: true
     tty: true
+    labels:
+      - "traefik.enable=true"
+      # Docs Router
+      - "traefik.http.services.frontend.loadbalancer.server.port=8001"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=api-t"
+    networks:
+      - local_net
+      - gateway_net
+
 
 volumes:
   postgres_data:
+
+networks:
+  gateway_net:
+    external: true
+  local_net:
+    driver: bridge
