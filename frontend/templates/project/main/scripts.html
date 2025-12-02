@@ -1,4 +1,35 @@
 <script>
+    // Function to handle file upload (used by both click and drag-drop)
+    function handleFileUpload(files) {
+        if (!files || files.length === 0) return;
+        
+        // Filter files to only accept .docx and .pdf
+        const allowedTypes = ['.docx', '.pdf'];
+        const validFiles = Array.from(files).filter(file => {
+            const fileName = file.name.toLowerCase();
+            return allowedTypes.some(type => fileName.endsWith(type));
+        });
+        
+        if (validFiles.length === 0) {
+            showNotification('warning', 'Cảnh báo', 'Vui lòng chọn file .docx hoặc .pdf');
+            return;
+        }
+        
+        if (validFiles.length < files.length) {
+            showNotification('info', 'Thông báo', `Đã bỏ qua ${files.length - validFiles.length} file không hợp lệ. Chỉ upload ${validFiles.length} file .docx/.pdf`);
+        }
+        
+        // Create a new FileList-like object and set it to the input
+        const dataTransfer = new DataTransfer();
+        validFiles.forEach(file => dataTransfer.items.add(file));
+        const fileInput = document.getElementById('fileInput');
+        fileInput.files = dataTransfer.files;
+        
+        // Trigger the change event to use existing upload logic
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    // File input change event handler
     document.getElementById('fileInput').addEventListener('change', function () {
         if (this.files.length > 0) {
             // Show loading state for file upload
@@ -20,6 +51,48 @@
 
             document.getElementById('uploadForm').submit();
         }
+    });
+    
+    // Drag & Drop functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadBox = document.querySelector('.upload-box');
+        const fileInput = document.getElementById('fileInput');
+        
+        if (!uploadBox || !fileInput) return;
+        
+        // Prevent default drag behaviors on the document
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, function(e) {
+                uploadBox.classList.add('drag-over');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, function(e) {
+                uploadBox.classList.remove('drag-over');
+            }, false);
+        });
+        
+        // Handle dropped files
+        uploadBox.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                handleFileUpload(files);
+            }
+        }, false);
     });
 
     // Link upload form loading state
@@ -80,6 +153,28 @@
         document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
         const currentPhase = document.getElementById('phase' + n);
         if (currentPhase) currentPhase.classList.remove('d-none');
+        
+        // Điều khiển hiển thị nút Back và Next theo từng step
+        const nextButton = document.getElementById('nextButton');
+        const backButton = document.getElementById('backButton');
+        
+        if (nextButton) {
+            // Ẩn Next ở step 5 (bước cuối) và step 2, 4 (AI tự xử lý)
+            if (n === totalSteps || n === 2 || n === 4) {
+                nextButton.style.display = 'none';
+            } else {
+                nextButton.style.display = 'inline-block';
+            }
+        }
+        
+        if (backButton) {
+            // Ẩn Back ở step 1 (bước đầu) và step 2, 4 (AI tự xử lý)
+            if (n === 1 || n === 2 || n === 4) {
+                backButton.style.display = 'none';
+            } else {
+                backButton.style.display = 'inline-block';
+            }
+        }
     }
     
     // Function to load report directly from report_id (without polling)

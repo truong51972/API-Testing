@@ -52,7 +52,7 @@ if not logger.handlers:
     logger.addHandler(console_handler)
 
 # Constants
-DEBUG = True  # Set to False to disable debug prints
+DEBUG = False  # Set to False to disable debug prints
 
 def debug_print(message):
     """Print debug message to both logger and stdout with flush"""

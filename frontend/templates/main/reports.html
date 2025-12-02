@@ -39,7 +39,6 @@
                                         <th>Report ID</th>
                                         <th>Dự án</th>
                                         <th>Test Suite</th>
-                                        <th>Trạng thái</th>
                                         <th>Thời gian chạy</th>
                                         <th>Thao tác</th>
                                     </tr>
@@ -59,19 +58,6 @@
                                                 {{ report.test_suite.test_suite_name }}
                                             {% else %}
                                                 <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if report.status == 'pending' %}
-                                                <span class="badge bg-warning">Chờ xử lý</span>
-                                            {% elif report.status == 'running' %}
-                                                <span class="badge bg-info">Đang chạy</span>
-                                            {% elif report.status == 'completed' %}
-                                                <span class="badge bg-success">Hoàn thành</span>
-                                            {% elif report.status == 'failed' %}
-                                                <span class="badge bg-danger">Lỗi</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">{{ report.status }}</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ report.executed_at|date:"d/m/Y H:i" }}</td>
