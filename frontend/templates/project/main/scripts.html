@@ -1,4 +1,35 @@
 <script>
+    // Function to handle file upload (used by both click and drag-drop)
+    function handleFileUpload(files) {
+        if (!files || files.length === 0) return;
+        
+        // Filter files to only accept .docx and .pdf
+        const allowedTypes = ['.docx', '.pdf'];
+        const validFiles = Array.from(files).filter(file => {
+            const fileName = file.name.toLowerCase();
+            return allowedTypes.some(type => fileName.endsWith(type));
+        });
+        
+        if (validFiles.length === 0) {
+            showNotification('warning', 'Cảnh báo', 'Vui lòng chọn file .docx hoặc .pdf');
+            return;
+        }
+        
+        if (validFiles.length < files.length) {
+            showNotification('info', 'Thông báo', `Đã bỏ qua ${files.length - validFiles.length} file không hợp lệ. Chỉ upload ${validFiles.length} file .docx/.pdf`);
+        }
+        
+        // Create a new FileList-like object and set it to the input
+        const dataTransfer = new DataTransfer();
+        validFiles.forEach(file => dataTransfer.items.add(file));
+        const fileInput = document.getElementById('fileInput');
+        fileInput.files = dataTransfer.files;
+        
+        // Trigger the change event to use existing upload logic
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    // File input change event handler
     document.getElementById('fileInput').addEventListener('change', function () {
         if (this.files.length > 0) {
             // Show loading state for file upload
@@ -20,6 +51,48 @@
 
             document.getElementById('uploadForm').submit();
         }
+    });
+    
+    // Drag & Drop functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadBox = document.querySelector('.upload-box');
+        const fileInput = document.getElementById('fileInput');
+        
+        if (!uploadBox || !fileInput) return;
+        
+        // Prevent default drag behaviors on the document
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, function(e) {
+                uploadBox.classList.add('drag-over');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadBox.addEventListener(eventName, function(e) {
+                uploadBox.classList.remove('drag-over');
+            }, false);
+        });
+        
+        // Handle dropped files
+        uploadBox.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                handleFileUpload(files);
+            }
+        }, false);
     });
 
     // Link upload form loading state
@@ -80,6 +153,49 @@
         document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
         const currentPhase = document.getElementById('phase' + n);
         if (currentPhase) currentPhase.classList.remove('d-none');
+        
+        // Điều khiển hiển thị nút Back và Next theo từng step
+        updateNavigationButtons(n);
+    }
+    
+    // Helper function to update navigation buttons visibility
+    function updateNavigationButtons(step) {
+        const nextButton = document.getElementById('nextButton');
+        const backButton = document.getElementById('backButton');
+        
+        if (nextButton) {
+            // Ẩn Next ở step 5 (bước cuối) và step 2 (AI tự xử lý)
+            // Step 4: chỉ ẩn nếu chưa chọn test cases (AI đang xử lý)
+            if (step === totalSteps || step === 2) {
+                nextButton.style.display = 'none';
+            } else if (step === 4) {
+                // Step 4: hiển thị Next nếu đã chọn test cases
+                if (window.testCasesSelected) {
+                    nextButton.style.display = 'inline-block';
+                } else {
+                    nextButton.style.display = 'none';
+                }
+            } else {
+                nextButton.style.display = 'inline-block';
+            }
+        }
+        
+        if (backButton) {
+            // Ẩn Back ở step 1 (bước đầu) và step 2 (AI tự xử lý)
+            // Step 4: chỉ ẩn nếu chưa chọn test cases (AI đang xử lý)
+            if (step === 1 || step === 2) {
+                backButton.style.display = 'none';
+            } else if (step === 4) {
+                // Step 4: hiển thị Back nếu đã chọn test cases
+                if (window.testCasesSelected) {
+                    backButton.style.display = 'inline-block';
+                } else {
+                    backButton.style.display = 'none';
+                }
+            } else {
+                backButton.style.display = 'inline-block';
+            }
+        }
     }
     
     // Function to load report directly from report_id (without polling)
@@ -862,6 +978,10 @@
         const hasSelectedTestCases = selectedTestCasesSet.size > 0;
         if (hasSelectedTestCases) {
             window.testCasesSelected = true;
+            // Hiển thị lại nút Next và Back nếu đang ở step 4
+            if (currentStep === 4) {
+                updateNavigationButtons(4);
+            }
         }
 
         // Reset to first page
@@ -1327,6 +1447,9 @@
                     console.warn('No test_suite_id in response, will try to get from database when executing');
                 }
                 
+                // Hiển thị lại nút Next và Back sau khi chọn test cases
+                updateNavigationButtons(4);
+                
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalHtml;
             } else {
@@ -1660,7 +1783,7 @@
             contentContainer.style.display = 'block';
         }
 
-        // Extract report data - format: {result: {...}, data: [...]}
+        // Extract report data - format: {success: true, message: "...", data: [...]}
         const reportDataArray = reportData.data || reportData.response?.data || [];
         const result = reportData.result || reportData.response?.result || {};
         
@@ -1682,6 +1805,11 @@
             testResults = reportDataArray.data;
         } else if (reportDataArray && Array.isArray(reportDataArray.test_results)) {
             testResults = reportDataArray.test_results;
+        }
+        
+        // Extract test_suite_report_id from first test result if available
+        if (testResults.length > 0 && testResults[0].test_suite_report_id && !testSuiteReportId) {
+            window.currentTestSuiteReportId = testResults[0].test_suite_report_id;
         }
 
         console.log('Parsed test results:', testResults);
@@ -1769,18 +1897,20 @@
                     // Format executed time (use end_time or start_time)
                     const executedAt = test.end_time || test.start_time || '-';
                     
-                    // Get test case name (might need to get from test_case_id or use a default)
-                    const testCaseName = test.test_case_name || `Test Case ${index + 1}`;
+                    // Get test case info from nested test_case object
+                    const testCaseObj = test.test_case || {};
+                    const testCaseName = testCaseObj.test_case || test.test_case_name || `Test Case ${index + 1}`;
+                    const testCaseId = testCaseObj.test_case_id || testCaseObj.id || test.test_case_id || test.id || '-';
                     
-                    // Get endpoint from request (if available in headers or request_body)
-                    const endpoint = test.endpoint || test.url || 'N/A';
+                    // Get endpoint from test_case.api_info.url
+                    const endpoint = testCaseObj.api_info?.url || test.endpoint || test.url || 'N/A';
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${index + 1}</td>
-                        <td><code class="small">${test.test_case_id || test.id || '-'}</code></td>
+                        <td><code class="small">${testCaseId}</code></td>
                         <td>${testCaseName}</td>
-                        <td><code class="text-info small">${endpoint}</code></td>
+                        <td><code class="text-info small" title="${endpoint}">${endpoint.length > 50 ? endpoint.substring(0, 50) + '...' : endpoint}</code></td>
                         <td>${statusBadge}</td>
                         <td><span class="badge ${getStatusCodeBadgeClass(responseCode)}">${responseCode}</span></td>
                         <td>${duration}</td>
@@ -1802,10 +1932,11 @@
         // Update report details
         const detailsSection = document.getElementById('reportDetailsSection');
         if (detailsSection) {
-            if (testSuiteReportId || testResults.length > 0) {
+            const reportId = testSuiteReportId || (testResults.length > 0 && testResults[0].test_suite_report_id) || window.currentTestSuiteReportId;
+            if (reportId || testResults.length > 0) {
                 detailsSection.style.display = 'block';
-                if (testSuiteReportId) {
-                    document.getElementById('reportSuiteId').textContent = testSuiteReportId;
+                if (reportId) {
+                    document.getElementById('reportSuiteId').textContent = reportId;
                 }
                 
                 // Calculate total duration from first and last test
@@ -1934,25 +2065,50 @@
             }
         }
         
+        // Get test case object
+        const testCaseObj = test.test_case || {};
+        const testCaseName = testCaseObj.test_case || test.test_case_name || `Test Case ${index + 1}`;
+        const testCaseId = testCaseObj.test_case_id || testCaseObj.id || test.test_case_id || test.id || 'N/A';
+        const testCaseType = testCaseObj.test_case_type || 'N/A';
+        const apiInfo = testCaseObj.api_info || {};
+        const endpoint = apiInfo.url || test.endpoint || test.url || 'N/A';
+        const method = apiInfo.method || 'N/A';
+        const expectedOutput = testCaseObj.expected_output || {};
+        
         // Populate modal
-        document.getElementById('resultDetailId').textContent = test.test_case_id || test.id || 'N/A';
-        document.getElementById('resultDetailName').textContent = test.test_case_name || `Test Case ${index + 1}`;
-        document.getElementById('resultDetailEndpoint').textContent = test.endpoint || test.url || 'N/A';
+        document.getElementById('resultDetailId').textContent = testCaseId;
+        document.getElementById('resultDetailName').textContent = testCaseName;
+        document.getElementById('resultDetailEndpoint').textContent = endpoint;
         document.getElementById('resultDetailStatus').innerHTML = getStatusBadge(status);
         document.getElementById('resultDetailResponseCode').innerHTML = `<span class="badge ${getStatusCodeBadgeClass(test.response_status_code)}">${test.response_status_code || 'N/A'}</span>`;
         document.getElementById('resultDetailDuration').textContent = duration;
         document.getElementById('resultDetailStartTime').textContent = formatDateTime(test.start_time);
         document.getElementById('resultDetailExecutedAt').textContent = formatDateTime(test.end_time || test.start_time);
         
+        // Update additional fields if they exist in the modal
+        const resultDetailMethod = document.getElementById('resultDetailMethod');
+        if (resultDetailMethod) {
+            resultDetailMethod.textContent = method;
+        }
+        const resultDetailTestCaseType = document.getElementById('resultDetailTestCaseType');
+        if (resultDetailTestCaseType) {
+            resultDetailTestCaseType.textContent = testCaseType;
+        }
+        const resultDetailExpectedOutput = document.getElementById('resultDetailExpectedOutput');
+        if (resultDetailExpectedOutput) {
+            resultDetailExpectedOutput.textContent = Object.keys(expectedOutput).length > 0 
+                ? JSON.stringify(expectedOutput, null, 2) 
+                : 'N/A';
+        }
+        
         // Request Body
         const requestBody = test.request_body || {};
-        document.getElementById('resultDetailRequest').textContent = typeof requestBody === 'string' 
-            ? requestBody 
-            : JSON.stringify(requestBody, null, 2);
         
         // Request Headers
         const requestHeader = test.request_header || {};
-        let requestInfo = 'Request Headers:\n' + JSON.stringify(requestHeader, null, 2);
+        let requestInfo = 'HTTP Method: ' + method + '\n';
+        requestInfo += 'URL: ' + endpoint + '\n\n';
+        requestInfo += 'Request Headers:\n' + JSON.stringify(requestHeader, null, 2);
         if (Object.keys(requestBody).length > 0) {
             requestInfo += '\n\nRequest Body:\n' + JSON.stringify(requestBody, null, 2);
         }
@@ -1960,15 +2116,14 @@
         
         // Response Body
         const responseBody = test.response_body || {};
-        document.getElementById('resultDetailResponse').textContent = typeof responseBody === 'string' 
-            ? responseBody 
-            : JSON.stringify(responseBody, null, 2);
         
         // Response Headers (add to response display)
         const responseHeader = test.response_header || {};
         let responseInfo = 'Response Headers:\n' + JSON.stringify(responseHeader, null, 2);
         if (Object.keys(responseBody).length > 0) {
             responseInfo += '\n\nResponse Body:\n' + JSON.stringify(responseBody, null, 2);
+        } else {
+            responseInfo += '\n\nResponse Body: (empty)';
         }
         document.getElementById('resultDetailResponse').textContent = responseInfo;
         

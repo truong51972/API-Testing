@@ -7,19 +7,6 @@
 {% block title %}User Dashboard{% endblock %}
 
 {% block content %}
-
-<!-- Search -->
-<div class="navbar-nav align-items-center">
-    <div class="nav-item navbar-search-wrapper mb-0">
-    <a class="nav-item nav-link search-toggler px-0" href="javascript:void(0);">
-        <span class="d-inline-block text-body-secondary fw-normal" id="autocomplete"></span>
-    </a>
-    </div>
-</div>
-
-<!-- /Search -->
-
-
       <!-- Content wrapper -->
 <div class="content-wrapper">
         <!-- Content -->
@@ -29,7 +16,7 @@
   <div class="card bg-transparent shadow-none my-6 border-0">
     <div class="card-body row p-0 pb-6 g-6">
       <div class="col-12 col-lg-8 card-separator">
-        <h5 class="mb-2">Welcome back,<span class="h4"> {{ request.user.username }} 👋🏻</span></h5>
+        <h5 class="mb-2">Welcome back,<span class="h4"> {{ current_username }} 👋🏻</span></h5>
         <div class="col-12 col-lg-5">
           <p>Your progress this week is Awesome. let's keep it up and get a lot of points reward !</p>
         </div>
@@ -54,8 +41,8 @@
               </div>
             </div>
             <div class="content-right">
-              <p class="mb-0 fw-medium">Hours Spent</p>
-              <h4 class="text-primary mb-0">34h</h4>
+              <p class="mb-0 fw-medium">Total Projects</p>
+              <h4 class="text-primary mb-0">{{ total_projects }}</h4>
             </div>
           </div>
           <div class="d-flex align-items-center gap-4">
@@ -81,8 +68,8 @@
               </div>
             </div>
             <div class="content-right">
-              <p class="mb-0 fw-medium">Test Results</p>
-              <h4 class="text-info mb-0">82%</h4>
+              <p class="mb-0 fw-medium">Test Success Rate</p>
+              <h4 class="text-info mb-0">{{ test_success_rate }}%</h4>
             </div>
           </div>
           <div class="d-flex align-items-center gap-4">
@@ -109,24 +96,30 @@
               </div>
             </div>
             <div class="content-right">
-              <p class="mb-0 fw-medium">Course Completed</p>
-              <h4 class="text-warning mb-0">14</h4>
+              <p class="mb-0 fw-medium">Test Cases</p>
+              <h4 class="text-warning mb-0">{{ total_test_cases }}</h4>
             </div>
           </div>
         </div>
       </div>
       <div class="col-12 col-lg-4 ps-md-4 ps-lg-6">
         <div class="d-flex justify-content-between align-items-center">
-          <div>
             <div>
-              <h5 class="mb-1">Time Spendings</h5>
-              <p class="mb-9">Weekly report</p>
+              <div>
+                <h5 class="mb-1">This Week</h5>
+                <p class="mb-9">Weekly statistics</p>
+              </div>
+              <div class="time-spending-chart">
+                <h4 class="mb-2">{{ projects_this_week }}<span class="text-body"> Projects</span></h4>
+                {% if projects_change > 0 %}
+                <span class="badge bg-label-success">+{{ projects_change }}%</span>
+                {% elif projects_change < 0 %}
+                <span class="badge bg-label-danger">{{ projects_change }}%</span>
+                {% else %}
+                <span class="badge bg-label-secondary">0%</span>
+                {% endif %}
+              </div>
             </div>
-            <div class="time-spending-chart">
-              <h4 class="mb-2">231<span class="text-body">h</span> 14<span class="text-body">m</span></h4>
-              <span class="badge bg-label-success">+18.4%</span>
-            </div>
-          </div>
           <div id="leadsReportChart"></div>
         </div>
       </div>
@@ -134,458 +127,463 @@
   </div>
   <!-- Hour chart End  -->
 
-  <!-- Topic and Instructors -->
+  <!-- Request Frequency Dashboard -->
   <div class="row mb-6 g-6">
-    <div class="col-12 col-xl-8">
+    <div class="col-12">
       <div class="card h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="card-title m-0 me-2">Topic you are interested in</h5>
+          <div>
+            <h5 class="card-title m-0 me-2">Request Frequency Dashboard</h5>
+            <p class="text-body-secondary mb-0">Tần suất hoạt động trong 30 ngày qua</p>
+          </div>
           <div class="dropdown">
-            <button class="btn p-0" type="button" id="topic" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-base bx bx-dots-vertical-rounded icon-lg text-body-secondary"></i>
+            <button class="btn text-body-secondary p-0" type="button" id="requestFrequency" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
             </button>
-            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="topic">
-              <a class="dropdown-item" href="javascript:void(0);">Highest Views</a>
-              <a class="dropdown-item" href="javascript:void(0);">See All</a>
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="requestFrequency">
+              <a class="dropdown-item" href="javascript:void(0);">Last 30 Days</a>
+              <a class="dropdown-item" href="javascript:void(0);">Last 7 Days</a>
             </div>
           </div>
         </div>
-        <div class="card-body row g-3">
-          <div class="col-md-8">
-            <div id="horizontalBarChart"></div>
-          </div>
-          <div class="col-md-4 d-flex justify-content-around align-items-center">
-            <div>
-              <div class="d-flex align-items-baseline">
-                <span class="text-primary me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
-                <div>
-                  <p class="mb-0">UI Design</p>
-                  <h5>35%</h5>
+        <div class="card-body">
+          <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-3">
+                  <div class="avatar-initial rounded bg-label-primary">
+                    <i class="icon-base bx bx-bar-chart-alt-2 icon-lg"></i>
+                  </div>
                 </div>
-              </div>
-              <div class="d-flex align-items-baseline my-12">
-                <span class="text-success me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
                 <div>
-                  <p class="mb-0">Music</p>
-                  <h5>14%</h5>
-                </div>
-              </div>
-              <div class="d-flex align-items-baseline">
-                <span class="text-danger me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
-                <div>
-                  <p class="mb-0">React</p>
-                  <h5>10%</h5>
+                  <p class="mb-0 text-body-secondary">Total Activities</p>
+                  <h4 class="mb-0">{{ total_activities_30_days }}</h4>
                 </div>
               </div>
             </div>
-
-            <div>
-              <div class="d-flex align-items-baseline">
-                <span class="text-info me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
+            <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-3">
+                  <div class="avatar-initial rounded bg-label-success">
+                    <i class="icon-base bx bx-trending-up icon-lg"></i>
+                  </div>
+                </div>
                 <div>
-                  <p class="mb-0">UX Design</p>
-                  <h5>20%</h5>
+                  <p class="mb-0 text-body-secondary">Avg Daily</p>
+                  <h4 class="mb-0">{{ avg_daily_activities }}</h4>
                 </div>
               </div>
-              <div class="d-flex align-items-baseline my-12">
-                <span class="text-secondary me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-3">
+                  <div class="avatar-initial rounded bg-label-info">
+                    <i class="icon-base bx bx-line-chart icon-lg"></i>
+                  </div>
+                </div>
                 <div>
-                  <p class="mb-0">Animation</p>
-                  <h5>12%</h5>
+                  <p class="mb-0 text-body-secondary">Peak Day</p>
+                  <h4 class="mb-0">{{ max_daily_activities }}</h4>
                 </div>
               </div>
-              <div class="d-flex align-items-baseline">
-                <span class="text-warning me-2"><i class="icon-base bx bxs-circle icon-12px"></i></span>
+            </div>
+            <div class="col-md-3 col-sm-6">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-3">
+                  <div class="avatar-initial rounded bg-label-warning">
+                    <i class="icon-base bx bx-calendar-week icon-lg"></i>
+                  </div>
+                </div>
                 <div>
-                  <p class="mb-0">SEO</p>
-                  <h5>9%</h5>
+                  <p class="mb-0 text-body-secondary">Last 7 Days</p>
+                  <h4 class="mb-0">{{ last_7_days_activities }}</h4>
                 </div>
               </div>
             </div>
           </div>
+          <!-- <div class="alert alert-info mb-0">
+            <small><i class="icon-base bx bx-info-circle"></i> <strong>Lưu ý:</strong> Dữ liệu được cập nhật theo thời gian thực. Nếu vừa tạo project/upload document/execute test, vui lòng <a href="javascript:location.reload();" class="alert-link">refresh trang</a> để xem dữ liệu mới nhất.</small>
+          </div> -->
+          {% if total_activities_30_days > 0 %}
+            <div id="requestFrequencyChart" style="min-height: 350px;"></div>
+          {% else %}
+            <div class="d-flex align-items-center justify-content-center" style="min-height: 350px;">
+              <div class="text-center">
+                <i class="icon-base bx bx-bar-chart-alt-2 icon-5x text-body-secondary mb-3"></i>
+                <h5 class="text-body-secondary">No Data Available</h5>
+                <p class="text-body-secondary mb-0">Chưa có hoạt động nào trong 30 ngày qua</p>
+              </div>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>
+  </div>
+  <!-- Request Frequency Dashboard End -->
 
+  <!-- Recent Projects and All Test Reports -->
+  <div class="row mb-6 g-6">
     <div class="col-12 col-xl-4 col-md-6">
       <div class="card h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
           <div class="card-title mb-0">
-            <h5 class="m-0 me-2">Popular Instructors</h5>
+            <h5 class="m-0 me-2">Recent Projects</h5>
           </div>
           <div class="dropdown">
-            <button class="btn text-body-secondary p-0" type="button" id="popularInstructors" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <button class="btn text-body-secondary p-0" type="button" id="recentProjects" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
             </button>
-            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="popularInstructors">
-              <a class="dropdown-item" href="javascript:void(0);">Select All</a>
-              <a class="dropdown-item" href="javascript:void(0);">Refresh</a>
-              <a class="dropdown-item" href="javascript:void(0);">Share</a>
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="recentProjects">
+              <a class="dropdown-item" href="{% url 'project_list' %}">View All</a>
+              <a class="dropdown-item" href="{% url 'project_add' %}">New Project</a>
             </div>
           </div>
         </div>
         <div class="px-5 py-4 border border-start-0 border-end-0">
           <div class="d-flex justify-content-between align-items-center">
-            <p class="mb-0 text-uppercase">Instructors</p>
-            <p class="mb-0 text-uppercase">courses</p>
+            <p class="mb-0 text-uppercase">Project Name</p>
+            <p class="mb-0 text-uppercase">Date</p>
           </div>
         </div>
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-6">
-            <div class="d-flex align-items-center">
-              <div class="avatar me-4 w-px-34 h-px-34">
-                <img src="../../static/assets/img/avatars/1.png" alt="Avatar" class="rounded-circle" />
-              </div>
-              <div>
+          {% if recent_projects %}
+            {% for project in recent_projects|slice:":5" %}
+            <div class="d-flex justify-content-between align-items-center {% if not forloop.last %}mb-6{% endif %}">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-4 w-px-34 h-px-34">
+                  <span class="avatar-initial rounded bg-label-primary">
+                    <i class="icon-base bx bx-folder icon-lg"></i>
+                  </span>
+                </div>
                 <div>
-                  <h6 class="mb-0 text-truncate">Maven Analytics</h6>
-                  <small class="text-truncate text-body">Business Intelligence</small>
+                  <div>
+                    <h6 class="mb-0 text-truncate">
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=project.uuid %}" class="text-body">
+                        {{ project.project_name|truncatechars:25 }}
+                      </a>
+                    </h6>
+                    <small class="text-truncate text-body">{{ project.created_at|date:"M d, Y" }}</small>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="text-end">
-              <h6 class="mb-0">33</h6>
-            </div>
-          </div>
-          <div class="d-flex justify-content-between align-items-center mb-6">
-            <div class="d-flex align-items-center">
-              <div class="avatar me-4 w-px-34 h-px-34">
-                <img src="../../static/assets/img/avatars/2.png" alt="Avatar" class="rounded-circle" />
-              </div>
-              <div>
-                <div>
-                  <h6 class="mb-0 text-truncate">Bentlee Emblin</h6>
-                  <small class="text-truncate text-body">Digital Marketing</small>
-                </div>
+              <div class="text-end">
+                <span class="badge bg-label-info">{{ project.documents.count }}</span>
               </div>
             </div>
-            <div class="text-end">
-              <h6 class="mb-0">52</h6>
+            {% endfor %}
+          {% else %}
+            <div class="text-center py-4">
+              <p class="text-body-secondary mb-0">No projects yet</p>
+              <a href="{% url 'project_add' %}" class="btn btn-sm btn-primary mt-2">Create Project</a>
             </div>
-          </div>
-          <div class="d-flex justify-content-between align-items-center mb-6">
-            <div class="d-flex align-items-center">
-              <div class="avatar me-4 w-px-34 h-px-34">
-                <img src="../../static/assets/img/avatars/3.png" alt="Avatar" class="rounded-circle" />
-              </div>
-              <div>
-                <div>
-                  <h6 class="mb-0 text-truncate">Benedetto Rossiter</h6>
-                  <small class="text-truncate text-body">UI/UX Design</small>
-                </div>
-              </div>
-            </div>
-            <div class="text-end">
-              <h6 class="mb-0">12</h6>
-            </div>
-          </div>
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-              <div class="avatar me-4 w-px-34 h-px-34">
-                <img src="../../static/assets/img/avatars/4.png" alt="Avatar" class="rounded-circle" />
-              </div>
-              <div>
-                <div>
-                  <h6 class="mb-0 text-truncate">Beverlie Krabbe</h6>
-                  <small class="text-truncate text-body">React Native</small>
-                </div>
-              </div>
-            </div>
-            <div class="text-end">
-              <h6 class="mb-0">8</h6>
-            </div>
-          </div>
+          {% endif %}
         </div>
       </div>
     </div>
 
-    <div class="col-12 col-xl-4 col-md-6">
+    <div class="col-12 col-xl-8 col-md-6">
       <div class="card h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="card-title m-0 me-2">Top Courses</h5>
+          <h5 class="card-title m-0 me-2">All Test Reports</h5>
           <div class="dropdown">
-            <button class="btn text-body-secondary p-0" type="button" id="topCourses" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <button class="btn text-body-secondary p-0" type="button" id="allReports" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
             </button>
-            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="topCourses">
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="allReports">
+              <a class="dropdown-item" href="{% url 'reports' %}">View All Reports</a>
               <a class="dropdown-item" href="javascript:void(0);">Refresh</a>
-              <a class="dropdown-item" href="javascript:void(0);">Download</a>
-              <a class="dropdown-item" href="javascript:void(0);">View All</a>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <ul class="list-unstyled mb-0">
-            <li class="d-flex mb-6 align-items-center">
-              <div class="avatar flex-shrink-0 me-4">
-                <span class="avatar-initial rounded bg-label-primary"><i class="icon-base bx bx-video icon-lg"></i></span>
-              </div>
-              <div class="row w-100 align-items-center">
-                <div class="col-sm-8 col-md-12 col-xxl-8 mb-1 mb-sm-0 mb-md-1 mb-xxl-0">
-                  <h6 class="mb-0">Videography Basic Design Course</h6>
-                </div>
-                <div class="col-sm-4 col-md-12 col-xxl-4 d-flex justify-content-xxl-end">
-                  <div class="badge bg-label-secondary">1.2k Views</div>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex mb-6 align-items-center">
-              <div class="avatar flex-shrink-0 me-4">
-                <span class="avatar-initial rounded bg-label-info"><i class="icon-base bx bx-code-alt icon-lg"></i></span>
-              </div>
-              <div class="row w-100 align-items-center">
-                <div class="col-sm-8 col-md-12 col-xxl-8 mb-1 mb-sm-0 mb-md-1 mb-xxl-0">
-                  <h6 class="mb-0">Basic Front-end Development Course</h6>
-                </div>
-                <div class="col-sm-4 col-md-12 col-xxl-4 d-flex justify-content-xxl-end">
-                  <div class="badge bg-label-secondary">834 Views</div>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex mb-6 align-items-center">
-              <div class="avatar flex-shrink-0 me-4">
-                <span class="avatar-initial rounded bg-label-success"><i class="icon-base bx bx-camera icon-lg"></i></span>
-              </div>
-              <div class="row w-100 align-items-center">
-                <div class="col-sm-8 col-md-12 col-xxl-8 mb-1 mb-sm-0 mb-md-1 mb-xxl-0">
-                  <h6 class="mb-0">Basic Fundamentals of Photography</h6>
-                </div>
-                <div class="col-sm-4 col-md-12 col-xxl-4 d-flex justify-content-xxl-end">
-                  <div class="badge bg-label-secondary">3.7k Views</div>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex mb-6 align-items-center">
-              <div class="avatar flex-shrink-0 me-4">
-                <span class="avatar-initial rounded bg-label-warning"><i class="icon-base bx bx-basketball icon-lg"></i></span>
-              </div>
-              <div class="row w-100 align-items-center">
-                <div class="col-sm-8 col-md-12 col-xxl-8 mb-1 mb-sm-0 mb-md-1 mb-xxl-0">
-                  <h6 class="mb-0">Advance Dribble Base Visual Design</h6>
-                </div>
-                <div class="col-sm-4 col-md-12 col-xxl-4 d-flex justify-content-xxl-end">
-                  <div class="badge bg-label-secondary">2.5k Views</div>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex align-items-center">
-              <div class="avatar flex-shrink-0 me-4">
-                <span class="avatar-initial rounded bg-label-danger"><i class="icon-base bx bx-microphone icon-lg"></i></span>
-              </div>
-              <div class="row w-100 align-items-center">
-                <div class="col-sm-8 col-md-12 col-xxl-8 mb-1 mb-sm-0 mb-md-1 mb-xxl-0">
-                  <h6 class="mb-0">Your First Singing Lesson</h6>
-                </div>
-                <div class="col-sm-4 col-md-12 col-xxl-4 d-flex justify-content-xxl-end">
-                  <div class="badge bg-label-secondary">948 Views</div>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-xl-4 col-md-6">
-      <div class="card h-100">
-        <div class="card-body">
-          <div class="bg-label-primary rounded-3 text-center mb-4 pt-6">
-            <img class="img-fluid" src="../../static/assets/img/illustrations/girl-doing-yoga-light.png" alt="Card girl image" style="width: 52%;" />
-          </div>
-          <h5 class="mb-2">Upcoming Webinar</h5>
-          <p>Next Generation Frontend Architecture Using Layout Engine And React Native Web.</p>
-          <div class="row mb-4 g-3">
-            <div class="col-6">
-              <div class="d-flex align-items-center">
-                <div class="avatar flex-shrink-0 me-3">
-                  <span class="avatar-initial rounded bg-label-primary"><i class="icon-base bx bx-calendar icon-lg"></i></span>
-                </div>
-                <div>
-                  <h6 class="mb-0 text-nowrap">17 Nov 23</h6>
-                  <small>Date</small>
-                </div>
-              </div>
+          {% if all_reports|length > 0 %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Test Suite</th>
+                    <th>Status</th>
+                    <th>Executed At</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for report in all_reports %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=report.project.uuid %}" class="text-body">
+                        {{ report.project.project_name|truncatechars:30 }}
+                      </a>
+                    </td>
+                    <td>
+                      {% if report.test_suite %}
+                        {{ report.test_suite.test_suite_name|truncatechars:25 }}
+                      {% else %}
+                        <span class="text-body-secondary">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if report.status == 'completed' %}
+                      <span class="badge bg-label-success">Completed</span>
+                      {% elif report.status == 'running' %}
+                      <span class="badge bg-label-info">Running</span>
+                      {% elif report.status == 'failed' %}
+                      <span class="badge bg-label-danger">Failed</span>
+                      {% else %}
+                      <span class="badge bg-label-secondary">Pending</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ report.executed_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=report.project.uuid %}" class="btn btn-sm btn-outline-primary">
+                        View
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
-            <div class="col-6">
-              <div class="d-flex align-items-center">
-                <div class="avatar flex-shrink-0 me-3">
-                  <span class="avatar-initial rounded bg-label-primary"><i class="icon-base bx bx-time-five icon-lg"></i></span>
-                </div>
-                <div>
-                  <h6 class="mb-0 text-nowrap">32 minutes</h6>
-                  <small>Duration</small>
-                </div>
-              </div>
+          {% else %}
+            <div class="text-center py-4">
+              <p class="text-body-secondary mb-0">No test reports yet</p>
             </div>
-          </div>
-          <div class="col-12 text-center">
-            <a href="javascript:void(0);" class="btn btn-primary w-100 d-grid">Join the event</a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-xl-4 col-md-6">
-      <div class="card h-100">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="card-title m-0 me-2">Assignment Progress</h5>
-          <div class="dropdown">
-            <button class="btn text-body-secondary p-0" type="button" id="assignmentProgress" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
-            </button>
-            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="assignmentProgress">
-              <a class="dropdown-item" href="javascript:void(0);">Refresh</a>
-              <a class="dropdown-item" href="javascript:void(0);">Download</a>
-              <a class="dropdown-item" href="javascript:void(0);">View All</a>
-            </div>
-          </div>
-        </div>
-        <div class="card-body">
-          <ul class="p-0 m-0">
-            <li class="d-flex mb-4 pb-1">
-              <div class="chart-progress me-4" data-color="primary" data-series="72" data-progress_variant="true"></div>
-              <div class="row w-100 align-items-center">
-                <div class="col-9">
-                  <div class="me-2">
-                    <h6 class="mb-1">User experience Design</h6>
-                    <p class="mb-0">120 Tasks</p>
-                  </div>
-                </div>
-                <div class="col-3 text-end">
-                  <button type="button" class="btn btn-sm btn-icon btn-label-secondary">
-                    <i class="icon-base bx bx-chevron-right icon-20px scaleX-n1-rtl"></i>
-                  </button>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex mb-4 pb-1">
-              <div class="chart-progress me-4" data-color="success" data-series="48" data-progress_variant="true"></div>
-              <div class="row w-100 align-items-center">
-                <div class="col-9">
-                  <div class="me-2">
-                    <h6 class="mb-1">Basic fundamentals</h6>
-                    <p class="mb-0">32 Tasks</p>
-                  </div>
-                </div>
-                <div class="col-3 text-end">
-                  <button type="button" class="btn btn-sm btn-icon btn-label-secondary">
-                    <i class="icon-base bx bx-chevron-right icon-20px scaleX-n1-rtl"></i>
-                  </button>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex mb-4 pb-1">
-              <div class="chart-progress me-4" data-color="danger" data-series="15" data-progress_variant="true"></div>
-              <div class="row w-100 align-items-center">
-                <div class="col-9">
-                  <div class="me-2">
-                    <h6 class="mb-1">React native components</h6>
-                    <p class="mb-0">182 Tasks</p>
-                  </div>
-                </div>
-                <div class="col-3 text-end">
-                  <button type="button" class="btn btn-sm btn-icon btn-label-secondary">
-                    <i class="icon-base bx bx-chevron-right icon-20px scaleX-n1-rtl"></i>
-                  </button>
-                </div>
-              </div>
-            </li>
-            <li class="d-flex">
-              <div class="chart-progress me-4" data-color="info" data-series="24" data-progress_variant="true"></div>
-              <div class="row w-100 align-items-center">
-                <div class="col-9">
-                  <div class="me-2">
-                    <h6 class="mb-1">Basic of music theory</h6>
-                    <p class="mb-0">56 Tasks</p>
-                  </div>
-                </div>
-                <div class="col-3 text-end">
-                  <button type="button" class="btn btn-sm btn-icon btn-label-secondary">
-                    <i class="icon-base bx bx-chevron-right icon-20px scaleX-n1-rtl"></i>
-                  </button>
-                </div>
-              </div>
-            </li>
-          </ul>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
   <!--  Topic and Instructors  End-->
 
-  <!-- Course datatable -->
-  <div class="card mb-6">
-    <div class="mb-4">
-      <table class="table table-sm datatables-academy-course">
-        <thead>
-          <tr>
-            <th></th>
-            <th></th>
-            <th>Course Name</th>
-            <th>Time</th>
-            <th class="w-25">Progress</th>
-            <th class="w-25">Status</th>
-          </tr>
-        </thead>
-      </table>
+  <!-- Recent Documents -->
+  <div class="row mb-6 g-6">
+    <div class="col-12">
+      <div class="card h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="card-title mb-0">
+            <h5 class="m-0 me-2">Recent Documents</h5>
+          </div>
+          <div class="dropdown">
+            <button class="btn text-body-secondary p-0" type="button" id="recentDocuments" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="recentDocuments">
+              <a class="dropdown-item" href="{% url 'library' %}">View All Documents</a>
+            </div>
+          </div>
+        </div>
+        <div class="px-5 py-4 border border-start-0 border-end-0">
+          <div class="d-flex justify-content-between align-items-center">
+            <p class="mb-0 text-uppercase">Document Name</p>
+            <p class="mb-0 text-uppercase">Date</p>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if recent_documents %}
+            {% for document in recent_documents|slice:":5" %}
+            <div class="d-flex justify-content-between align-items-center {% if not forloop.last %}mb-6{% endif %}">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-4 w-px-34 h-px-34">
+                  <span class="avatar-initial rounded bg-label-success">
+                    <i class="icon-base bx bx-file icon-lg"></i>
+                  </span>
+                </div>
+                <div>
+                  <div>
+                    <h6 class="mb-0 text-truncate">
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=document.project.uuid %}" class="text-body">
+                        {{ document.original_filename|default:document.file.name|default:document.link|truncatechars:25 }}
+                      </a>
+                    </h6>
+                    <small class="text-truncate text-body">
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=document.project.uuid %}" class="text-body-secondary">
+                        {{ document.project.project_name|truncatechars:20 }}
+                      </a>
+                    </small>
+                  </div>
+                </div>
+              </div>
+              <div class="text-end">
+                <small class="text-body-secondary">{{ document.uploaded_at|date:"M d, Y" }}</small>
+                <div>
+                  {% if document.ai_processing_status == 'completed' %}
+                  <span class="badge bg-label-success">Completed</span>
+                  {% elif document.ai_processing_status == 'processing' %}
+                  <span class="badge bg-label-info">Processing</span>
+                  {% elif document.ai_processing_status == 'failed' %}
+                  <span class="badge bg-label-danger">Failed</span>
+                  {% else %}
+                  <span class="badge bg-label-secondary">Pending</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center py-4">
+              <p class="text-body-secondary mb-0">No documents yet</p>
+              <a href="{% url 'project_list' %}" class="btn btn-sm btn-primary mt-2">Upload Document</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
-  <!-- Course datatable End -->
+  <!-- Recent Documents End -->
+
+
 
 </div>
 
+{{ request_frequency_data|json_script:"request-frequency-data" }}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  // Dữ liệu giả (tổng = 100%)
-  const categories = ['UI Design', 'UX Design', 'Music', 'Animation', 'React', 'SEO'];
-  const values     = [35, 20, 14, 12, 10, 9];
-
-  // Màu tương ứng với legend (primary, info, success, secondary, danger, warning)
-  const colors = ['#6366f1', '#06b6d4', '#10b981', '#94a3b8', '#ef4444', '#f59e0b'];
-
-  const options = {
-    series: [{ name: 'Interest', data: values }],
-    chart: {
-      type: 'bar',
-      height: 320,
-      toolbar: { show: false },
-      fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif'
-    },
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: '60%',
-        borderRadius: 6,
-        distributed: true  // mỗi thanh một màu (theo mảng colors)
+function initRequestFrequencyChart() {
+  // Check if ApexCharts is loaded
+  if (typeof ApexCharts === 'undefined') {
+    console.error('ApexCharts is not loaded');
+    return;
+  }
+  
+  // Get data from JSON script tag (using Django's json_script)
+  const dataScript = document.getElementById('request-frequency-data');
+  if (!dataScript || !dataScript.textContent) {
+    console.error('Request frequency data not found');
+    return;
+  }
+  
+  try {
+    const frequencyData = JSON.parse(dataScript.textContent);
+    
+    console.log('Request Frequency Data:', frequencyData);
+    console.log('Data Length:', frequencyData ? frequencyData.length : 0);
+    
+    if (!frequencyData || frequencyData.length === 0) {
+      console.warn('No frequency data available');
+      return;
+    }
+    
+    // Extract data for chart - only Total Activities (like the example image)
+    const dates = frequencyData.map(item => item.date_display);
+    const totals = frequencyData.map(item => item.total);
+    
+    console.log('Dates:', dates);
+    console.log('Totals:', totals);
+    console.log('Total Activities 30 Days:', {{ total_activities_30_days }});
+    
+    const options = {
+      series: [
+        {
+          name: 'Total Activities',
+          data: totals
+        }
+      ],
+      chart: {
+        height: 350,
+        type: 'line',
+        toolbar: {
+          show: true,
+          tools: {
+            download: true,
+            selection: true,
+            zoom: true,
+            zoomin: true,
+            zoomout: true,
+            pan: true,
+            reset: true
+          }
+        },
+        fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        zoom: {
+          enabled: true
+        }
+      },
+      stroke: {
+        width: 2,
+        curve: 'smooth'
+      },
+      colors: ['#6366f1'],
+      dataLabels: {
+        enabled: false
+      },
+      markers: {
+        size: 4,
+        hover: {
+          size: 6
+        }
+      },
+      xaxis: {
+        categories: dates,
+        labels: {
+          rotate: -45,
+          rotateAlways: false,
+          style: {
+            fontSize: '12px'
+          }
+        },
+        title: {
+          text: 'Date'
+        }
+      },
+      yaxis: {
+        title: {
+          text: 'Number of Activities'
+        },
+        min: 0
+      },
+      tooltip: {
+        y: {
+          formatter: function (val) {
+            return val + ' activities'
+          }
+        }
+      },
+      legend: {
+        show: true,
+        position: 'top',
+        horizontalAlign: 'right'
+      },
+      grid: {
+        strokeDashArray: 3,
+        borderColor: '#e0e0e0'
       }
-    },
-    colors: colors,
-    dataLabels: {
-      enabled: true,
-      formatter: (val) => val + '%',
-      style: { fontWeight: '600' }
-    },
-    xaxis: {
-      categories: categories,
-      labels: { formatter: (val) => val + '%' }
-    },
-    yaxis: { labels: { style: { fontWeight: 600 } } },
-    grid: { strokeDashArray: 3 },
-    tooltip: { y: { formatter: (val) => val + '%' } },
-    legend: { show: false }
-  };
+    };
+    
+    // Render chart
+    const chartEl = document.querySelector('#requestFrequencyChart');
+    if (chartEl) {
+      if (chartEl._apexchart) {
+        chartEl._apexchart.destroy();
+      }
+      const chart = new ApexCharts(chartEl, options);
+      chartEl._apexchart = chart;
+      chart.render();
+    } else {
+      console.error('Chart element not found');
+    }
+  } catch (error) {
+    console.error('Error initializing request frequency chart:', error);
+  }
+}
 
-  // Render
-  const el = document.querySelector('#horizontalBarChart');
-  if (el) {
-    // Nếu đã render trước đó, hủy và render lại
-    if (el._apexchart) { el._apexchart.destroy(); }
-    const chart = new ApexCharts(el, options);
-    el._apexchart = chart;
-    chart.render();
+// Load ApexCharts and initialize chart
+document.addEventListener('DOMContentLoaded', function () {
+  // Check if ApexCharts is already loaded
+  if (typeof ApexCharts !== 'undefined') {
+    initRequestFrequencyChart();
+  } else {
+    // Load ApexCharts dynamically
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/apexcharts';
+    script.onload = function() {
+      initRequestFrequencyChart();
+    };
+    script.onerror = function() {
+      console.error('Failed to load ApexCharts library');
+    };
+    document.head.appendChild(script);
   }
 });
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 {% endblock %}

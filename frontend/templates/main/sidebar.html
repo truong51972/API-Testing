@@ -85,29 +85,18 @@
                 </a>
             </li>
         </ul>
-
-        {% if test_suites_show and test_suites %}
-        <!-- Test Suites Section -->
-        <div class="nav-section-header">
-            <span>{% trans "Test Suites" %}</span>
-            <button class="add-btn-header" data-url="{% url 'test_suite_add' project_uuid=project.uuid %}" title="{% trans 'Add new test suite' %}">
-                <i class="fa fa-plus"></i>
-            </button>
-        </div>
-
-        <ul class="nav nav-pills flex-column">
-            {% for test_suite in test_suites %}
-            <li class="nav-item">
-                <a href="{% url 'test_suite_detail' test_suite_uuid=test_suite.uuid %}" 
-                   class="nav-link">
-                    <i class="fa fa-tasks"></i>
-                    <span>{{ test_suite.test_suite_name }}</span>
-                </a>
-            </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
     </div>
+
+    <!-- API Status Indicator -->
+    {% if user.is_authenticated %}
+    <div class="sidebar-api-status" id="sidebarApiStatus">
+        <div class="api-status-item" id="apiStatusItem" onclick="showApiStatusModal()" title="Click để xem chi tiết trạng thái API">
+            <div class="api-status-dot-sidebar" id="apiStatusDotSidebar"></div>
+            <span class="api-status-text-sidebar" id="apiStatusTextSidebar">API Server</span>
+            <i class="fa fa-info-circle api-status-info" onclick="event.stopPropagation(); showApiStatusModal();"></i>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Footer with User Menu -->
     <div class="sidebar-footer">
@@ -222,6 +211,79 @@
     </div>
     {% endif %}
 </div>
+
+<!-- API Status Modal -->
+{% if user.is_authenticated %}
+<div class="modal fade" id="apiStatusModal" tabindex="-1" aria-labelledby="apiStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="apiStatusModalLabel">
+                    <i class="fa fa-exclamation-triangle text-warning me-2"></i>
+                    API Server Không khả dụng
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="apiModalAlertContainer">
+                    <div class="alert alert-danger" id="apiModalOfflineAlert">
+                        <div class="d-flex align-items-center">
+                            <div class="alert-icon">
+                                <i class="fa fa-exclamation-triangle fs-1"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="alert-heading">Không thể kết nối đến API Server</h6>
+                                <p class="mb-2" id="apiModalErrorMessage">API server hiện đang offline hoặc không phản hồi.</p>
+                                <hr>
+                                <p class="mb-0">
+                                    <strong>Các chức năng bị ảnh hưởng:</strong>
+                                </p>
+                                <ul class="mb-0 mt-2">
+                                    <li>Xử lý tài liệu AI</li>
+                                    <li>Tạo test case tự động</li>
+                                    <li>Phân tích functional requirements</li>
+                                    <li>Tất cả các tác vụ yêu cầu API server</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success" id="apiModalOnlineAlert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="alert-icon">
+                                <i class="fa fa-check-circle fs-1"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="alert-heading">API Server Đang hoạt động</h6>
+                                <p class="mb-2">API server đang hoạt động bình thường và sẵn sàng xử lý các yêu cầu.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" id="apiModalRecommendations">
+                    <h6><i class="fa fa-lightbulb me-2"></i>Khuyến nghị:</h6>
+                    <ul class="mb-0" id="apiModalRecommendationsList">
+                        <li>Kiểm tra xem API server đã được khởi chạy chưa</li>
+                        <li>Kiểm tra kết nối mạng và firewall</li>
+                        <li>Liên hệ administrator nếu vấn đề vẫn tiếp diễn</li>
+                        <li>Thử lại sau vài phút</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="refreshSidebarApiStatus(); setTimeout(() => { const modal = bootstrap.Modal.getInstance(document.getElementById('apiStatusModal')); if (modal) modal.hide(); }, 1000);">
+                    <i class="fa fa-sync-alt me-1"></i>Kiểm tra lại
+                </button>
+                <a href="{% url 'api_status' %}" class="btn btn-outline-primary" target="_blank">
+                    <i class="fa fa-eye me-1"></i>Xem chi tiết
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- JavaScript for enhanced functionality -->
 <script>
@@ -445,5 +507,113 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // API Status Indicator in Sidebar
+    function updateSidebarApiStatus(status, errorMessage = null) {
+        const statusDot = document.getElementById('apiStatusDotSidebar');
+        const statusText = document.getElementById('apiStatusTextSidebar');
+        const statusItem = document.getElementById('apiStatusItem');
+
+        if (!statusDot || !statusText || !statusItem) return;
+
+        if (status) {
+            // Online - Green
+            statusDot.className = 'api-status-dot-sidebar online';
+            statusText.textContent = 'API Server: Online';
+            statusText.style.color = '#198754';
+            statusItem.style.borderColor = '#198754';
+        } else {
+            // Offline - Red
+            statusDot.className = 'api-status-dot-sidebar offline';
+            statusText.textContent = 'API Server: Offline';
+            statusText.style.color = '#dc3545';
+            statusItem.style.borderColor = '#dc3545';
+            
+            if (errorMessage) {
+                statusText.textContent = 'API Server: Lỗi';
+            }
+        }
+    }
+
+    function refreshSidebarApiStatus() {
+        fetch('{% url "api_server_status" %}', { _noLoading: true })
+            .then(response => response.json())
+            .then(data => {
+                updateSidebarApiStatus(data.status, data.error_message);
+                // Also update global status for other components
+                window.apiServerOnline = data.status;
+            })
+            .catch(error => {
+                console.error('Error refreshing API status:', error);
+                updateSidebarApiStatus(false, 'Connection Error');
+                window.apiServerOnline = false;
+            });
+    }
+
+    // Initialize API status on page load
+    if (document.getElementById('sidebarApiStatus')) {
+        // Show cached status immediately if available
+        if (window.apiServerOnline !== undefined) {
+            updateSidebarApiStatus(window.apiServerOnline);
+        } else {
+            refreshSidebarApiStatus();
+        }
+
+        // Set up periodic status checking (every 30 seconds)
+        setInterval(function() {
+            refreshSidebarApiStatus();
+        }, 30000);
+
+        // Refresh status when page becomes visible
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                refreshSidebarApiStatus();
+            }
+        });
+    }
+
+    // Function to show API status modal (if modal exists)
+    function showApiStatusModal() {
+        const modal = document.getElementById('apiStatusModal');
+        if (!modal) {
+            // If modal doesn't exist, redirect to status page
+            window.location.href = '{% url "api_status" %}';
+            return;
+        }
+
+        // Update modal content based on current status
+        const isOnline = window.apiServerOnline === true;
+        const modalTitle = document.getElementById('apiStatusModalLabel');
+        const offlineAlert = document.getElementById('apiModalOfflineAlert');
+        const onlineAlert = document.getElementById('apiModalOnlineAlert');
+        const recommendations = document.getElementById('apiModalRecommendations');
+        const errorMessage = document.getElementById('apiModalErrorMessage');
+
+        if (modalTitle) {
+            if (isOnline) {
+                modalTitle.innerHTML = '<i class="fa fa-check-circle text-success me-2"></i>API Server Đang hoạt động';
+            } else {
+                modalTitle.innerHTML = '<i class="fa fa-exclamation-triangle text-warning me-2"></i>API Server Không khả dụng';
+            }
+        }
+
+        // Show/hide appropriate alerts
+        if (offlineAlert) {
+            offlineAlert.style.display = isOnline ? 'none' : 'block';
+        }
+        if (onlineAlert) {
+            onlineAlert.style.display = isOnline ? 'block' : 'none';
+        }
+        if (recommendations) {
+            recommendations.style.display = isOnline ? 'none' : 'block';
+        }
+
+        if (errorMessage && !isOnline) {
+            errorMessage.textContent = 'API server hiện đang offline hoặc không phản hồi.';
+        }
+
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    }
 });
 </script>

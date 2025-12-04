@@ -172,7 +172,8 @@ function refreshStatus() {
         method: 'GET',
         headers: {
             'Accept': 'application/json'
-        }
+        },
+        _noLoading: true
     })
     .then(response => response.json())
     .then(data => {
@@ -312,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
     statusCheckInterval = setInterval(() => {
         // Only refresh if the page is visible
         if (!document.hidden) {
-            fetch('{% url "api_server_status" %}')
+            fetch('{% url "api_server_status" %}', { _noLoading: true })
                 .then(response => response.json())
                 .then(data => {
                     updateStatusDisplay(data);
@@ -335,7 +336,7 @@ document.addEventListener('visibilitychange', function() {
     } else {
         // Restart auto refresh when page becomes visible again
         statusCheckInterval = setInterval(() => {
-            fetch('{% url "api_server_status" %}')
+            fetch('{% url "api_server_status" %}', { _noLoading: true })
                 .then(response => response.json())
                 .then(data => {
                     updateStatusDisplay(data);

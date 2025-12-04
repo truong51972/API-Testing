@@ -29,7 +29,7 @@ from django.views.decorators.http import require_http_methods
 
 # Local imports
 from main.decorators import set_test_suites_show
-from main.models import TestSuiteReport
+from main.models import TestSuiteReport, UserActivity
 from testcase_history.models import TestCaseHistory
 from test_suite.models import ProjectTestSuite
 
@@ -966,6 +966,14 @@ def project_add(request):
                     description=description
                 )
                 
+                # Log activity
+                UserActivity.objects.create(
+                    user=request.user,
+                    activity_type='project_created',
+                    project=local_project,
+                    description=f"Created project: {project_name}"
+                )
+                
                 if DEBUG:
                     print(f"=== LOCAL PROJECT CREATED ===")
                     print(f"Local Project UUID: {local_project.uuid}")
@@ -1138,6 +1146,13 @@ def project_detail_by_uuid(request, project_uuid):
                         doc.file_id = upload_result['file_id']
                         doc.original_filename = original_filename
                         doc.save()
+                        # Log activity
+                        UserActivity.objects.create(
+                            user=request.user,
+                            activity_type='document_uploaded',
+                            project=project,
+                            description=f"Uploaded document: {original_filename}"
+                        )
                         success_count += 1
                     else:
                         error_messages.append(f"Lỗi upload {file_obj.name}: {upload_result.get('error', 'Unknown error')}")
@@ -1300,8 +1315,186 @@ def delete_preprocessed_document(request, project_uuid, doc_id):
 @set_test_suites_show(True)
 @login_required
 def dashboard(request):
-    current_username = request.user.username
-    return render(request, 'main/home.html', {'current_username': current_username})
+    from django.db.models import Count, Q
+    from datetime import datetime, timedelta
+    from django.utils import timezone
+    
+    user = request.user
+    current_username = user.username
+    
+    # Calculate statistics
+    # Total projects
+    total_projects = UserProject.objects.filter(user=user).count()
+    
+    # Total test suites
+    user_projects = UserProject.objects.filter(user=user)
+    total_test_suites = ProjectTestSuite.objects.filter(project__in=user_projects).count()
+    
+    # Total test cases
+    total_test_cases = GeneratedTestCase.objects.filter(project__in=user_projects).count()
+    selected_test_cases = GeneratedTestCase.objects.filter(project__in=user_projects, is_selected=True).count()
+    
+    # Test reports statistics
+    test_reports = TestSuiteReport.objects.filter(project__in=user_projects)
+    total_reports = test_reports.count()
+    completed_reports = test_reports.filter(status='completed').count()
+    running_reports = test_reports.filter(status='running').count()
+    failed_reports = test_reports.filter(status='failed').count()
+    pending_reports = test_reports.filter(status='pending').count()
+    
+    # Calculate test success rate (if we have completed reports)
+    # Note: This is a simplified calculation. In reality, you might need to fetch report details from API
+    test_success_rate = 0
+    if completed_reports > 0:
+        # For now, we'll use a simple calculation based on completed vs failed
+        # In production, you'd want to fetch actual test results from API
+        test_success_rate = round((completed_reports / total_reports * 100) if total_reports > 0 else 0)
+    
+    # Recent projects (last 5) - explicitly limit to 5
+    recent_projects = UserProject.objects.filter(user=user).order_by('-created_at')[:5]
+    
+    # Recent documents (last 5) - explicitly limit to 5
+    recent_documents = ProjectDocument.objects.filter(project__in=user_projects).order_by('-uploaded_at')[:5]
+    
+    # All test reports (ordered by executed_at desc)
+    all_reports = test_reports.order_by('-executed_at')
+    
+    # Weekly statistics (last 7 days)
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    projects_this_week = UserProject.objects.filter(user=user, created_at__gte=seven_days_ago).count()
+    test_suites_this_week = ProjectTestSuite.objects.filter(
+        project__in=user_projects, 
+        created_at__gte=seven_days_ago
+    ).count()
+    test_cases_this_week = GeneratedTestCase.objects.filter(
+        project__in=user_projects, 
+        created_at__gte=seven_days_ago
+    ).count()
+    reports_this_week = test_reports.filter(executed_at__gte=seven_days_ago).count()
+    
+    # Calculate percentage change (simplified - comparing with previous week)
+    fourteen_days_ago = timezone.now() - timedelta(days=14)
+    projects_previous_week = UserProject.objects.filter(
+        user=user, 
+        created_at__gte=fourteen_days_ago,
+        created_at__lt=seven_days_ago
+    ).count()
+    
+    projects_change = 0
+    if projects_previous_week > 0:
+        projects_change = round(((projects_this_week - projects_previous_week) / projects_previous_week) * 100, 1)
+    elif projects_this_week > 0:
+        projects_change = 100
+    
+    # Documents statistics
+    total_documents = ProjectDocument.objects.filter(project__in=user_projects).count()
+    completed_documents = ProjectDocument.objects.filter(
+        project__in=user_projects, 
+        ai_processing_status='completed'
+    ).count()
+    
+    # Request frequency statistics (last 30 days)
+    # Read from UserActivity model (much simpler and more accurate)
+    from django.db.models.functions import TruncDate
+    
+    now_local = timezone.localtime(timezone.now())
+    thirty_days_ago = now_local - timedelta(days=30)
+    
+    # Get daily activity counts for the last 30 days from UserActivity
+    request_frequency_data = []
+    for i in range(30):
+        day = now_local - timedelta(days=29-i)
+        day_start = timezone.make_aware(datetime.combine(day.date(), datetime.min.time()))
+        day_end = day_start + timedelta(days=1)
+        
+        # Count activities by type for this day from UserActivity using timezone-aware range
+        day_activities = UserActivity.objects.filter(
+            user=user,
+            created_at__gte=day_start,
+            created_at__lt=day_end
+        )
+        
+        projects_count = day_activities.filter(activity_type='project_created').count()
+        documents_count = day_activities.filter(activity_type='document_uploaded').count()
+        test_reports_count = day_activities.filter(activity_type='test_suite_executed').count()
+        test_cases_count = day_activities.filter(activity_type='test_cases_generated').count()
+        
+        total_activities = day_activities.count()
+        
+        # Debug: Log today's data if it's today
+        if i == 29:  # Today is the last day in the loop
+            print(f"=== DASHBOARD DEBUG - TODAY ({day.date()}) ===")
+            print(f"Day Start: {day_start}")
+            print(f"Day End: {day_end}")
+            print(f"Projects Count: {projects_count}")
+            print(f"Test Reports Count: {test_reports_count}")
+            print(f"Test Cases Count: {test_cases_count}")
+            print(f"Documents Count: {documents_count}")
+            print(f"Total Activities: {total_activities}")
+            # Check all activities for this user today
+            today_activities = UserActivity.objects.filter(
+                user=user,
+                created_at__gte=day_start,
+                created_at__lt=day_end
+            )
+            print(f"Today's Activities ({today_activities.count()}):")
+            for act in today_activities:
+                print(f"  - {act.get_activity_type_display()}: {act.description} at {act.created_at}")
+            print(f"==========================================")
+        
+        request_frequency_data.append({
+            'date': day.strftime('%Y-%m-%d'),
+            'date_display': day.strftime('%m/%d'),
+            'projects': projects_count,
+            'test_reports': test_reports_count,
+            'test_cases': test_cases_count,
+            'documents': documents_count,
+            'total': total_activities
+        })
+    
+    # Calculate statistics
+    total_activities_30_days = sum(item['total'] for item in request_frequency_data)
+    avg_daily_activities = round(total_activities_30_days / 30, 1) if total_activities_30_days > 0 else 0
+    max_daily_activities = max(item['total'] for item in request_frequency_data) if request_frequency_data else 0
+    
+    # Weekly activity (last 7 days)
+    last_7_days_activities = sum(item['total'] for item in request_frequency_data[-7:])
+    
+    context = {
+        'current_username': current_username,
+        # Main statistics
+        'total_projects': total_projects,
+        'total_test_suites': total_test_suites,
+        'total_test_cases': total_test_cases,
+        'selected_test_cases': selected_test_cases,
+        'total_reports': total_reports,
+        'completed_reports': completed_reports,
+        'running_reports': running_reports,
+        'failed_reports': failed_reports,
+        'pending_reports': pending_reports,
+        'test_success_rate': test_success_rate,
+        # Recent data
+        'recent_projects': recent_projects,
+        'recent_documents': recent_documents,
+        'all_reports': all_reports,
+        # Weekly statistics
+        'projects_this_week': projects_this_week,
+        'test_suites_this_week': test_suites_this_week,
+        'test_cases_this_week': test_cases_this_week,
+        'reports_this_week': reports_this_week,
+        'projects_change': projects_change,
+        # Documents
+        'total_documents': total_documents,
+        'completed_documents': completed_documents,
+        # Request frequency
+        'request_frequency_data': request_frequency_data,  # Will be converted to JSON by json_script filter
+        'total_activities_30_days': total_activities_30_days,
+        'avg_daily_activities': avg_daily_activities,
+        'max_daily_activities': max_daily_activities,
+        'last_7_days_activities': last_7_days_activities,
+    }
+    
+    return render(request, 'main/home.html', context)
 
 # AI Processing Views
 @login_required
@@ -2865,6 +3058,15 @@ def fetch_and_save_test_cases_from_api(project):
             print(f"Total saved: {saved_count}")
             print(f"=========================")
         
+        # Log activity if test cases were generated
+        if saved_count > 0:
+            UserActivity.objects.create(
+                user=project.user,
+                activity_type='test_cases_generated',
+                project=project,
+                description=f"Generated {saved_count} test cases"
+            )
+        
         return True, saved_count
         
     except Exception as e:
@@ -3671,12 +3873,19 @@ def execute_test_suite(request, project_uuid):
                         ).first()
                     
                     # Create TestSuiteReport record
-                    TestSuiteReport.objects.create(
+                    report = TestSuiteReport.objects.create(
                         project=project,
                         test_suite=test_suite,
                         test_suite_report_id=test_suite_report_id,
                         api_test_suite_id=test_suite_id or '',
                         status='running'
+                    )
+                    # Log activity
+                    UserActivity.objects.create(
+                        user=request.user,
+                        activity_type='test_suite_executed',
+                        project=project,
+                        description=f"Executed test suite: {test_suite.test_suite_name if test_suite else 'Unknown'}"
                     )
                     if DEBUG:
                         print(f"\n--- Saved TestSuiteReport to database ---")
@@ -3873,4 +4082,6 @@ def get_test_report(request, project_uuid, test_suite_report_id):
             'success': False,
             'message': f'Unexpected error: {str(e)}'
         }, status=500)
+
+
 

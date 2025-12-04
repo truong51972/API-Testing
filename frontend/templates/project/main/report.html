@@ -94,7 +94,7 @@
             </div>
 
             <!-- Result Status Alert -->
-            <div id="reportStatusAlert" class="alert mb-4" style="display: none;">
+            <!-- <div id="reportStatusAlert" class="alert mb-4" style="display: none;">
                 <div class="d-flex align-items-center">
                     <i class="bi me-2" style="font-size: 1.5rem;"></i>
                     <div>
@@ -102,7 +102,7 @@
                         <p class="mb-0" id="reportStatusMessage"></p>
                     </div>
                 </div>
-            </div>
+            </div> -->
 
             <!-- Test Results Table -->
             <div class="mb-3 d-flex justify-content-between align-items-center">
@@ -193,20 +193,26 @@
                         <p class="mb-0"><code id="resultDetailId">-</code></p>
                     </div>
                     <div class="col-md-6">
-                        <strong><i class="bi bi-check-circle"></i> Status:</strong>
-                        <p class="mb-0"><span class="badge" id="resultDetailStatus">-</span></p>
+                        <strong><i class="bi bi-card-heading"></i> Test Case Name:</strong>
+                        <p class="mb-0" id="resultDetailName">-</p>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <strong><i class="bi bi-card-heading"></i> Test Case Name:</strong>
-                    <p class="mb-0" id="resultDetailName">-</p>
                 </div>
                 
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong><i class="bi bi-link-45deg"></i> Endpoint:</strong>
                         <p class="mb-0"><code class="text-info" id="resultDetailEndpoint">-</code></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-code-slash"></i> HTTP Method:</strong>
+                        <p class="mb-0"><span class="badge bg-primary" id="resultDetailMethod">-</span></p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong><i class="bi bi-tag"></i> Test Case Type:</strong>
+                        <p class="mb-0"><span class="badge bg-info" id="resultDetailTestCaseType">-</span></p>
                     </div>
                     <div class="col-md-6">
                         <strong><i class="bi bi-check-circle"></i> Status:</strong>
@@ -234,6 +240,11 @@
                         <strong><i class="bi bi-calendar"></i> End Time:</strong>
                         <p class="mb-0" id="resultDetailExecutedAt">-</p>
                     </div>
+                </div>
+                
+                <div class="mb-3">
+                    <strong><i class="bi bi-bullseye"></i> Expected Output:</strong>
+                    <pre id="resultDetailExpectedOutput" class="mb-0 bg-light p-3 rounded border" style="max-height: 150px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
                 </div>
                 
                 <div class="mb-3">
