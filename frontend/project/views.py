@@ -1353,6 +1353,9 @@ def dashboard(request):
     # Recent projects (last 5) - explicitly limit to 5
     recent_projects = UserProject.objects.filter(user=user).order_by('-created_at')[:5]
     
+    # Recent documents (last 5) - explicitly limit to 5
+    recent_documents = ProjectDocument.objects.filter(project__in=user_projects).order_by('-uploaded_at')[:5]
+    
     # All test reports (ordered by executed_at desc)
     all_reports = test_reports.order_by('-executed_at')
     
@@ -1472,6 +1475,7 @@ def dashboard(request):
         'test_success_rate': test_success_rate,
         # Recent data
         'recent_projects': recent_projects,
+        'recent_documents': recent_documents,
         'all_reports': all_reports,
         # Weekly statistics
         'projects_this_week': projects_this_week,

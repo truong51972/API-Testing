@@ -356,6 +356,82 @@
   </div>
   <!--  Topic and Instructors  End-->
 
+  <!-- Recent Documents -->
+  <div class="row mb-6 g-6">
+    <div class="col-12">
+      <div class="card h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="card-title mb-0">
+            <h5 class="m-0 me-2">Recent Documents</h5>
+          </div>
+          <div class="dropdown">
+            <button class="btn text-body-secondary p-0" type="button" id="recentDocuments" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="icon-base bx bx-dots-vertical-rounded icon-lg"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end" aria-labelledby="recentDocuments">
+              <a class="dropdown-item" href="{% url 'library' %}">View All Documents</a>
+            </div>
+          </div>
+        </div>
+        <div class="px-5 py-4 border border-start-0 border-end-0">
+          <div class="d-flex justify-content-between align-items-center">
+            <p class="mb-0 text-uppercase">Document Name</p>
+            <p class="mb-0 text-uppercase">Date</p>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if recent_documents %}
+            {% for document in recent_documents|slice:":5" %}
+            <div class="d-flex justify-content-between align-items-center {% if not forloop.last %}mb-6{% endif %}">
+              <div class="d-flex align-items-center">
+                <div class="avatar me-4 w-px-34 h-px-34">
+                  <span class="avatar-initial rounded bg-label-success">
+                    <i class="icon-base bx bx-file icon-lg"></i>
+                  </span>
+                </div>
+                <div>
+                  <div>
+                    <h6 class="mb-0 text-truncate">
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=document.project.uuid %}" class="text-body">
+                        {{ document.original_filename|default:document.file.name|default:document.link|truncatechars:25 }}
+                      </a>
+                    </h6>
+                    <small class="text-truncate text-body">
+                      <a href="{% url 'project_detail_by_uuid' project_uuid=document.project.uuid %}" class="text-body-secondary">
+                        {{ document.project.project_name|truncatechars:20 }}
+                      </a>
+                    </small>
+                  </div>
+                </div>
+              </div>
+              <div class="text-end">
+                <small class="text-body-secondary">{{ document.uploaded_at|date:"M d, Y" }}</small>
+                <div>
+                  {% if document.ai_processing_status == 'completed' %}
+                  <span class="badge bg-label-success">Completed</span>
+                  {% elif document.ai_processing_status == 'processing' %}
+                  <span class="badge bg-label-info">Processing</span>
+                  {% elif document.ai_processing_status == 'failed' %}
+                  <span class="badge bg-label-danger">Failed</span>
+                  {% else %}
+                  <span class="badge bg-label-secondary">Pending</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center py-4">
+              <p class="text-body-secondary mb-0">No documents yet</p>
+              <a href="{% url 'project_list' %}" class="btn btn-sm btn-primary mt-2">Upload Document</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Recent Documents End -->
+
 
 
 </div>
