@@ -6,8 +6,12 @@ from django.utils import translation
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from project.models import ProjectDocument, UserProject
-from main.models import TestSuiteReport
+from django.db.models import Count, Q
+from datetime import datetime, timedelta
+from django.utils import timezone
+from project.models import ProjectDocument, UserProject, GeneratedTestCase
+from main.models import TestSuiteReport, UserActivity
+from test_suite.models import ProjectTestSuite
 import requests
 import urllib3
 
@@ -21,7 +25,168 @@ GET_TEST_REPORT_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/execute-and-report/repor
 # Create your views here.
 @login_required
 def home(request):
-    return render(request, 'main/home.html')
+    user = request.user
+    current_username = user.username
+    
+    # Calculate statistics
+    # Total projects
+    total_projects = UserProject.objects.filter(user=user).count()
+    
+    # Total test suites
+    user_projects = UserProject.objects.filter(user=user)
+    total_test_suites = ProjectTestSuite.objects.filter(project__in=user_projects).count()
+    
+    # Total test cases
+    total_test_cases = GeneratedTestCase.objects.filter(project__in=user_projects).count()
+    selected_test_cases = GeneratedTestCase.objects.filter(project__in=user_projects, is_selected=True).count()
+    
+    # Test reports statistics
+    test_reports = TestSuiteReport.objects.filter(project__in=user_projects)
+    total_reports = test_reports.count()
+    completed_reports = test_reports.filter(status='completed').count()
+    running_reports = test_reports.filter(status='running').count()
+    failed_reports = test_reports.filter(status='failed').count()
+    pending_reports = test_reports.filter(status='pending').count()
+    
+    # Calculate test success rate (if we have completed reports)
+    # Note: This is a simplified calculation. In reality, you might need to fetch report details from API
+    test_success_rate = 0
+    if completed_reports > 0:
+        # For now, we'll use a simple calculation based on completed vs failed
+        # In production, you'd want to fetch actual test results from API
+        test_success_rate = round((completed_reports / total_reports * 100) if total_reports > 0 else 0)
+    
+    # Recent projects pagination (5 items per page)
+    all_recent_projects = UserProject.objects.filter(user=user).order_by('-created_at')
+    projects_paginator = Paginator(all_recent_projects, 5)
+    projects_page_number = request.GET.get('projects_page', 1)
+    recent_projects_page = projects_paginator.get_page(projects_page_number)
+    
+    # Recent documents pagination (5 items per page)
+    all_recent_documents = ProjectDocument.objects.filter(project__in=user_projects).order_by('-uploaded_at')
+    documents_paginator = Paginator(all_recent_documents, 5)
+    documents_page_number = request.GET.get('documents_page', 1)
+    recent_documents_page = documents_paginator.get_page(documents_page_number)
+    
+    # All test reports pagination (5 items per page)
+    all_reports_queryset = test_reports.order_by('-executed_at')
+    reports_paginator = Paginator(all_reports_queryset, 6)
+    reports_page_number = request.GET.get('reports_page', 1)
+    all_reports_page = reports_paginator.get_page(reports_page_number)
+    
+    # Weekly statistics (last 7 days)
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    projects_this_week = UserProject.objects.filter(user=user, created_at__gte=seven_days_ago).count()
+    test_suites_this_week = ProjectTestSuite.objects.filter(
+        project__in=user_projects, 
+        created_at__gte=seven_days_ago
+    ).count()
+    test_cases_this_week = GeneratedTestCase.objects.filter(
+        project__in=user_projects, 
+        created_at__gte=seven_days_ago
+    ).count()
+    reports_this_week = test_reports.filter(executed_at__gte=seven_days_ago).count()
+    
+    # Calculate percentage change (simplified - comparing with previous week)
+    fourteen_days_ago = timezone.now() - timedelta(days=14)
+    projects_previous_week = UserProject.objects.filter(
+        user=user, 
+        created_at__gte=fourteen_days_ago,
+        created_at__lt=seven_days_ago
+    ).count()
+    
+    projects_change = 0
+    if projects_previous_week > 0:
+        projects_change = round(((projects_this_week - projects_previous_week) / projects_previous_week) * 100, 1)
+    elif projects_this_week > 0:
+        projects_change = 100
+    
+    # Documents statistics
+    total_documents = ProjectDocument.objects.filter(project__in=user_projects).count()
+    completed_documents = ProjectDocument.objects.filter(
+        project__in=user_projects, 
+        ai_processing_status='completed'
+    ).count()
+    
+    # Request frequency statistics (last 30 days)
+    # Read from UserActivity model (much simpler and more accurate)
+    now_local = timezone.localtime(timezone.now())
+    thirty_days_ago = now_local - timedelta(days=30)
+    
+    # Get daily activity counts for the last 30 days from UserActivity
+    request_frequency_data = []
+    for i in range(30):
+        day = now_local - timedelta(days=29-i)
+        day_start = timezone.make_aware(datetime.combine(day.date(), datetime.min.time()))
+        day_end = day_start + timedelta(days=1)
+        
+        # Count activities by type for this day from UserActivity using timezone-aware range
+        day_activities = UserActivity.objects.filter(
+            user=user,
+            created_at__gte=day_start,
+            created_at__lt=day_end
+        )
+        
+        projects_count = day_activities.filter(activity_type='project_created').count()
+        documents_count = day_activities.filter(activity_type='document_uploaded').count()
+        test_reports_count = day_activities.filter(activity_type='test_suite_executed').count()
+        test_cases_count = day_activities.filter(activity_type='test_cases_generated').count()
+        
+        total_activities = day_activities.count()
+        
+        request_frequency_data.append({
+            'date': day.strftime('%Y-%m-%d'),
+            'date_display': day.strftime('%m/%d'),
+            'projects': projects_count,
+            'test_reports': test_reports_count,
+            'test_cases': test_cases_count,
+            'documents': documents_count,
+            'total': total_activities
+        })
+    
+    # Calculate statistics
+    total_activities_30_days = sum(item['total'] for item in request_frequency_data)
+    avg_daily_activities = round(total_activities_30_days / 30, 1) if total_activities_30_days > 0 else 0
+    max_daily_activities = max(item['total'] for item in request_frequency_data) if request_frequency_data else 0
+    
+    # Weekly activity (last 7 days)
+    last_7_days_activities = sum(item['total'] for item in request_frequency_data[-7:])
+    
+    context = {
+        'current_username': current_username,
+        # Main statistics
+        'total_projects': total_projects,
+        'total_test_suites': total_test_suites,
+        'total_test_cases': total_test_cases,
+        'selected_test_cases': selected_test_cases,
+        'total_reports': total_reports,
+        'completed_reports': completed_reports,
+        'running_reports': running_reports,
+        'failed_reports': failed_reports,
+        'pending_reports': pending_reports,
+        'test_success_rate': test_success_rate,
+        # Recent data with pagination
+        'recent_projects_page': recent_projects_page,
+        'recent_documents_page': recent_documents_page,
+        'all_reports_page': all_reports_page,
+        # Weekly statistics
+        'projects_this_week': projects_this_week,
+        'test_suites_this_week': test_suites_this_week,
+        'test_cases_this_week': test_cases_this_week,
+        'reports_this_week': reports_this_week,
+        'projects_change': projects_change,
+        # Documents
+        'total_documents': total_documents,
+        'completed_documents': completed_documents,
+        # Request frequency
+        'request_frequency_data': request_frequency_data,  # Will be converted to JSON by json_script filter
+        'total_activities_30_days': total_activities_30_days,
+        'avg_daily_activities': avg_daily_activities,
+        'max_daily_activities': max_daily_activities,
+        'last_7_days_activities': last_7_days_activities,
+    }
+    
+    return render(request, 'main/home.html', context)
 
 def library(request):
     """Hiển thị thư viện tài liệu của user"""

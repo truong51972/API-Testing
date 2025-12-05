@@ -691,18 +691,6 @@
                     document.getElementById('testCaseStatusMessage').textContent = 'AI đang tạo test cases từ các sections đã chọn...';
                     document.getElementById('testCaseProgressBar').style.width = '0%';
 
-                    // Realistic progress stages for test case generation
-                    const progressStages = [
-                        { progress: 5, message: 'Đang khởi tạo quá trình tạo test cases...', duration: 2000 },
-                        { progress: 15, message: 'Đang phân tích các sections đã chọn...', duration: 2500 },
-                        { progress: 30, message: 'Đang trích xuất functional requirements...', duration: 3000 },
-                        { progress: 45, message: 'Đang tạo test scenarios...', duration: 4000 },
-                        { progress: 60, message: 'Đang tạo test cases...', duration: 5000 },
-                        { progress: 75, message: 'Đang xác thực test cases...', duration: 3000 },
-                        { progress: 85, message: 'Đang hoàn thiện test suite...', duration: 2000 },
-                        { progress: 95, message: 'Sắp hoàn thành...', duration: 1000 }
-                    ];
-
                     // Prevent multiple progress bars from running
                     if (isTestCaseProgressRunning) {
                         console.log('Test case progress already running, skipping...');
@@ -710,28 +698,31 @@
                     }
                     
                     isTestCaseProgressRunning = true;
-                    let currentStage = 0;
-                    let accumulatedDelay = 0;
-
-                    // Schedule all progress stages upfront to prevent overlap
-                    progressStages.forEach((stage, index) => {
-                        accumulatedDelay += (index === 0 ? 500 : progressStages[index - 1].duration);
-                        const timeoutId = setTimeout(() => {
-                            // Only update if still running and not cleared
-                            if (isTestCaseProgressRunning && currentStage === index) {
-                                document.getElementById('testCaseProgressBar').style.width = stage.progress + '%';
-                                document.getElementById('testCaseStatusMessage').textContent = stage.message;
-                                currentStage++;
-                                
-                                // If this is the last stage, keep at 95%
-                                if (index === progressStages.length - 1) {
-                                    document.getElementById('testCaseProgressBar').style.width = '95%';
-                                    document.getElementById('testCaseStatusMessage').textContent = 'Đang chờ hoàn thành...';
-                                }
-                            }
-                        }, accumulatedDelay);
-                        testCaseProgressStages.push(timeoutId);
-                    });
+                    
+                    // Countdown timer 60 seconds - store reference globally so it can be cleared
+                    let countdown = 60;
+                    let countdownInterval = setInterval(() => {
+                        if (!isTestCaseProgressRunning) {
+                            clearInterval(countdownInterval);
+                            countdownInterval = null;
+                            return;
+                        }
+                        
+                        countdown--;
+                        const progress = Math.min(95, ((60 - countdown) / 60) * 95);
+                        document.getElementById('testCaseProgressBar').style.width = progress + '%';
+                        document.getElementById('testCaseStatusMessage').textContent = `Đang tạo test cases... Còn lại ${countdown} giây`;
+                        
+                        if (countdown <= 0) {
+                            clearInterval(countdownInterval);
+                            countdownInterval = null;
+                            document.getElementById('testCaseProgressBar').style.width = '95%';
+                            document.getElementById('testCaseStatusMessage').textContent = 'Đang chờ hoàn thành...';
+                        }
+                    }, 1000);
+                    // Store interval reference so it can be cleared by checkTestCaseStatusLoop
+                    window.testCaseCountdownInterval = countdownInterval;
+                    testCaseProgressStages.push(countdownInterval);
 
                     fetch(`/project/${projectUuid}/test-cases/generate/`, {
                         method: 'POST',
@@ -821,11 +812,20 @@
 
     function checkTestCaseStatusLoop(projectUuid) {
         // Clear staged progress (but keep the flag running since we're checking status)
-        // Only clear the staged progress timeouts, not the final interval
-        testCaseProgressStages.forEach(timeoutId => {
-            if (timeoutId) clearTimeout(timeoutId);
+        // Clear both timeouts and intervals
+        testCaseProgressStages.forEach(id => {
+            if (id) {
+                clearTimeout(id);
+                clearInterval(id);
+            }
         });
         testCaseProgressStages = [];
+        
+        // Also clear the countdown interval if it exists
+        if (window.testCaseCountdownInterval) {
+            clearInterval(window.testCaseCountdownInterval);
+            window.testCaseCountdownInterval = null;
+        }
         
         // Clear status check timeout if exists
         if (testCaseStatusCheckTimeout) {
@@ -1868,6 +1868,13 @@
         const tableBody = document.getElementById('testResultsTableBody');
         const emptyState = document.getElementById('reportEmptyState');
         
+        // Reset sort direction when populating new data
+        testCaseIdSortDirection = 'asc';
+        const sortIcon = document.getElementById('testCaseIdSortIcon');
+        if (sortIcon) {
+            sortIcon.className = 'bi bi-arrow-down-up';
+        }
+        
         if (tableBody) {
             tableBody.innerHTML = '';
             
@@ -1907,14 +1914,10 @@
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${index + 1}</td>
                         <td><code class="small">${testCaseId}</code></td>
                         <td>${testCaseName}</td>
-                        <td><code class="text-info small" title="${endpoint}">${endpoint.length > 50 ? endpoint.substring(0, 50) + '...' : endpoint}</code></td>
                         <td>${statusBadge}</td>
                         <td><span class="badge ${getStatusCodeBadgeClass(responseCode)}">${responseCode}</span></td>
-                        <td>${duration}</td>
-                        <td>${formatDateTime(executedAt)}</td>
                         <td>
                             <button class="btn btn-sm btn-outline-primary" onclick="viewTestResultDetail(${index})" title="View Details">
                                 <i class="bi bi-eye"></i>
@@ -1966,9 +1969,19 @@
                 
                 const successRate = totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0;
                 document.getElementById('reportSuccessRate').textContent = successRate + '%';
-                document.getElementById('reportOverallStatus').innerHTML = failedTests === 0 && totalTests > 0
-                    ? '<span class="badge bg-success">Success</span>' 
-                    : '<span class="badge bg-danger">Failed</span>';
+                // Status shows percentage of Passed tests
+                const passedRate = parseFloat(successRate);
+                let statusBadgeClass = 'bg-warning';
+                if (passedRate == 100) {
+                    statusBadgeClass = 'bg-success';
+                } else if (passedRate == 0) {
+                    statusBadgeClass = 'bg-danger';
+                } else if (passedRate >= 50) {
+                    statusBadgeClass = 'bg-info';
+                } else {
+                    statusBadgeClass = 'bg-danger';
+                }
+                document.getElementById('reportOverallStatus').innerHTML = `<span class="badge ${statusBadgeClass}">${successRate}% Passed</span>`;
             } else {
                 detailsSection.style.display = 'none';
             }
@@ -2043,6 +2056,54 @@
         return 'bg-secondary';
     }
 
+    // Sort state for Test Case ID column
+    let testCaseIdSortDirection = 'asc'; // 'asc' or 'desc'
+
+    function sortTableByTestCaseId() {
+        const tableBody = document.getElementById('testResultsTableBody');
+        if (!tableBody) return;
+
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+
+        // Toggle sort direction
+        testCaseIdSortDirection = testCaseIdSortDirection === 'asc' ? 'desc' : 'asc';
+
+        // Sort rows by Test Case ID
+        rows.sort((a, b) => {
+            const aId = a.cells[0].querySelector('code')?.textContent?.trim() || '';
+            const bId = b.cells[0].querySelector('code')?.textContent?.trim() || '';
+            
+            // Try to compare as numbers if both are numeric
+            const aNum = parseFloat(aId);
+            const bNum = parseFloat(bId);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                return testCaseIdSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+            
+            // Otherwise compare as strings
+            if (testCaseIdSortDirection === 'asc') {
+                return aId.localeCompare(bId);
+            } else {
+                return bId.localeCompare(aId);
+            }
+        });
+
+        // Clear and re-append sorted rows
+        tableBody.innerHTML = '';
+        rows.forEach(row => tableBody.appendChild(row));
+
+        // Update sort icon
+        const sortIcon = document.getElementById('testCaseIdSortIcon');
+        if (sortIcon) {
+            if (testCaseIdSortDirection === 'asc') {
+                sortIcon.className = 'bi bi-arrow-up';
+            } else {
+                sortIcon.className = 'bi bi-arrow-down';
+            }
+        }
+    }
+
     function viewTestResultDetail(index) {
         if (!window.testResults || !window.testResults[index]) {
             showNotification('error', 'Lỗi', 'Không tìm thấy test result');
@@ -2051,6 +2112,21 @@
 
         const test = window.testResults[index];
         const status = (test.status || 'pending').toLowerCase();
+        
+        // Update modal header color based on status
+        const modalHeader = document.querySelector('#testResultDetailModal .modal-header');
+        if (modalHeader) {
+            // Remove existing background classes
+            modalHeader.classList.remove('bg-success', 'bg-danger', 'bg-warning');
+            // Add appropriate class based on status
+            if (status === 'passed' || status === 'pass') {
+                modalHeader.classList.add('bg-success');
+            } else if (status === 'failed' || status === 'fail') {
+                modalHeader.classList.add('bg-danger');
+            } else {
+                modalHeader.classList.add('bg-warning');
+            }
+        }
         
         // Calculate duration
         let duration = '-';
@@ -2104,26 +2180,42 @@
         // Request Body
         const requestBody = test.request_body || {};
         
-        // Request Headers
+        // Request Headers - populate into expander
         const requestHeader = test.request_header || {};
-        let requestInfo = 'HTTP Method: ' + method + '\n';
-        requestInfo += 'URL: ' + endpoint + '\n\n';
-        requestInfo += 'Request Headers:\n' + JSON.stringify(requestHeader, null, 2);
+        const requestHeadersElement = document.getElementById('resultDetailRequestHeaders');
+        if (requestHeadersElement) {
+            requestHeadersElement.textContent = Object.keys(requestHeader).length > 0 
+                ? JSON.stringify(requestHeader, null, 2) 
+                : '(empty)';
+        }
+        
+        // Request Body - only show body, no method/url/headers
+        let requestInfo = '';
         if (Object.keys(requestBody).length > 0) {
-            requestInfo += '\n\nRequest Body:\n' + JSON.stringify(requestBody, null, 2);
+            requestInfo = JSON.stringify(requestBody, null, 2);
+        } else {
+            requestInfo = '(empty)';
         }
         document.getElementById('resultDetailRequest').textContent = requestInfo;
         
         // Response Body
         const responseBody = test.response_body || {};
         
-        // Response Headers (add to response display)
+        // Response Headers - populate into expander
         const responseHeader = test.response_header || {};
-        let responseInfo = 'Response Headers:\n' + JSON.stringify(responseHeader, null, 2);
+        const responseHeadersElement = document.getElementById('resultDetailResponseHeaders');
+        if (responseHeadersElement) {
+            responseHeadersElement.textContent = Object.keys(responseHeader).length > 0 
+                ? JSON.stringify(responseHeader, null, 2) 
+                : '(empty)';
+        }
+        
+        // Response Body - only show body, no headers
+        let responseInfo = '';
         if (Object.keys(responseBody).length > 0) {
-            responseInfo += '\n\nResponse Body:\n' + JSON.stringify(responseBody, null, 2);
+            responseInfo = JSON.stringify(responseBody, null, 2);
         } else {
-            responseInfo += '\n\nResponse Body: (empty)';
+            responseInfo = '(empty)';
         }
         document.getElementById('resultDetailResponse').textContent = responseInfo;
         

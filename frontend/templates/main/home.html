@@ -246,8 +246,8 @@
           </div>
         </div>
         <div class="card-body">
-          {% if recent_projects %}
-            {% for project in recent_projects|slice:":5" %}
+          {% if recent_projects_page %}
+            {% for project in recent_projects_page %}
             <div class="d-flex justify-content-between align-items-center {% if not forloop.last %}mb-6{% endif %}">
               <div class="d-flex align-items-center">
                 <div class="avatar me-4 w-px-34 h-px-34">
@@ -271,6 +271,27 @@
               </div>
             </div>
             {% endfor %}
+            {% if recent_projects_page.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+              <span class="text-body-secondary small">
+                Page {{ recent_projects_page.number }} of {{ recent_projects_page.paginator.num_pages }}
+              </span>
+              <div class="d-flex gap-2">
+                {% if recent_projects_page.has_previous %}
+                <a href="?projects_page={{ recent_projects_page.previous_page_number }}{% if request.GET.reports_page %}&reports_page={{ request.GET.reports_page }}{% endif %}{% if request.GET.documents_page %}&documents_page={{ request.GET.documents_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-secondary">
+                  <i class="icon-base bx bx-chevron-left"></i> Previous
+                </a>
+                {% endif %}
+                {% if recent_projects_page.has_next %}
+                <a href="?projects_page={{ recent_projects_page.next_page_number }}{% if request.GET.reports_page %}&reports_page={{ request.GET.reports_page }}{% endif %}{% if request.GET.documents_page %}&documents_page={{ request.GET.documents_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-primary">
+                  Next <i class="icon-base bx bx-chevron-right"></i>
+                </a>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
           {% else %}
             <div class="text-center py-4">
               <p class="text-body-secondary mb-0">No projects yet</p>
@@ -296,20 +317,19 @@
           </div>
         </div>
         <div class="card-body">
-          {% if all_reports|length > 0 %}
+          {% if all_reports_page|length > 0 %}
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead>
                   <tr>
                     <th>Project</th>
                     <th>Test Suite</th>
-                    <th>Status</th>
                     <th>Executed At</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {% for report in all_reports %}
+                  {% for report in all_reports_page %}
                   <tr>
                     <td>
                       <a href="{% url 'project_detail_by_uuid' project_uuid=report.project.uuid %}" class="text-body">
@@ -323,17 +343,6 @@
                         <span class="text-body-secondary">N/A</span>
                       {% endif %}
                     </td>
-                    <td>
-                      {% if report.status == 'completed' %}
-                      <span class="badge bg-label-success">Completed</span>
-                      {% elif report.status == 'running' %}
-                      <span class="badge bg-label-info">Running</span>
-                      {% elif report.status == 'failed' %}
-                      <span class="badge bg-label-danger">Failed</span>
-                      {% else %}
-                      <span class="badge bg-label-secondary">Pending</span>
-                      {% endif %}
-                    </td>
                     <td>{{ report.executed_at|date:"M d, Y H:i" }}</td>
                     <td>
                       <a href="{% url 'project_detail_by_uuid' project_uuid=report.project.uuid %}" class="btn btn-sm btn-outline-primary">
@@ -345,6 +354,27 @@
                 </tbody>
               </table>
             </div>
+            {% if all_reports_page.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+              <span class="text-body-secondary small">
+                Page {{ all_reports_page.number }} of {{ all_reports_page.paginator.num_pages }}
+              </span>
+              <div class="d-flex gap-2">
+                {% if all_reports_page.has_previous %}
+                <a href="?reports_page={{ all_reports_page.previous_page_number }}{% if request.GET.projects_page %}&projects_page={{ request.GET.projects_page }}{% endif %}{% if request.GET.documents_page %}&documents_page={{ request.GET.documents_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-secondary">
+                  <i class="icon-base bx bx-chevron-left"></i> Previous
+                </a>
+                {% endif %}
+                {% if all_reports_page.has_next %}
+                <a href="?reports_page={{ all_reports_page.next_page_number }}{% if request.GET.projects_page %}&projects_page={{ request.GET.projects_page }}{% endif %}{% if request.GET.documents_page %}&documents_page={{ request.GET.documents_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-primary">
+                  Next <i class="icon-base bx bx-chevron-right"></i>
+                </a>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
           {% else %}
             <div class="text-center py-4">
               <p class="text-body-secondary mb-0">No test reports yet</p>
@@ -380,8 +410,8 @@
           </div>
         </div>
         <div class="card-body">
-          {% if recent_documents %}
-            {% for document in recent_documents|slice:":5" %}
+          {% if recent_documents_page %}
+            {% for document in recent_documents_page %}
             <div class="d-flex justify-content-between align-items-center {% if not forloop.last %}mb-6{% endif %}">
               <div class="d-flex align-items-center">
                 <div class="avatar me-4 w-px-34 h-px-34">
@@ -420,6 +450,27 @@
               </div>
             </div>
             {% endfor %}
+            {% if recent_documents_page.has_other_pages %}
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+              <span class="text-body-secondary small">
+                Page {{ recent_documents_page.number }} of {{ recent_documents_page.paginator.num_pages }}
+              </span>
+              <div class="d-flex gap-2">
+                {% if recent_documents_page.has_previous %}
+                <a href="?documents_page={{ recent_documents_page.previous_page_number }}{% if request.GET.projects_page %}&projects_page={{ request.GET.projects_page }}{% endif %}{% if request.GET.reports_page %}&reports_page={{ request.GET.reports_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-secondary">
+                  <i class="icon-base bx bx-chevron-left"></i> Previous
+                </a>
+                {% endif %}
+                {% if recent_documents_page.has_next %}
+                <a href="?documents_page={{ recent_documents_page.next_page_number }}{% if request.GET.projects_page %}&projects_page={{ request.GET.projects_page }}{% endif %}{% if request.GET.reports_page %}&reports_page={{ request.GET.reports_page }}{% endif %}" 
+                   class="btn btn-sm btn-outline-primary">
+                  Next <i class="icon-base bx bx-chevron-right"></i>
+                </a>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
           {% else %}
             <div class="text-center py-4">
               <p class="text-body-secondary mb-0">No documents yet</p>
