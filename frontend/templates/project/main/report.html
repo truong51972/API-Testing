@@ -15,10 +15,46 @@
         font-size: 0.85em;
         padding: 0.35em 0.65em;
     }
+    .step-header-title {
+        margin-bottom: 0 !important;
+        color: #ffffff !important;
+        font-size: 1.25rem !important;
+        font-weight: 500 !important;
+        line-height: 1.5 !important;
+    }
+    .step-header-title i {
+        margin-right: 0.5rem;
+    }
+    details summary {
+        list-style: none;
+        user-select: none;
+    }
+    details summary::-webkit-details-marker {
+        display: none;
+    }
+    details summary i {
+        transition: transform 0.2s;
+        display: inline-block;
+    }
+    details[open] summary i {
+        transform: rotate(90deg);
+    }
+    details summary:hover {
+        color: #0d6efd !important;
+    }
+    /* Custom modal width - có thể điều chỉnh giá trị max-width để thay đổi kích thước */
+    #testResultDetailModal .modal-dialog {
+        max-width: 900px; /* Điều chỉnh giá trị này để thay đổi width (ví dụ: 800px, 1000px, 1200px) */
+    }
+    @media (max-width: 992px) {
+        #testResultDetailModal .modal-dialog {
+            max-width: 95%; /* Responsive trên màn hình nhỏ */
+        }
+    }
 </style>
 <div class="card mt-4 shadow-sm phase d-none" id="phase5">
-    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Test Execution Report</h5>
+    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #1c263b;">
+        <h5 class="step-header-title"><i class="bi bi-file-earmark-text"></i> Test Execution Report</h5>
         <div>
             <button class="btn btn-sm btn-light" onclick="refreshReport()" id="refreshReportBtn" title="Refresh Report">
                 <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -117,15 +153,13 @@
                 <table class="table table-hover table-striped table-bordered" id="testResultsTable">
                     <thead class="table-success">
                         <tr>
-                            <th style="width: 50px;">#</th>
-                            <th style="width: 150px;">Test Case ID</th>
-                            <th style="width: 200px;">Test Case Name</th>
-                            <th style="width: 150px;">Endpoint</th>
-                            <th style="width: 100px;">Status</th>
-                            <th style="width: 100px;">Response Code</th>
-                            <th style="width: 120px;">Duration</th>
-                            <th style="width: 150px;">End Time</th>
-                            <th style="width: 100px;">Action</th>
+                            <th style="width: 50px; cursor: pointer;" onclick="sortTableByTestCaseId()" title="Click to sort">
+                                Test Case ID <i class="bi bi-arrow-down-up" id="testCaseIdSortIcon"></i>
+                            </th>
+                            <th style="width: 300px;">Test Case Name</th>
+                            <th style="width: 150px;">Status</th>
+                            <th style="width: 150px;">Response Code</th>
+                            <th style="width: 30px;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="testResultsTableBody">
@@ -178,7 +212,7 @@
 
 <!-- Test Result Detail Modal -->
 <div class="modal fade" id="testResultDetailModal" tabindex="-1" aria-labelledby="testResultDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title" id="testResultDetailModalLabel">
@@ -249,12 +283,24 @@
                 
                 <div class="mb-3">
                     <strong><i class="bi bi-send"></i> Request:</strong>
-                    <pre id="resultDetailRequest" class="mb-0 bg-light p-3 rounded border" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                    <details class="mt-2">
+                        <summary class="text-muted mb-2" style="cursor: pointer; font-weight: 500;">
+                            <i class="bi bi-chevron-right"></i> Request Headers
+                        </summary>
+                        <pre id="resultDetailRequestHeaders" class="mb-0 bg-light p-3 rounded border" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                    </details>
+                    <pre id="resultDetailRequest" class="mb-0 bg-light p-3 rounded border mt-2" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
                 </div>
                 
                 <div class="mb-3">
                     <strong><i class="bi bi-reply"></i> Response:</strong>
-                    <pre id="resultDetailResponse" class="mb-0 bg-light p-3 rounded border" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                    <details class="mt-2">
+                        <summary class="text-muted mb-2" style="cursor: pointer; font-weight: 500;">
+                            <i class="bi bi-chevron-right"></i> Response Headers
+                        </summary>
+                        <pre id="resultDetailResponseHeaders" class="mb-0 bg-light p-3 rounded border" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
+                    </details>
+                    <pre id="resultDetailResponse" class="mb-0 bg-light p-3 rounded border mt-2" style="max-height: 400px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">-</pre>
                 </div>
 
                 <div class="mb-3" id="resultDetailErrorSection" style="display: none;">
