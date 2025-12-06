@@ -1,5 +1,7 @@
 import uuid
 
+import regex as re
+from pydantic import field_validator
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
@@ -8,6 +10,29 @@ class ApiInfoModel(SQLModel):
     url: str
     method: str
     headers: dict
+
+    @field_validator("url")
+    def validate_url(cls, value):
+        url_regex = re.compile(
+            r"^(https?://)?"  # http:// or https://
+            r"(([A-Za-z0-9-]+\.)+[A-Za-z]{2,6})"  # domain...
+            r"(:\d+)?"  # optional port
+            r"(/[\w./?%&=-]*)?$"  # path
+        )
+        result = re.match(url_regex, value) is not None
+        if not result:
+            raise ValueError(f"Invalid URL format: {value}")
+
+        if not value.endswith("/"):
+            value += "/"
+        return value
+
+    @field_validator("method")
+    def validate_method(cls, value):
+        valid_methods = {"GET", "POST", "PUT", "DELETE", "PATCH"}
+        if value.upper() not in valid_methods:
+            raise ValueError(f"Invalid HTTP method: {value}")
+        return value.upper()
 
 
 class ExpectedResponseModel(SQLModel):
