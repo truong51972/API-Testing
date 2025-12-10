@@ -2,33 +2,33 @@
     // Function to handle file upload (used by both click and drag-drop)
     function handleFileUpload(files) {
         if (!files || files.length === 0) return;
-        
+
         // Filter files to only accept .docx and .pdf
         const allowedTypes = ['.docx', '.pdf'];
         const validFiles = Array.from(files).filter(file => {
             const fileName = file.name.toLowerCase();
             return allowedTypes.some(type => fileName.endsWith(type));
         });
-        
+
         if (validFiles.length === 0) {
             showNotification('warning', 'Cảnh báo', 'Vui lòng chọn file .docx hoặc .pdf');
             return;
         }
-        
+
         if (validFiles.length < files.length) {
             showNotification('info', 'Thông báo', `Đã bỏ qua ${files.length - validFiles.length} file không hợp lệ. Chỉ upload ${validFiles.length} file .docx/.pdf`);
         }
-        
+
         // Create a new FileList-like object and set it to the input
         const dataTransfer = new DataTransfer();
         validFiles.forEach(file => dataTransfer.items.add(file));
         const fileInput = document.getElementById('fileInput');
         fileInput.files = dataTransfer.files;
-        
+
         // Trigger the change event to use existing upload logic
         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    
+
     // File input change event handler
     document.getElementById('fileInput').addEventListener('change', function () {
         if (this.files.length > 0) {
@@ -52,43 +52,43 @@
             document.getElementById('uploadForm').submit();
         }
     });
-    
+
     // Drag & Drop functionality
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const uploadBox = document.querySelector('.upload-box');
         const fileInput = document.getElementById('fileInput');
-        
+
         if (!uploadBox || !fileInput) return;
-        
+
         // Prevent default drag behaviors on the document
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             uploadBox.addEventListener(eventName, preventDefaults, false);
             document.body.addEventListener(eventName, preventDefaults, false);
         });
-        
+
         function preventDefaults(e) {
             e.preventDefault();
             e.stopPropagation();
         }
-        
+
         // Highlight drop area when item is dragged over it
         ['dragenter', 'dragover'].forEach(eventName => {
-            uploadBox.addEventListener(eventName, function(e) {
+            uploadBox.addEventListener(eventName, function (e) {
                 uploadBox.classList.add('drag-over');
             }, false);
         });
-        
+
         ['dragleave', 'drop'].forEach(eventName => {
-            uploadBox.addEventListener(eventName, function(e) {
+            uploadBox.addEventListener(eventName, function (e) {
                 uploadBox.classList.remove('drag-over');
             }, false);
         });
-        
+
         // Handle dropped files
-        uploadBox.addEventListener('drop', function(e) {
+        uploadBox.addEventListener('drop', function (e) {
             const dt = e.dataTransfer;
             const files = dt.files;
-            
+
             if (files.length > 0) {
                 handleFileUpload(files);
             }
@@ -127,7 +127,7 @@
     const projectUuid = '{{ project.uuid }}';
 
     // Restore current step from localStorage on page load
-    (function() {
+    (function () {
         const savedStep = localStorage.getItem(`project_step_${projectUuid}`);
         if (savedStep) {
             const stepNum = parseInt(savedStep, 10);
@@ -145,15 +145,15 @@
             if (i === n - 1) s.classList.add('active');  // bước hiện tại
         });
         currentStep = n;
-        
+
         // Save current step to localStorage
         localStorage.setItem(`project_step_${projectUuid}`, n.toString());
-        
+
         // Update URL để remove query param step cũ (trừ khi có report_id)
         // Điều này đảm bảo khi reload sẽ dùng localStorage thay vì query param
         const url = new URL(window.location.href);
         const hasReportId = url.searchParams.has('report_id');
-        
+
         // Chỉ update URL nếu không có report_id (vì report_id cần giữ lại)
         if (!hasReportId) {
             // Remove step param từ URL để khi reload sẽ dùng localStorage
@@ -166,19 +166,19 @@
         document.querySelectorAll('.phase').forEach(el => el.classList.add('d-none'));
         const currentPhase = document.getElementById('phase' + n);
         if (currentPhase) currentPhase.classList.remove('d-none');
-        
+
         // Điều khiển hiển thị nút Back và Next theo từng step
         updateNavigationButtons(n);
-        
+
         // Cập nhật lock status cho các step
         updateStepLocks();
     }
-    
+
     // Helper function to update navigation buttons visibility
     function updateNavigationButtons(step) {
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
-        
+
         if (nextButton) {
             // Ẩn Next ở step 5 (bước cuối) và step 2 (AI tự xử lý)
             // Step 4: chỉ ẩn nếu chưa chọn test cases (AI đang xử lý)
@@ -195,7 +195,7 @@
                 nextButton.style.display = 'inline-block';
             }
         }
-        
+
         if (backButton) {
             // Ẩn Back ở step 1 (bước đầu) và step 2 (AI tự xử lý)
             // Step 4: chỉ ẩn nếu chưa chọn test cases (AI đang xử lý)
@@ -213,48 +213,72 @@
             }
         }
     }
-    
+
     // Function to load report directly from report_id (without polling)
     function loadReportFromId(projectUuid, testSuiteReportId) {
         console.log('Loading report directly from ID:', testSuiteReportId);
-        
+        loadMultipleReports(projectUuid, [testSuiteReportId]);
+    }
+
+    // Function to load multiple reports
+    function loadMultipleReports(projectUuid, reportIds) {
+        console.log('Loading multiple reports:', reportIds);
+
         // Set step to 5 (report phase)
         setStep(5);
-        
+
         // Show loading state
         showTestExecutionStatus();
-        updateTestExecutionStatus('Đang tải report...');
-        
-        // Fetch report directly
-        fetch(`/project/${projectUuid}/test-report/${testSuiteReportId}/`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Report data received:', data);
-            
-            if (data.success) {
-                // Report is ready, display it
-                console.log('✅ Report loaded successfully!');
-                window.testReportReady = true;
-                displayTestReport(data, testSuiteReportId);
-                hideTestExecutionStatus();
-                showNotification('success', 'Thành công', 'Đã tải report thành công.');
-            } else {
-                // Report not found or error
-                console.error('❌ Error loading report:', data.message);
-                showNotification('error', 'Lỗi!', data.message || 'Không thể tải report.');
-                hideTestExecutionStatus();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading report:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi tải report.');
+        updateTestExecutionStatus(`Đang tải ${reportIds.length} report(s)...`);
+
+        // Fetch all reports in parallel
+        const fetchPromises = reportIds.map(reportId => 
+            fetch(`/project/${projectUuid}/test-report/${reportId}/`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+                }
+            })
+                .then(response => response.json())
+                .then(data => ({ reportId, data }))
+                .catch(error => {
+                    console.error(`Error loading report ${reportId}:`, error);
+                    return { reportId, error };
+                })
+        );
+
+        Promise.all(fetchPromises).then(results => {
+            let successCount = 0;
+            let errorCount = 0;
+
+            results.forEach(({ reportId, data, error }) => {
+                if (error) {
+                    errorCount++;
+                    console.error(`❌ Error loading report ${reportId}:`, error);
+                } else if (data.success) {
+                    successCount++;
+                    console.log(`✅ Report ${reportId} loaded successfully!`);
+                    // Display report (append mode for multiple reports)
+                    displayTestReport(data, reportId, successCount > 1);
+                } else {
+                    errorCount++;
+                    console.error(`❌ Error loading report ${reportId}:`, data.message);
+                }
+            });
+
             hideTestExecutionStatus();
+            
+            if (successCount > 0) {
+                window.testReportReady = true;
+                if (successCount === reportIds.length) {
+                    showNotification('success', 'Thành công', `Đã tải ${successCount} report(s) thành công.`);
+                } else {
+                    showNotification('warning', 'Cảnh báo', `Đã tải ${successCount}/${reportIds.length} report(s). ${errorCount} report(s) có lỗi.`);
+                }
+            } else {
+                showNotification('error', 'Lỗi!', 'Không thể tải bất kỳ report nào.');
+            }
         });
     }
 
@@ -267,12 +291,12 @@
             }
             return;
         }
-        
+
         // Kiểm tra xem step có được unlock không
         if (!isStepUnlocked(n)) {
             const maxUnlocked = getMaxUnlockedStep();
             let message = '';
-            
+
             if (n === 3) {
                 message = 'Vui lòng hoàn thành bước 2 (AI Extract) trước khi chuyển sang bước 3.';
             } else if (n === 4) {
@@ -282,13 +306,13 @@
             } else {
                 message = `Bước ${n} chưa được mở khóa. Vui lòng hoàn thành bước ${maxUnlocked} trước.`;
             }
-            
+
             if (typeof showNotification === 'function') {
                 showNotification('warning', 'Cảnh báo', message);
             }
             return;
         }
-        
+
         // Nếu click vào step 2 và có documents đã completed, chuyển sang step 3
         if (n === 2 && window.hasCompletedDocuments) {
             // Hiển thị thông báo và chuyển sang step 3
@@ -304,10 +328,10 @@
             }
             return;
         }
-        
+
         // Cho các step khác, gọi setStep bình thường
         setStep(n);
-        
+
         // Xử lý các logic đặc biệt cho từng step
         setTimeout(() => {
             if (n === 2 && typeof startAIProcessing === 'function') {
@@ -324,16 +348,16 @@
     }
 
     // Restore step on page load
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // Ưu tiên check URL query param nếu có (cho deep linking)
         const params = new URLSearchParams(window.location.search);
         const stepParam = params.get('step');
         const reportId = params.get('report_id');
-        
+
         // Nếu có step param trong URL, sử dụng nó (cho deep linking)
         // Nếu không, sử dụng currentStep từ localStorage (đã được restore ở trên)
         let stepToSet = currentStep; // currentStep đã được restore từ localStorage ở IIFE
-        
+
         if (stepParam) {
             const stepNum = parseInt(stepParam, 10);
             if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= totalSteps) {
@@ -348,34 +372,58 @@
             // currentStep đã được restore từ localStorage ở IIFE, nên chỉ cần dùng nó
             stepToSet = currentStep;
         }
-        
+
         setStep(stepToSet);
-        
+
         // Thêm event listener cho các step icon để có thể click vào chúng
         const steps = document.querySelectorAll('.step');
         steps.forEach((step, index) => {
             const stepNumber = index + 1;
-            
+
             // Thêm event listener cho click
-            step.addEventListener('click', function() {
+            step.addEventListener('click', function () {
                 // Chỉ cho phép click nếu step được unlock
                 if (isStepUnlocked(stepNumber)) {
                     goToStep(stepNumber);
                 }
             });
         });
-        
+
         // Cập nhật lock status ban đầu
         updateStepLocks();
-        
-        // Check if report_id is in URL query params and auto-load report
+
+        // Check if report_id(s) is in URL query params and auto-load report(s)
+        const reportIds = params.get('report_ids');
         if (reportId) {
-            // Set step to 5 (report phase) and load the report
+            // Single report ID (legacy support)
             setTimeout(() => {
                 loadReportFromId(projectUuid, reportId);
             }, 500);
+        } else if (reportIds) {
+            // Multiple report IDs (comma-separated)
+            const reportIdArray = reportIds.split(',').filter(id => id.trim());
+            if (reportIdArray.length > 0) {
+                setTimeout(() => {
+                    loadMultipleReports(projectUuid, reportIdArray);
+                }, 500);
+            }
+        } else {
+            // Try to load from localStorage as backup
+            const savedReports = localStorage.getItem(`project_reports_${projectUuid}`);
+            if (savedReports) {
+                try {
+                    const reportIdArray = JSON.parse(savedReports);
+                    if (Array.isArray(reportIdArray) && reportIdArray.length > 0) {
+                        setTimeout(() => {
+                            loadMultipleReports(projectUuid, reportIdArray);
+                        }, 500);
+                    }
+                } catch (e) {
+                    console.error('Error parsing saved reports from localStorage:', e);
+                }
+            }
         }
-        
+
         // Auto-load data for specific steps
         if (stepToSet === 2) {
             // If on step 2, check if we need to start AI processing or FR extraction
@@ -406,7 +454,7 @@
                 loadSections();
                 return;
             }
-            
+
             // Nếu không có documents completed, chuyển sang phase 2 như bình thường
             setStep(2);
             // Auto start AI processing when entering step 2
@@ -430,13 +478,13 @@
         } else if (currentStep === 3) {
             // Check if at least one FR is selected (checkboxes are saved automatically)
             const selectedFRs = Array.from(document.querySelectorAll('.fr-checkbox:checked'));
-            
+
             // If no FRs are currently checked, require selection
             if (selectedFRs.length === 0) {
                 showNotification('warning', 'Cảnh báo', 'Vui lòng chọn ít nhất một Functional Requirement (FR) trước khi tiếp tục.');
                 return;
             }
-            
+
             // Selections are saved automatically when checkboxes are toggled, so we can proceed
             // All validations passed, proceed to next step
             setStep(4);
@@ -450,17 +498,20 @@
                 showNotification('warning', 'Cảnh báo', 'Vui lòng chọn test cases và bấm "Xác Nhận Chọn Test Cases" trước khi tiếp tục.');
                 return;
             }
-            
+
             // Move to step 5 and start executing test suite
             setStep(5);
-            
-            // Start executing test suite - test_suite_id sẽ được lấy từ DB nếu chưa có
+
+            // Start executing test suite - lấy tất cả test suite IDs từ selected test cases
             setTimeout(() => {
-                const testSuiteId = window.selectedTestSuiteId;
-                if (testSuiteId) {
-                    executeTestSuite('{{ project.uuid }}', testSuiteId);
+                // Luôn lấy tất cả test suite IDs từ selected test cases để support multiple suites
+                const testSuiteIds = getUniqueTestSuiteIdsFromSelected();
+                if (testSuiteIds.length > 0) {
+                    console.log(`Found ${testSuiteIds.length} test suite(s) from selected test cases:`, testSuiteIds);
+                    executeTestSuite('{{ project.uuid }}', testSuiteIds);
                 } else {
-                    // Nếu không có test_suite_id, lấy từ database
+                    // Fallback: nếu không tìm thấy từ selected test cases, thử lấy từ database
+                    console.warn('No test suite IDs found from selected test cases, trying database...');
                     getTestSuiteIdFromDatabase('{{ project.uuid }}');
                 }
             }, 500);
@@ -484,10 +535,10 @@
     window.testReportReady = false; // Track if test report is ready
     window.testCasesSelected = false; // Track if test cases have been selected
     window.selectedTestSuiteId = null; // Store selected test suite ID
-    
+
     // Store original states of disabled elements
     window.disabledElements = [];
-    
+
     // Hàm tạo blocking overlay để chặn tất cả tương tác
     function createBlockingOverlay() {
         // Kiểm tra xem overlay đã tồn tại chưa
@@ -508,7 +559,7 @@
                 justify-content: center;
                 backdrop-filter: blur(2px);
             `;
-            
+
             const content = document.createElement('div');
             content.style.cssText = `
                 background: white;
@@ -518,7 +569,7 @@
                 box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 max-width: 400px;
             `;
-            
+
             content.innerHTML = `
                 <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
                     <span class="visually-hidden">Loading...</span>
@@ -526,14 +577,14 @@
                 <h5 class="mb-2">AI đang xử lý...</h5>
                 <p class="text-muted mb-0">Vui lòng đợi quá trình hoàn thành. Bạn không thể thao tác trên màn hình lúc này.</p>
             `;
-            
+
             overlay.appendChild(content);
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
         return overlay;
     }
-    
+
     // Hàm ẩn blocking overlay
     function hideBlockingOverlay() {
         const overlay = document.getElementById('ai-processing-blocking-overlay');
@@ -541,11 +592,11 @@
             overlay.style.display = 'none';
         }
     }
-    
+
     // Hàm disable tất cả interactive elements
     function disableAllInteractiveElements() {
         window.disabledElements = [];
-        
+
         // Disable tất cả buttons (trừ các button trong phase 2 - AI processing)
         const buttons = document.querySelectorAll('button:not(#ai-processing-blocking-overlay button)');
         buttons.forEach(btn => {
@@ -555,7 +606,7 @@
                 window.disabledElements.push(btn);
             }
         });
-        
+
         // Disable tất cả links
         const links = document.querySelectorAll('a:not(#ai-processing-blocking-overlay a)');
         links.forEach(link => {
@@ -566,7 +617,7 @@
                 window.disabledElements.push(link);
             }
         });
-        
+
         // Disable tất cả inputs và textareas
         const inputs = document.querySelectorAll('input:not(#ai-processing-blocking-overlay input), textarea:not(#ai-processing-blocking-overlay textarea), select:not(#ai-processing-blocking-overlay select)');
         inputs.forEach(input => {
@@ -576,7 +627,7 @@
                 window.disabledElements.push(input);
             }
         });
-        
+
         // Disable tất cả forms
         const forms = document.querySelectorAll('form:not(#ai-processing-blocking-overlay form)');
         forms.forEach(form => {
@@ -587,7 +638,7 @@
                 window.disabledElements.push(form);
             }
         });
-        
+
         // Prevent clicks on step icons
         const steps = document.querySelectorAll('.step');
         steps.forEach(step => {
@@ -598,7 +649,7 @@
             }
         });
     }
-    
+
     // Hàm enable lại tất cả interactive elements
     function enableAllInteractiveElements() {
         window.disabledElements.forEach(element => {
@@ -614,36 +665,36 @@
         });
         window.disabledElements = [];
     }
-    
+
     // Hàm block tất cả tương tác khi AI processing
     function blockAllInteractions() {
         createBlockingOverlay();
         disableAllInteractiveElements();
     }
-    
+
     // Hàm unblock tất cả tương tác khi AI processing hoàn thành
     function unblockAllInteractions() {
         hideBlockingOverlay();
         enableAllInteractiveElements();
     }
-    
+
     // Hàm kiểm tra step có được unlock không
     function isStepUnlocked(stepNumber) {
         // Nếu AI đang processing, chỉ cho phép step 1 và 2
         if (window.aiProcessingInProgress) {
             return stepNumber === 1 || stepNumber === 2;
         }
-        
+
         // Step 1: luôn unlock (bước đầu tiên)
         if (stepNumber === 1) {
             return true;
         }
-        
+
         // Step 2: unlock nếu đã có documents hoặc đã vào step 1
         if (stepNumber === 2) {
             return true; // Có thể vào step 2 để xử lý documents
         }
-        
+
         // Step 3: unlock nếu:
         // - Đã hoàn thành step 2 (AI processing + FR extraction) HOẶC
         // - Có documents đã completed (bỏ qua step 2)
@@ -653,20 +704,20 @@
             const frComplete = window.frExtractionComplete || false;
             return hasCompletedDocs || (aiComplete && frComplete);
         }
-        
+
         // Step 4: unlock nếu đã hoàn thành step 3 (đã chọn và lưu FR)
         if (stepNumber === 4) {
             return window.frSelectionsSaved || false;
         }
-        
+
         // Step 5: unlock nếu đã hoàn thành step 4 (đã chọn test cases)
         if (stepNumber === 5) {
             return window.testCasesSelected || false;
         }
-        
+
         return false;
     }
-    
+
     // Hàm lấy step cao nhất đã được unlock
     function getMaxUnlockedStep() {
         for (let i = totalSteps; i >= 1; i--) {
@@ -676,16 +727,16 @@
         }
         return 1; // Mặc định step 1 luôn unlock
     }
-    
+
     // Hàm cập nhật UI để disable/lock các step chưa unlock
     function updateStepLocks() {
         const steps = document.querySelectorAll('.step');
         const maxUnlocked = getMaxUnlockedStep();
-        
+
         steps.forEach((step, index) => {
             const stepNumber = index + 1;
             const isUnlocked = stepNumber <= maxUnlocked;
-            
+
             if (isUnlocked) {
                 step.classList.remove('locked', 'disabled');
                 step.style.cursor = 'pointer';
@@ -709,7 +760,7 @@
         blockAllInteractions();
         // Cập nhật lock status cho các step
         updateStepLocks();
-        
+
         // Update UI to show processing
         document.getElementById('aiStatusText').textContent = 'AI Processing Started...';
         document.getElementById('aiStatusMessage').textContent = 'AI is analyzing your document...';
@@ -875,12 +926,12 @@
         blockAllInteractions();
         // Cập nhật lock status cho các step
         updateStepLocks();
-        
+
         // Update UI to show FR extraction
         document.getElementById('aiStatusText').textContent = 'Đang trích xuất Functional Requirements...';
         document.getElementById('aiStatusMessage').textContent = 'AI đang phân tích và trích xuất các Functional Requirements từ documents...';
         document.getElementById('aiProgressBar').style.width = '0%';
-        
+
         // Cập nhật message trong blocking overlay
         const overlayContent = document.querySelector('#ai-processing-blocking-overlay > div');
         if (overlayContent) {
@@ -1019,6 +1070,30 @@
     let testCaseProgressStages = []; // Store all stage timeouts
     let isTestCaseProgressRunning = false; // Flag to prevent multiple progress bars
     let isTestCaseGenerationStarted = false; // Flag to prevent multiple calls to startTestCaseGeneration
+    
+    // Retry configuration for test case generation
+    let testCaseGenerateRetryCount = 0;
+    const MAX_GENERATE_RETRIES = 5;
+    const INITIAL_RETRY_DELAY = 3000; // 3 seconds
+    
+    let testCaseStatusRetryCount = 0;
+    const MAX_STATUS_RETRIES = 10;
+    
+    // Helper function for retry with exponential backoff
+    function retryWithBackoff(fn, maxRetries, initialDelay, retryCount = 0) {
+        return fn().catch(error => {
+            if (retryCount < maxRetries) {
+                const delay = initialDelay * Math.pow(2, retryCount); // Exponential backoff
+                console.log(`Retry attempt ${retryCount + 1}/${maxRetries} after ${delay}ms...`);
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve(retryWithBackoff(fn, maxRetries, initialDelay, retryCount + 1));
+                    }, delay);
+                });
+            }
+            throw error; // Re-throw if max retries reached
+        });
+    }
 
     function clearAllTestCaseProgress() {
         // Clear all progress-related timeouts and intervals
@@ -1052,24 +1127,34 @@
             console.log('Test case generation already started, skipping duplicate call...');
             return;
         }
-        
+
         // Clear any existing progress first
         clearAllTestCaseProgress();
-        
+
         // Set flag to prevent duplicate calls
         isTestCaseGenerationStarted = true;
+
+        // First, check if testsuite already exists (with retry)
+        const checkTestSuite = () => {
+            return fetch(`/project/${projectUuid}/test-cases/check/`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                _noLoading: true
+                // Removed timeout - allow more time for check
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                });
+        };
         
-        // First, check if testsuite already exists
-        fetch(`/project/${projectUuid}/test-cases/check/`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            _noLoading: true,
-            _timeoutMs: 10000
-        })
-            .then(response => response.json())
+        // Retry check with exponential backoff (max 3 retries for check)
+        retryWithBackoff(checkTestSuite, 3, 2000)
             .then(data => {
                 if (data.success && data.exists) {
                     // Test suite already exists, just load the test cases
@@ -1078,7 +1163,7 @@
                     document.getElementById('testCaseStatusText').textContent = 'Đang tải Test Cases...';
                     document.getElementById('testCaseStatusMessage').textContent = `Đang tải ${data.test_cases_count} test cases đã có sẵn...`;
                     document.getElementById('testCaseProgressBar').style.width = '100%';
-                    
+
                     // Load test cases directly
                     setTimeout(() => {
                         fetchTestCases(projectUuid);
@@ -1097,9 +1182,9 @@
                         console.log('Test case progress already running, skipping...');
                         return;
                     }
-                    
+
                     isTestCaseProgressRunning = true;
-                    
+
                     // Countdown timer 60 seconds - store reference globally so it can be cleared
                     let countdown = 60;
                     let countdownInterval = setInterval(() => {
@@ -1108,12 +1193,12 @@
                             countdownInterval = null;
                             return;
                         }
-                        
+
                         countdown--;
                         const progress = Math.min(95, ((60 - countdown) / 60) * 95);
                         document.getElementById('testCaseProgressBar').style.width = progress + '%';
                         document.getElementById('testCaseStatusMessage').textContent = `Đang tạo test cases... Còn lại ${countdown} giây`;
-                        
+
                         if (countdown <= 0) {
                             clearInterval(countdownInterval);
                             countdownInterval = null;
@@ -1125,21 +1210,37 @@
                     window.testCaseCountdownInterval = countdownInterval;
                     testCaseProgressStages.push(countdownInterval);
 
-                    fetch(`/project/${projectUuid}/test-cases/generate/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            lang: 'en'
-                        }),
-                        _noLoading: true,
-                        _timeoutMs: 120000
-                    })
-                        .then(response => response.json())
+                    // Reset retry count for new generation attempt
+                    testCaseGenerateRetryCount = 0;
+                    
+                    // Function to call generate API with retry
+                    const generateTestCases = () => {
+                        return fetch(`/project/${projectUuid}/test-cases/generate/`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                lang: 'en'
+                            }),
+                            _noLoading: true
+                            // Removed timeout - let BE handle retry timing
+                        })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                return response.json();
+                            });
+                    };
+                    
+                    // Retry with exponential backoff
+                    retryWithBackoff(generateTestCases, MAX_GENERATE_RETRIES, INITIAL_RETRY_DELAY)
                         .then(data => {
                             if (data.success) {
+                                // Reset retry count on success
+                                testCaseGenerateRetryCount = 0;
                                 // Stop the countdown immediately when starting status check
                                 if (window.testCaseCountdownInterval) {
                                     clearInterval(window.testCaseCountdownInterval);
@@ -1151,63 +1252,129 @@
                                 // Start checking status
                                 checkTestCaseStatusLoop(projectUuid);
                             } else {
-                                // Stop any ongoing progress updates
-                                isTestCaseProgressRunning = false;
-                                clearAllTestCaseProgress();
-                                isTestCaseGenerationStarted = false; // Reset flag on error
-                                document.getElementById('testCaseStatusText').textContent = 'Error';
-                                document.getElementById('testCaseStatusMessage').textContent = data.message;
-                                document.getElementById('testCaseStatusIndicator').innerHTML = `
-                            <div class="alert alert-danger">
-                                <i class="bi bi-exclamation-triangle"></i> ${data.message}
-                            </div>
-                        `;
+                                // If backend returns error but not network error, check if we should retry
+                                if (testCaseGenerateRetryCount < MAX_GENERATE_RETRIES) {
+                                    testCaseGenerateRetryCount++;
+                                    const delay = INITIAL_RETRY_DELAY * Math.pow(2, testCaseGenerateRetryCount - 1);
+                                    document.getElementById('testCaseStatusMessage').textContent = `Lỗi: ${data.message}. Đang thử lại sau ${delay/1000} giây... (Lần thử: ${testCaseGenerateRetryCount}/${MAX_GENERATE_RETRIES})`;
+                                    console.log(`Retrying generate after error: ${data.message}`);
+                                    setTimeout(() => {
+                                        retryWithBackoff(generateTestCases, MAX_GENERATE_RETRIES - testCaseGenerateRetryCount, INITIAL_RETRY_DELAY)
+                                            .then(data => {
+                                                if (data.success) {
+                                                    testCaseGenerateRetryCount = 0;
+                                                    if (window.testCaseCountdownInterval) {
+                                                        clearInterval(window.testCaseCountdownInterval);
+                                                        window.testCaseCountdownInterval = null;
+                                                    }
+                                                    document.getElementById('testCaseProgressBar').style.width = '50%';
+                                                    document.getElementById('testCaseStatusMessage').textContent = 'Đang xử lý...';
+                                                    checkTestCaseStatusLoop(projectUuid);
+                                                } else {
+                                                    // Max retries reached or non-retryable error
+                                                    handleGenerateError(data.message);
+                                                }
+                                            })
+                                            .catch(error => {
+                                                handleGenerateError(error.message);
+                                            });
+                                    }, delay);
+                                } else {
+                                    // Max retries reached
+                                    handleGenerateError(data.message);
+                                }
                             }
                         })
                         .catch(error => {
-                            console.error('Error:', error);
-                            isTestCaseProgressRunning = false;
-                            clearAllTestCaseProgress();
-                            isTestCaseGenerationStarted = false; // Reset flag on error
-                            document.getElementById('testCaseStatusText').textContent = 'Error';
-                            document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while starting test case generation.';
-                            document.getElementById('testCaseStatusIndicator').innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle"></i> An error occurred while starting test case generation.
-                        </div>
-                    `;
+                            console.error('Error generating test cases:', error);
+                            if (testCaseGenerateRetryCount < MAX_GENERATE_RETRIES) {
+                                testCaseGenerateRetryCount++;
+                                const delay = INITIAL_RETRY_DELAY * Math.pow(2, testCaseGenerateRetryCount - 1);
+                                document.getElementById('testCaseStatusMessage').textContent = `Lỗi kết nối. Đang thử lại sau ${delay/1000} giây... (Lần thử: ${testCaseGenerateRetryCount}/${MAX_GENERATE_RETRIES})`;
+                                console.log(`Retrying generate after network error, attempt ${testCaseGenerateRetryCount}`);
+                                setTimeout(() => {
+                                    retryWithBackoff(generateTestCases, MAX_GENERATE_RETRIES - testCaseGenerateRetryCount, INITIAL_RETRY_DELAY)
+                                        .then(data => {
+                                            if (data.success) {
+                                                testCaseGenerateRetryCount = 0;
+                                                if (window.testCaseCountdownInterval) {
+                                                    clearInterval(window.testCaseCountdownInterval);
+                                                    window.testCaseCountdownInterval = null;
+                                                }
+                                                document.getElementById('testCaseProgressBar').style.width = '50%';
+                                                document.getElementById('testCaseStatusMessage').textContent = 'Đang xử lý...';
+                                                checkTestCaseStatusLoop(projectUuid);
+                                            } else {
+                                                handleGenerateError(data.message);
+                                            }
+                                        })
+                                        .catch(err => {
+                                            handleGenerateError(err.message);
+                                        });
+                                }, delay);
+                            } else {
+                                handleGenerateError(error.message || 'An error occurred while starting test case generation.');
+                            }
                         });
+                    
+                    // Helper function to handle generate errors
+                    function handleGenerateError(errorMessage) {
+                        isTestCaseProgressRunning = false;
+                        clearAllTestCaseProgress();
+                        isTestCaseGenerationStarted = false;
+                        testCaseGenerateRetryCount = 0;
+                        document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                        document.getElementById('testCaseStatusMessage').textContent = errorMessage || 'Không thể khởi động tạo test cases sau nhiều lần thử.';
+                        document.getElementById('testCaseStatusIndicator').innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle"></i> ${errorMessage || 'Không thể khởi động tạo test cases sau nhiều lần thử.'}
+                            </div>
+                        `;
+                    }
                 }
             })
             .catch(error => {
-                console.error('Error checking test suite:', error);
+                console.error('Error checking test suite after retries:', error);
                 // Clear any existing progress before starting new one
                 clearAllTestCaseProgress();
                 // Reset flag so we can retry
                 isTestCaseGenerationStarted = false;
-                // If check fails, proceed with generation as fallback
+                // If check fails after retries, proceed with generation as fallback
                 document.getElementById('testCaseStatusText').textContent = 'Đang bắt đầu tạo Test Cases...';
-                document.getElementById('testCaseStatusMessage').textContent = 'AI đang tạo test cases từ các sections đã chọn...';
+                document.getElementById('testCaseStatusMessage').textContent = 'Không thể kiểm tra test suite hiện có. Đang bắt đầu tạo mới...';
                 document.getElementById('testCaseProgressBar').style.width = '0%';
-                
+
                 // Set flag again for the fallback generation
                 isTestCaseGenerationStarted = true;
+                testCaseGenerateRetryCount = 0;
+
+                // Function to call generate API with retry (fallback)
+                const generateTestCasesFallback = () => {
+                    return fetch(`/project/${projectUuid}/test-cases/generate/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            lang: 'en'
+                        }),
+                        _noLoading: true
+                        // Removed timeout - let BE handle retry timing
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        });
+                };
                 
-                fetch(`/project/${projectUuid}/test-cases/generate/`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        lang: 'en'
-                    }),
-                    _noLoading: true,
-                    _timeoutMs: 120000
-                })
-                    .then(response => response.json())
+                // Retry with exponential backoff for fallback
+                retryWithBackoff(generateTestCasesFallback, MAX_GENERATE_RETRIES, INITIAL_RETRY_DELAY)
                     .then(data => {
                         if (data.success) {
+                            testCaseGenerateRetryCount = 0;
                             // Stop any countdown immediately when starting status check
                             if (window.testCaseCountdownInterval) {
                                 clearInterval(window.testCaseCountdownInterval);
@@ -1218,20 +1385,94 @@
                             document.getElementById('testCaseStatusMessage').textContent = 'Đang xử lý...';
                             checkTestCaseStatusLoop(projectUuid);
                         } else {
-                            isTestCaseProgressRunning = false;
-                            clearAllTestCaseProgress();
-                            isTestCaseGenerationStarted = false; // Reset flag on error
-                            document.getElementById('testCaseStatusText').textContent = 'Error';
-                            document.getElementById('testCaseStatusMessage').textContent = data.message;
+                            if (testCaseGenerateRetryCount < MAX_GENERATE_RETRIES) {
+                                testCaseGenerateRetryCount++;
+                                const delay = INITIAL_RETRY_DELAY * Math.pow(2, testCaseGenerateRetryCount - 1);
+                                document.getElementById('testCaseStatusMessage').textContent = `Lỗi: ${data.message}. Đang thử lại sau ${delay/1000} giây... (Lần thử: ${testCaseGenerateRetryCount}/${MAX_GENERATE_RETRIES})`;
+                                setTimeout(() => {
+                                    retryWithBackoff(generateTestCasesFallback, MAX_GENERATE_RETRIES - testCaseGenerateRetryCount, INITIAL_RETRY_DELAY)
+                                        .then(data => {
+                                            if (data.success) {
+                                                testCaseGenerateRetryCount = 0;
+                                                if (window.testCaseCountdownInterval) {
+                                                    clearInterval(window.testCaseCountdownInterval);
+                                                    window.testCaseCountdownInterval = null;
+                                                }
+                                                document.getElementById('testCaseProgressBar').style.width = '50%';
+                                                document.getElementById('testCaseStatusMessage').textContent = 'Đang xử lý...';
+                                                checkTestCaseStatusLoop(projectUuid);
+                                            } else {
+                                                isTestCaseProgressRunning = false;
+                                                clearAllTestCaseProgress();
+                                                isTestCaseGenerationStarted = false;
+                                                testCaseGenerateRetryCount = 0;
+                                                document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                                                document.getElementById('testCaseStatusMessage').textContent = data.message || 'Không thể khởi động tạo test cases.';
+                                            }
+                                        })
+                                        .catch(err => {
+                                            isTestCaseProgressRunning = false;
+                                            clearAllTestCaseProgress();
+                                            isTestCaseGenerationStarted = false;
+                                            testCaseGenerateRetryCount = 0;
+                                            document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                                            document.getElementById('testCaseStatusMessage').textContent = err.message || 'Không thể khởi động tạo test cases sau nhiều lần thử.';
+                                        });
+                                }, delay);
+                            } else {
+                                isTestCaseProgressRunning = false;
+                                clearAllTestCaseProgress();
+                                isTestCaseGenerationStarted = false;
+                                testCaseGenerateRetryCount = 0;
+                                document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                                document.getElementById('testCaseStatusMessage').textContent = data.message || 'Không thể khởi động tạo test cases sau nhiều lần thử.';
+                            }
                         }
                     })
                     .catch(err => {
                         console.error('Error generating test cases:', err);
-                        isTestCaseProgressRunning = false;
-                        clearAllTestCaseProgress();
-                        isTestCaseGenerationStarted = false; // Reset flag on error
-                        document.getElementById('testCaseStatusText').textContent = 'Error';
-                        document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while generating test cases.';
+                        if (testCaseGenerateRetryCount < MAX_GENERATE_RETRIES) {
+                            testCaseGenerateRetryCount++;
+                            const delay = INITIAL_RETRY_DELAY * Math.pow(2, testCaseGenerateRetryCount - 1);
+                            document.getElementById('testCaseStatusMessage').textContent = `Lỗi kết nối. Đang thử lại sau ${delay/1000} giây... (Lần thử: ${testCaseGenerateRetryCount}/${MAX_GENERATE_RETRIES})`;
+                            setTimeout(() => {
+                                retryWithBackoff(generateTestCasesFallback, MAX_GENERATE_RETRIES - testCaseGenerateRetryCount, INITIAL_RETRY_DELAY)
+                                    .then(data => {
+                                        if (data.success) {
+                                            testCaseGenerateRetryCount = 0;
+                                            if (window.testCaseCountdownInterval) {
+                                                clearInterval(window.testCaseCountdownInterval);
+                                                window.testCaseCountdownInterval = null;
+                                            }
+                                            document.getElementById('testCaseProgressBar').style.width = '50%';
+                                            document.getElementById('testCaseStatusMessage').textContent = 'Đang xử lý...';
+                                            checkTestCaseStatusLoop(projectUuid);
+                                        } else {
+                                            isTestCaseProgressRunning = false;
+                                            clearAllTestCaseProgress();
+                                            isTestCaseGenerationStarted = false;
+                                            testCaseGenerateRetryCount = 0;
+                                            document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                                            document.getElementById('testCaseStatusMessage').textContent = data.message || 'Không thể khởi động tạo test cases.';
+                                        }
+                                    })
+                                    .catch(error => {
+                                        isTestCaseProgressRunning = false;
+                                        clearAllTestCaseProgress();
+                                        isTestCaseGenerationStarted = false;
+                                        testCaseGenerateRetryCount = 0;
+                                        document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                                        document.getElementById('testCaseStatusMessage').textContent = error.message || 'Không thể khởi động tạo test cases sau nhiều lần thử.';
+                                    });
+                            }, delay);
+                        } else {
+                            isTestCaseProgressRunning = false;
+                            clearAllTestCaseProgress();
+                            isTestCaseGenerationStarted = false;
+                            testCaseGenerateRetryCount = 0;
+                            document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                            document.getElementById('testCaseStatusMessage').textContent = err.message || 'Không thể khởi động tạo test cases sau nhiều lần thử.';
+                        }
                     });
             });
     }
@@ -1246,36 +1487,55 @@
             }
         });
         testCaseProgressStages = [];
-        
+
         // Also clear the countdown interval if it exists
         if (window.testCaseCountdownInterval) {
             clearInterval(window.testCaseCountdownInterval);
             window.testCaseCountdownInterval = null;
         }
-        
+
         // Clear status check timeout if exists
         if (testCaseStatusCheckTimeout) {
             clearTimeout(testCaseStatusCheckTimeout);
             testCaseStatusCheckTimeout = null;
         }
-        
+
         let checking = false;
+        testCaseStatusRetryCount = 0; // Reset retry count when starting new status check loop
+        
         const checkStatus = () => {
             if (checking) return; // prevent overlap
             checking = true;
-            fetch(`/project/${projectUuid}/test-cases/status/`, { _noLoading: true, _timeoutMs: 15000, _retries: 1 })
-                .then(response => response.json())
+            
+            // Function to fetch status with retry capability
+            const fetchStatus = () => {
+                return fetch(`/project/${projectUuid}/test-cases/status/`, { 
+                    _noLoading: true
+                    // Removed timeout - let BE handle retry timing
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    });
+            };
+            
+            fetchStatus()
                 .then(data => {
+                    // Reset retry count on successful response
+                    testCaseStatusRetryCount = 0;
+                    
                     if (data.status === 'completed') {
                         // Stop staged progress
                         isTestCaseProgressRunning = false;
-                        
+
                         // Clear any existing final interval
                         if (testCaseFinalInterval) {
                             clearInterval(testCaseFinalInterval);
                             testCaseFinalInterval = null;
                         }
-                        
+
                         // Gradually complete the progress bar from 95% to 100%
                         let finalProgress = 95;
                         testCaseFinalInterval = setInterval(() => {
@@ -1311,32 +1571,54 @@
                         const pollingInterval = data.message && data.message.includes('polling') ? 5000 : 2000;
                         testCaseStatusCheckTimeout = setTimeout(() => { checking = false; checkStatus(); }, pollingInterval);
                     } else {
-                        // Stop all progress updates
-                        isTestCaseProgressRunning = false;
-                        clearAllTestCaseProgress();
-                        isTestCaseGenerationStarted = false; // Reset flag on error
-                        document.getElementById('testCaseStatusText').textContent = 'Error';
-                        document.getElementById('testCaseStatusMessage').textContent = data.message;
-                        document.getElementById('testCaseStatusIndicator').innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-triangle"></i> ${data.message}
-                    </div>
-                `;
+                        // If status is error but not fatal, retry a few times
+                        if (testCaseStatusRetryCount < MAX_STATUS_RETRIES && 
+                            (data.message && (data.message.includes('retry') || data.message.includes('thử lại') || data.message.includes('processing')))) {
+                            testCaseStatusRetryCount++;
+                            const delay = 5000; // 5 seconds for status retry
+                            document.getElementById('testCaseStatusMessage').textContent = `${data.message} (Đang thử lại sau ${delay/1000} giây... Lần thử: ${testCaseStatusRetryCount}/${MAX_STATUS_RETRIES})`;
+                            console.log(`Retrying status check after error: ${data.message}, attempt ${testCaseStatusRetryCount}`);
+                            testCaseStatusCheckTimeout = setTimeout(() => { checking = false; checkStatus(); }, delay);
+                        } else {
+                            // Stop all progress updates - max retries reached or fatal error
+                            isTestCaseProgressRunning = false;
+                            clearAllTestCaseProgress();
+                            isTestCaseGenerationStarted = false; // Reset flag on error
+                            testCaseStatusRetryCount = 0;
+                            document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                            document.getElementById('testCaseStatusMessage').textContent = data.message || 'Có lỗi xảy ra khi kiểm tra trạng thái.';
+                            document.getElementById('testCaseStatusIndicator').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> ${data.message || 'Có lỗi xảy ra khi kiểm tra trạng thái.'}
+                        </div>
+                    `;
+                        }
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    // Stop all progress on error
-                    isTestCaseProgressRunning = false;
-                    clearAllTestCaseProgress();
-                    isTestCaseGenerationStarted = false; // Reset flag on error
-                    document.getElementById('testCaseStatusText').textContent = 'Error';
-                    document.getElementById('testCaseStatusMessage').textContent = 'An error occurred while checking status.';
-                    document.getElementById('testCaseStatusIndicator').innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i> An error occurred while checking status.
-                </div>
-            `;
+                    console.error('Error checking status:', error);
+                    
+                    // Retry on network errors
+                    if (testCaseStatusRetryCount < MAX_STATUS_RETRIES) {
+                        testCaseStatusRetryCount++;
+                        const delay = 5000; // 5 seconds for status retry
+                        document.getElementById('testCaseStatusMessage').textContent = `Lỗi kết nối khi kiểm tra trạng thái. Đang thử lại sau ${delay/1000} giây... (Lần thử: ${testCaseStatusRetryCount}/${MAX_STATUS_RETRIES})`;
+                        console.log(`Retrying status check after network error, attempt ${testCaseStatusRetryCount}`);
+                        testCaseStatusCheckTimeout = setTimeout(() => { checking = false; checkStatus(); }, delay);
+                    } else {
+                        // Max retries reached
+                        isTestCaseProgressRunning = false;
+                        clearAllTestCaseProgress();
+                        isTestCaseGenerationStarted = false; // Reset flag on error
+                        testCaseStatusRetryCount = 0;
+                        document.getElementById('testCaseStatusText').textContent = 'Lỗi';
+                        document.getElementById('testCaseStatusMessage').textContent = 'Không thể kiểm tra trạng thái sau nhiều lần thử. Vui lòng làm mới trang.';
+                        document.getElementById('testCaseStatusIndicator').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Không thể kiểm tra trạng thái sau nhiều lần thử. Vui lòng làm mới trang.
+                    </div>
+                `;
+                    }
                 })
                 .finally(() => { checking = false; });
         };
@@ -1377,15 +1659,18 @@
 
     // Store test cases globally for detail view
     let allTestCases = [];
+    let filteredTestCases = []; // Store filtered test cases
     let currentTestCasesPage = 1;
     const TEST_CASES_PER_PAGE = 7;
     // Store selected test case IDs globally (across all pages)
     let selectedTestCasesSet = new Set();
-    
+    let currentEndpointFilter = ''; // Store current endpoint filter
+    let currentTestSuiteFilter = ''; // Store current test suite filter
+
     // Helper function to get test case ID from test case object
     function getTestCaseId(testCase) {
-        return (testCase.full_test_case_data && testCase.full_test_case_data.id) 
-            ? testCase.full_test_case_data.id 
+        return (testCase.full_test_case_data && testCase.full_test_case_data.id)
+            ? testCase.full_test_case_data.id
             : (testCase.uuid || '');
     }
 
@@ -1396,7 +1681,7 @@
 
         // Store test cases globally
         allTestCases = testCases || [];
-        
+
         // Initialize selectedTestCasesSet with test cases that are already selected in database
         selectedTestCasesSet.clear();
         allTestCases.forEach(tc => {
@@ -1407,7 +1692,7 @@
                 }
             }
         });
-        
+
         // Check if any test cases are selected (from database)
         const hasSelectedTestCases = selectedTestCasesSet.size > 0;
         if (hasSelectedTestCases) {
@@ -1423,7 +1708,164 @@
         // Reset to first page
         currentTestCasesPage = 1;
 
+        // Populate filter dropdowns
+        populateEndpointFilter();
+        populateTestSuiteFilter();
+
+        // Initialize filtered test cases with all test cases
+        filteredTestCases = allTestCases;
+        currentEndpointFilter = '';
+        currentTestSuiteFilter = '';
+
         // Render table with pagination
+        renderTestCasesPage();
+    }
+
+    // Populate test suite filter dropdown with unique test suite names
+    function populateTestSuiteFilter() {
+        const testSuiteFilter = document.getElementById('testSuiteFilter');
+        if (!testSuiteFilter) return;
+
+        // Get unique test suite names from all test cases
+        const testSuites = new Map(); // Use Map to store suite name -> count
+        allTestCases.forEach(testCase => {
+            const suiteName = testCase.test_suite_name || 'N/A';
+            if (suiteName && suiteName !== 'N/A') {
+                if (testSuites.has(suiteName)) {
+                    testSuites.set(suiteName, testSuites.get(suiteName) + 1);
+                } else {
+                    testSuites.set(suiteName, 1);
+                }
+            }
+        });
+
+        // Clear existing options except the first one
+        testSuiteFilter.innerHTML = '<option value="">Tất cả Test Suites</option>';
+
+        // Add test suite options with count
+        const sortedSuites = Array.from(testSuites.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+        sortedSuites.forEach(([suiteName, count]) => {
+            const option = document.createElement('option');
+            option.value = suiteName;
+            // Display suite name with count
+            const displayText = `${suiteName} (${count} test cases)`;
+            option.textContent = displayText;
+            option.title = suiteName; // Full suite name in tooltip
+            testSuiteFilter.appendChild(option);
+        });
+    }
+
+    // Populate endpoint filter dropdown with unique endpoints
+    function populateEndpointFilter() {
+        const endpointFilter = document.getElementById('endpointFilter');
+        if (!endpointFilter) return;
+
+        // Get unique endpoints from filtered test cases (or all if no suite filter)
+        const sourceTestCases = currentTestSuiteFilter ? filteredTestCases : allTestCases;
+        const endpoints = new Set();
+        sourceTestCases.forEach(testCase => {
+            const endpoint = testCase.endpoint || testCase.api_info?.url || 'N/A';
+            if (endpoint && endpoint !== 'N/A') {
+                endpoints.add(endpoint);
+            }
+        });
+
+        // Clear existing options except the first one
+        endpointFilter.innerHTML = '<option value="">Tất cả Endpoints</option>';
+
+        // Add endpoint options
+        const sortedEndpoints = Array.from(endpoints).sort();
+        sortedEndpoints.forEach(endpoint => {
+            const option = document.createElement('option');
+            option.value = endpoint;
+            // Truncate long endpoints for display
+            const displayText = endpoint.length > 60 ? endpoint.substring(0, 60) + '...' : endpoint;
+            option.textContent = displayText;
+            option.title = endpoint; // Full endpoint in tooltip
+            endpointFilter.appendChild(option);
+        });
+    }
+
+    // Filter test cases by test suite
+    function filterTestCasesBySuite(testSuiteName) {
+        currentTestSuiteFilter = testSuiteName || '';
+        
+        // Apply filters (both suite and endpoint)
+        applyFilters();
+    }
+
+    // Filter test cases by endpoint
+    function filterTestCasesByEndpoint(endpoint) {
+        currentEndpointFilter = endpoint || '';
+        
+        // Apply filters (both suite and endpoint)
+        applyFilters();
+    }
+
+    // Apply both filters (test suite and endpoint)
+    function applyFilters() {
+        // Start with all test cases
+        let filtered = allTestCases;
+
+        // Filter by test suite if selected
+        if (currentTestSuiteFilter && currentTestSuiteFilter !== '') {
+            filtered = filtered.filter(testCase => {
+                const suiteName = testCase.test_suite_name || 'N/A';
+                return suiteName === currentTestSuiteFilter;
+            });
+        }
+
+        // Filter by endpoint if selected
+        if (currentEndpointFilter && currentEndpointFilter !== '') {
+            filtered = filtered.filter(testCase => {
+                const testCaseEndpoint = testCase.endpoint || testCase.api_info?.url || 'N/A';
+                return testCaseEndpoint === currentEndpointFilter;
+            });
+        }
+
+        // Update filtered test cases
+        filteredTestCases = filtered;
+
+        // Update endpoint filter dropdown based on current suite filter
+        if (currentTestSuiteFilter && currentTestSuiteFilter !== '') {
+            populateEndpointFilter();
+            // Restore endpoint filter selection if it still exists in filtered list
+            const endpointFilter = document.getElementById('endpointFilter');
+            if (endpointFilter && currentEndpointFilter) {
+                // Check if current endpoint filter is still valid
+                const validEndpoints = Array.from(endpointFilter.options).map(opt => opt.value);
+                if (!validEndpoints.includes(currentEndpointFilter)) {
+                    // Current endpoint filter is not valid for this suite, clear it
+                    currentEndpointFilter = '';
+                    endpointFilter.value = '';
+                } else {
+                    endpointFilter.value = currentEndpointFilter;
+                }
+            }
+        }
+
+        // Show/hide filtered count badge
+        const filteredCountEl = document.getElementById('filteredCount');
+        const totalCountEl = document.getElementById('totalCount');
+        const filteredCountBadge = document.getElementById('filteredTestCasesCount');
+        
+        if ((currentTestSuiteFilter && currentTestSuiteFilter !== '') || 
+            (currentEndpointFilter && currentEndpointFilter !== '')) {
+            if (filteredCountEl && totalCountEl && filteredCountBadge) {
+                filteredCountEl.textContent = filteredTestCases.length;
+                totalCountEl.textContent = allTestCases.length;
+                filteredCountBadge.style.display = 'inline-block';
+            }
+        } else {
+            if (filteredCountBadge) {
+                filteredCountBadge.style.display = 'none';
+            }
+        }
+
+        // Reset to first page when filter changes
+        currentTestCasesPage = 1;
+
+        // Re-render table with filtered test cases
         renderTestCasesPage();
     }
 
@@ -1431,7 +1873,10 @@
         const tbody = document.getElementById('testCasesTableBody');
         tbody.innerHTML = '';
 
-        if (!allTestCases || allTestCases.length === 0) {
+        // Use filtered test cases instead of all test cases
+        const testCasesToRender = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+
+        if (!testCasesToRender || testCasesToRender.length === 0) {
             tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center text-muted py-4">
@@ -1446,11 +1891,11 @@
             return;
         }
 
-        // Calculate pagination
-        const totalPages = Math.ceil(allTestCases.length / TEST_CASES_PER_PAGE);
+        // Calculate pagination using filtered test cases
+        const totalPages = Math.ceil(testCasesToRender.length / TEST_CASES_PER_PAGE);
         const startIndex = (currentTestCasesPage - 1) * TEST_CASES_PER_PAGE;
-        const endIndex = Math.min(startIndex + TEST_CASES_PER_PAGE, allTestCases.length);
-        const currentPageTestCases = allTestCases.slice(startIndex, endIndex);
+        const endIndex = Math.min(startIndex + TEST_CASES_PER_PAGE, testCasesToRender.length);
+        const currentPageTestCases = testCasesToRender.slice(startIndex, endIndex);
 
         // Render current page test cases
         currentPageTestCases.forEach((testCase, localIndex) => {
@@ -1475,10 +1920,10 @@
             // Truncate endpoint if too long
             const endpoint = testCase.endpoint || 'N/A';
             const shortEndpoint = endpoint.length > 30 ? endpoint.substring(0, 30) + '...' : endpoint;
-            
+
             // Format headers for display
             const headers = testCase.header || {};
-            const headersText = Object.keys(headers).length > 0 
+            const headersText = Object.keys(headers).length > 0
                 ? Object.entries(headers).map(([key, value]) => `${key}: ${value}`).join('; ')
                 : 'N/A';
             const shortHeaders = headersText.length > 40 ? headersText.substring(0, 40) + '...' : headersText;
@@ -1486,10 +1931,10 @@
             // Get test case ID using helper function for consistency
             const testCaseApiId = getTestCaseId(testCase) || `test-case-${globalIndex}`;
             const checkboxId = `testCaseCheckbox_${globalIndex}`;
-            
+
             // Check if test case is selected (from database or user selection)
             const isSelected = testCase.is_selected === true || selectedTestCasesSet.has(testCaseApiId);
-            
+
             // If selected from database, add to Set
             if (testCase.is_selected === true && testCaseApiId) {
                 selectedTestCasesSet.add(testCaseApiId);
@@ -1512,7 +1957,7 @@
                 <span class="badge ${statusClass}">${statusCode}</span>
             </td>
             <td class="text-center">
-                <button class="btn btn-sm btn-outline-primary" onclick="viewTestCaseDetails(${globalIndex})" title="Xem chi tiết">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewTestCaseDetails(${globalIndex}, '${testCaseApiId}')" title="Xem chi tiết" data-test-case-id="${testCaseApiId}">
                     <i class="bi bi-eye"></i> Details
                 </button>
             </td>
@@ -1521,14 +1966,19 @@
         });
 
         // Update count text
-        document.getElementById('testCasesCount').innerHTML = `
-        <i class="bi bi-info-circle"></i> 
-        Hiển thị <strong>${startIndex + 1}-${endIndex}</strong> / <strong>${allTestCases.length}</strong> test cases
-    `;
+        const totalCount = testCasesToRender.length;
+        const allCount = allTestCases.length;
+        let countText = '';
+        if (currentEndpointFilter && currentEndpointFilter !== '') {
+            countText = `<i class="bi bi-info-circle"></i> Hiển thị <strong>${startIndex + 1}-${endIndex}</strong> / <strong>${totalCount}</strong> test cases (tổng: ${allCount})`;
+        } else {
+            countText = `<i class="bi bi-info-circle"></i> Hiển thị <strong>${startIndex + 1}-${endIndex}</strong> / <strong>${totalCount}</strong> test cases`;
+        }
+        document.getElementById('testCasesCount').innerHTML = countText;
 
         // Render pagination
         renderTestCasesPagination(totalPages);
-        
+
         // Update selected count
         updateSelectedTestCasesCount();
     }
@@ -1640,7 +2090,7 @@
     function quickSelectTestCases() {
         // Scroll to test cases section and select all
         const testCasesContainer = document.getElementById('testCaseResultsContainer');
-        
+
         if (!testCasesContainer || testCasesContainer.style.display === 'none') {
             // If results container is not visible, fetch test cases first
             const projectUuid = '{{ project.uuid }}';
@@ -1651,30 +2101,31 @@
                     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     // Select all after loading
                     setTimeout(() => {
-                        // Select all test cases across all pages
-                        allTestCases.forEach(tc => {
+                        // Select all test cases in filtered scope (or all if no filter)
+                        const testCasesToSelect = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+                        testCasesToSelect.forEach(tc => {
                             const testCaseId = getTestCaseId(tc);
                             if (testCaseId) {
                                 selectedTestCasesSet.add(testCaseId);
                             }
                         });
-                        
+
                         // Update UI
                         const selectAllCheckbox = document.getElementById('selectAllTestCases');
                         if (selectAllCheckbox) {
                             selectAllCheckbox.checked = true;
                             selectAllCheckbox.indeterminate = false;
                         }
-                        
+
                         // Update visible checkboxes
                         const checkboxes = document.querySelectorAll('.test-case-checkbox');
                         checkboxes.forEach(cb => {
                             const testCaseId = cb.getAttribute('data-test-case-id');
                             cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
                         });
-                        
+
                         updateSelectedTestCasesCount();
-                        
+
                         // Save all selections immediately
                         const allTestCaseIds = Array.from(selectedTestCasesSet);
                         if (allTestCaseIds.length > 0) {
@@ -1686,45 +2137,50 @@
             }, 1000);
         } else {
             testCasesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            
+
             // Highlight the container briefly
             testCasesContainer.style.transition = 'box-shadow 0.3s ease';
             testCasesContainer.style.boxShadow = '0 0 20px rgba(13, 202, 240, 0.5)';
             setTimeout(() => {
                 testCasesContainer.style.boxShadow = '';
             }, 2000);
-            
-            // Select all test cases across all pages
-            allTestCases.forEach(tc => {
+
+            // Select all test cases in filtered scope (or all if no filter)
+            const testCasesToSelect = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+            testCasesToSelect.forEach(tc => {
                 const testCaseId = getTestCaseId(tc);
                 if (testCaseId) {
                     selectedTestCasesSet.add(testCaseId);
                 }
             });
-            
+
             // Update UI
             const selectAllCheckbox = document.getElementById('selectAllTestCases');
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = true;
                 selectAllCheckbox.indeterminate = false;
             }
-            
+
             // Update visible checkboxes on current page
             const checkboxes = document.querySelectorAll('.test-case-checkbox');
             checkboxes.forEach(cb => {
                 const testCaseId = cb.getAttribute('data-test-case-id');
                 cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
             });
-            
+
             updateSelectedTestCasesCount();
-            
+
             // Save all selections immediately
             const allTestCaseIds = Array.from(selectedTestCasesSet);
             if (allTestCaseIds.length > 0) {
                 saveMultipleTestCaseSelections(allTestCaseIds, true);
             }
-            
-            showNotification('success', 'Đã chọn tất cả!', `Đã chọn tất cả ${allTestCases.length} test cases.`);
+
+            const selectedCount = testCasesToSelect.length;
+            const filterInfo = (currentTestSuiteFilter || currentEndpointFilter) 
+                ? ` (trong phạm vi đã lọc)` 
+                : '';
+            showNotification('success', 'Đã chọn tất cả!', `Đã chọn tất cả ${selectedCount} test cases${filterInfo}.`);
         }
     }
 
@@ -1736,60 +2192,62 @@
         if (countElement) {
             countElement.textContent = count;
         }
-        
+
         // Update testCasesSelected flag and show Next button if any test case is selected
         const hasSelected = count > 0;
         window.testCasesSelected = hasSelected;
         if (currentStep === 4) {
             updateNavigationButtons(4);
         }
-        
-        // Update select all checkbox state based on all test cases
+
+        // Update select all checkbox state based on filtered test cases (or all if no filter)
         const selectAllCheckbox = document.getElementById('selectAllTestCases');
-        if (selectAllCheckbox && allTestCases.length > 0) {
-            const allTestCasesIds = allTestCases.map(tc => {
-                return (tc.full_test_case_data && tc.full_test_case_data.id) 
-                    ? tc.full_test_case_data.id 
+        const testCasesToCheck = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+        
+        if (selectAllCheckbox && testCasesToCheck.length > 0) {
+            const testCasesIds = testCasesToCheck.map(tc => {
+                return (tc.full_test_case_data && tc.full_test_case_data.id)
+                    ? tc.full_test_case_data.id
                     : (tc.uuid || '');
             }).filter(id => id); // Filter out empty IDs
-            
-            const allSelected = allTestCasesIds.length > 0 && 
-                allTestCasesIds.every(id => selectedTestCasesSet.has(id));
-            const someSelected = allTestCasesIds.some(id => selectedTestCasesSet.has(id));
-            
+
+            const allSelected = testCasesIds.length > 0 &&
+                testCasesIds.every(id => selectedTestCasesSet.has(id));
+            const someSelected = testCasesIds.some(id => selectedTestCasesSet.has(id));
+
             selectAllCheckbox.checked = allSelected;
             selectAllCheckbox.indeterminate = someSelected && !allSelected;
         }
     }
-    
+
     // Update selection state when checkbox is clicked
     function handleTestCaseCheckboxChange(checkbox) {
         const testCaseId = checkbox.getAttribute('data-test-case-id');
         if (testCaseId) {
             const isSelected = checkbox.checked;
-            
+
             if (isSelected) {
                 selectedTestCasesSet.add(testCaseId);
             } else {
                 selectedTestCasesSet.delete(testCaseId);
             }
             updateSelectedTestCasesCount();
-            
+
             // Save selection immediately
             saveSingleTestCaseSelection(testCaseId, isSelected);
         }
     }
-    
+
     // Function to save a single test case selection immediately
     function saveSingleTestCaseSelection(testCaseId, isSelected) {
         console.log(`Saving test case selection: ${testCaseId}, isSelected: ${isSelected}`);
-        
+
         const projectUuid = '{{ project.uuid }}';
         const payload = {
             test_case_ids: [testCaseId],
             execute: isSelected  // true to select, false to deselect
         };
-        
+
         fetch(`/project/${projectUuid}/test-cases/select/`, {
             method: 'POST',
             headers: {
@@ -1801,17 +2259,33 @@
             _timeoutMs: 30000,
             _retries: 1
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Selection saved successfully
-                console.log(`Test case ${testCaseId} ${isSelected ? 'selected' : 'deselected'} successfully`);
-                
-                // Update testCasesSelected flag and show Next button if any test case is selected
-                const hasSelected = selectedTestCasesSet.size > 0;
-                window.testCasesSelected = hasSelected;
-                updateNavigationButtons(4);
-            } else {
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Selection saved successfully
+                    console.log(`Test case ${testCaseId} ${isSelected ? 'selected' : 'deselected'} successfully`);
+
+                    // Update testCasesSelected flag and show Next button if any test case is selected
+                    const hasSelected = selectedTestCasesSet.size > 0;
+                    window.testCasesSelected = hasSelected;
+                    updateNavigationButtons(4);
+                } else {
+                    // Revert checkbox state on error
+                    const checkbox = document.querySelector(`[data-test-case-id="${testCaseId}"]`);
+                    if (checkbox) {
+                        checkbox.checked = !isSelected;
+                        if (isSelected) {
+                            selectedTestCasesSet.delete(testCaseId);
+                        } else {
+                            selectedTestCasesSet.add(testCaseId);
+                        }
+                        updateSelectedTestCasesCount();
+                    }
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể lưu lựa chọn test case.');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving test case selection:', error);
                 // Revert checkbox state on error
                 const checkbox = document.querySelector(`[data-test-case-id="${testCaseId}"]`);
                 if (checkbox) {
@@ -1823,69 +2297,60 @@
                     }
                     updateSelectedTestCasesCount();
                 }
-                showNotification('error', 'Lỗi!', data.message || 'Không thể lưu lựa chọn test case.');
-            }
-        })
-        .catch(error => {
-            console.error('Error saving test case selection:', error);
-            // Revert checkbox state on error
-            const checkbox = document.querySelector(`[data-test-case-id="${testCaseId}"]`);
-            if (checkbox) {
-                checkbox.checked = !isSelected;
-                if (isSelected) {
-                    selectedTestCasesSet.delete(testCaseId);
-                } else {
-                    selectedTestCasesSet.add(testCaseId);
-                }
-                updateSelectedTestCasesCount();
-            }
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lưu lựa chọn test case.');
-        });
+                showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lưu lựa chọn test case.');
+            });
     }
 
     function toggleAllTestCases(checkbox) {
         const isSelected = checkbox.checked;
-        
-        // Select/deselect ALL test cases across all pages, not just current page
+
+        // Select/deselect test cases in filtered scope (or all if no filter)
         if (isSelected) {
-            // Add all test case IDs to the Set
-            allTestCases.forEach(tc => {
+            // Add all test case IDs from filtered scope to the Set
+            const testCasesToSelect = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+            testCasesToSelect.forEach(tc => {
                 const testCaseId = getTestCaseId(tc);
                 if (testCaseId) {
                     selectedTestCasesSet.add(testCaseId);
                 }
             });
         } else {
-            // Remove all test case IDs from the Set
-            selectedTestCasesSet.clear();
+            // Remove test case IDs from filtered scope (or all if no filter)
+            const testCasesToDeselect = filteredTestCases.length > 0 ? filteredTestCases : allTestCases;
+            testCasesToDeselect.forEach(tc => {
+                const testCaseId = getTestCaseId(tc);
+                if (testCaseId) {
+                    selectedTestCasesSet.delete(testCaseId);
+                }
+            });
         }
-        
+
         // Update visible checkboxes on current page
         const checkboxes = document.querySelectorAll('.test-case-checkbox');
         checkboxes.forEach(cb => {
             const testCaseId = cb.getAttribute('data-test-case-id');
             cb.checked = testCaseId && selectedTestCasesSet.has(testCaseId);
         });
-        
+
         updateSelectedTestCasesCount();
-        
+
         // Save all selections immediately
         const allTestCaseIds = Array.from(selectedTestCasesSet);
         if (allTestCaseIds.length > 0) {
             saveMultipleTestCaseSelections(allTestCaseIds, isSelected);
         }
     }
-    
+
     // Function to save multiple test case selections (for select all/deselect all)
     function saveMultipleTestCaseSelections(testCaseIds, isSelected) {
         console.log(`Saving ${testCaseIds.length} test case selections: isSelected=${isSelected}`);
-        
+
         const projectUuid = '{{ project.uuid }}';
         const payload = {
             test_case_ids: testCaseIds,
             execute: isSelected
         };
-        
+
         fetch(`/project/${projectUuid}/test-cases/select/`, {
             method: 'POST',
             headers: {
@@ -1897,58 +2362,58 @@
             _timeoutMs: 30000,
             _retries: 1
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log(`Successfully ${isSelected ? 'selected' : 'deselected'} ${testCaseIds.length} test cases`);
-                
-                // Update testCasesSelected flag and show Next button if any test case is selected
-                const hasSelected = selectedTestCasesSet.size > 0;
-                window.testCasesSelected = hasSelected;
-                updateNavigationButtons(4);
-            } else {
-                showNotification('error', 'Lỗi!', data.message || 'Không thể lưu lựa chọn test cases.');
-            }
-        })
-        .catch(error => {
-            console.error('Error saving test case selections:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lưu lựa chọn test cases.');
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log(`Successfully ${isSelected ? 'selected' : 'deselected'} ${testCaseIds.length} test cases`);
+
+                    // Update testCasesSelected flag and show Next button if any test case is selected
+                    const hasSelected = selectedTestCasesSet.size > 0;
+                    window.testCasesSelected = hasSelected;
+                    updateNavigationButtons(4);
+                } else {
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể lưu lựa chọn test cases.');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving test case selections:', error);
+                showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lưu lựa chọn test cases.');
+            });
     }
 
     function clearSelectedTestCases() {
         // Get all test case IDs before clearing
         const allTestCaseIds = Array.from(selectedTestCasesSet);
-        
+
         // Clear all selections from the Set
         selectedTestCasesSet.clear();
-        
+
         // Update visible checkboxes on current page
         const checkboxes = document.querySelectorAll('.test-case-checkbox');
         checkboxes.forEach(cb => {
             cb.checked = false;
         });
-        
+
         const selectAllCheckbox = document.getElementById('selectAllTestCases');
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = false;
             selectAllCheckbox.indeterminate = false;
         }
-        
+
         updateSelectedTestCasesCount();
-        
+
         // Save deselection immediately if there were any selected
         if (allTestCaseIds.length > 0) {
             saveMultipleTestCaseSelections(allTestCaseIds, false);
         }
-        
+
         showNotification('info', 'Đã bỏ chọn', 'Đã bỏ chọn tất cả test cases.');
     }
 
     function submitSelectedTestCases() {
         // Get all selected test case IDs from the Set (across all pages)
         const testCaseIds = Array.from(selectedTestCasesSet);
-        
+
         if (testCaseIds.length === 0) {
             showNotification('warning', 'Chưa chọn test case', 'Vui lòng chọn ít nhất một test case trước khi xác nhận.');
             return;
@@ -1957,7 +2422,7 @@
         const projectUuid = '{{ project.uuid }}';
         const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
         const originalHtml = submitBtn.innerHTML;
-        
+
         // Show loading state
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
@@ -1979,77 +2444,77 @@
             _timeoutMs: 30000,
             _retries: 1
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('success', 'Thành công!', data.message || `Đã chọn ${testCaseIds.length} test case(s) thành công.`);
-                
-                // Extract test_suite_id from response and save it for later execution
-                let testSuiteId = null;
-                
-                // Try multiple possible locations for test_suite_id
-                if (data.test_suite_id) {
-                    testSuiteId = data.test_suite_id;
-                } else if (data.response) {
-                    if (data.response.data) {
-                        if (data.response.data.test_suite_id) {
-                            testSuiteId = data.response.data.test_suite_id;
-                        } else if (typeof data.response.data === 'string') {
-                            // Sometimes data might be a string ID
-                            testSuiteId = data.response.data;
-                        } else if (data.response.data.id) {
-                            testSuiteId = data.response.data.id;
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('success', 'Thành công!', data.message || `Đã chọn ${testCaseIds.length} test case(s) thành công.`);
+
+                    // Extract test_suite_id from response and save it for later execution
+                    let testSuiteId = null;
+
+                    // Try multiple possible locations for test_suite_id
+                    if (data.test_suite_id) {
+                        testSuiteId = data.test_suite_id;
+                    } else if (data.response) {
+                        if (data.response.data) {
+                            if (data.response.data.test_suite_id) {
+                                testSuiteId = data.response.data.test_suite_id;
+                            } else if (typeof data.response.data === 'string') {
+                                // Sometimes data might be a string ID
+                                testSuiteId = data.response.data;
+                            } else if (data.response.data.id) {
+                                testSuiteId = data.response.data.id;
+                            }
+                        }
+                        if (!testSuiteId && data.response.test_suite_id) {
+                            testSuiteId = data.response.test_suite_id;
+                        }
+                        if (!testSuiteId && data.response.id) {
+                            testSuiteId = data.response.id;
                         }
                     }
-                    if (!testSuiteId && data.response.test_suite_id) {
-                        testSuiteId = data.response.test_suite_id;
+
+                    // Log for debugging
+                    console.log('Extracted test_suite_id:', testSuiteId);
+                    console.log('Full response data:', data);
+
+                    if (testSuiteId) {
+                        // Lưu test_suite_id để dùng khi bấm Next sang step 5
+                        window.selectedTestSuiteId = testSuiteId;
+                        window.testCasesSelected = true;
+                        updateStepLocks();
+                        showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
+                    } else {
+                        // Nếu không có test_suite_id, vẫn cho phép chọn (test_suite_id sẽ được lấy từ DB khi execute)
+                        window.testCasesSelected = true;
+                        updateStepLocks();
+                        showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
+                        console.warn('No test_suite_id in response, will try to get from database when executing');
                     }
-                    if (!testSuiteId && data.response.id) {
-                        testSuiteId = data.response.id;
-                    }
-                }
-                
-                // Log for debugging
-                console.log('Extracted test_suite_id:', testSuiteId);
-                console.log('Full response data:', data);
-                
-                if (testSuiteId) {
-                    // Lưu test_suite_id để dùng khi bấm Next sang step 5
-                    window.selectedTestSuiteId = testSuiteId;
-                    window.testCasesSelected = true;
-                    updateStepLocks();
-                    showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
+
+                    // Hiển thị lại nút Next và Back sau khi chọn test cases
+                    updateNavigationButtons(4);
+
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalHtml;
                 } else {
-                    // Nếu không có test_suite_id, vẫn cho phép chọn (test_suite_id sẽ được lấy từ DB khi execute)
-                    window.testCasesSelected = true;
-                    updateStepLocks();
-                    showNotification('success', 'Thành công!', `Đã chọn ${testCaseIds.length} test case(s) thành công. Bấm "Next" để thực thi test suite.`);
-                    console.warn('No test_suite_id in response, will try to get from database when executing');
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể chọn test cases.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalHtml;
                 }
-                
-                // Hiển thị lại nút Next và Back sau khi chọn test cases
-                updateNavigationButtons(4);
-                
+            })
+            .catch(error => {
+                console.error('Error selecting test cases:', error);
+                showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi chọn test cases. Vui lòng thử lại.');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalHtml;
-            } else {
-                showNotification('error', 'Lỗi!', data.message || 'Không thể chọn test cases.');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalHtml;
-            }
-        })
-        .catch(error => {
-            console.error('Error selecting test cases:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi chọn test cases. Vui lòng thử lại.');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHtml;
-        });
+            });
     }
 
     function getTestSuiteIdFromDatabase(projectUuid) {
         // Show execution status with progress bar instead of loading page
         showTestExecutionStatus('Đang lấy test suite ID từ database...');
-        
+
         // Call backend to get test suite ID from database
         fetch(`/project/${projectUuid}/test-suite/get-id/`, {
             method: 'GET',
@@ -2060,113 +2525,213 @@
             _timeoutMs: 10000,
             _retries: 1
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.test_suite_id) {
-                // Lưu test_suite_id và execute
-                window.selectedTestSuiteId = data.test_suite_id;
-                executeTestSuite(projectUuid, data.test_suite_id);
-            } else {
-                showNotification('error', 'Lỗi!', data.message || 'Không tìm thấy test_suite_id trong database. Vui lòng đảm bảo test cases đã được generate.');
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.test_suite_id) {
+                    // Execute với single test suite ID (fallback case)
+                    executeTestSuite(projectUuid, [data.test_suite_id]);
+                } else {
+                    showNotification('error', 'Lỗi!', data.message || 'Không tìm thấy test_suite_id trong database. Vui lòng đảm bảo test cases đã được generate.');
+                    hideReportLoading();
+                    console.error('No test_suite_id found in database:', data);
+                }
+            })
+            .catch(error => {
+                console.error('Error getting test_suite_id from database:', error);
+                showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lấy test_suite_id từ database.');
                 hideReportLoading();
-                console.error('No test_suite_id found in database:', data);
-            }
-        })
-        .catch(error => {
-            console.error('Error getting test_suite_id from database:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi lấy test_suite_id từ database.');
-            hideReportLoading();
-        });
+            });
     }
 
-    function executeTestSuite(projectUuid, testSuiteId) {
+    // Helper function to get unique test suite IDs from selected test cases
+    function getUniqueTestSuiteIdsFromSelected() {
+        const selectedIds = Array.from(selectedTestCasesSet);
+        const suiteIdSet = new Set();
+        
+        allTestCases.forEach(tc => {
+            const testCaseId = getTestCaseId(tc);
+            if (selectedIds.includes(testCaseId) && tc.test_suite_id) {
+                suiteIdSet.add(tc.test_suite_id);
+            }
+        });
+        
+        return Array.from(suiteIdSet);
+    }
+
+    function executeTestSuite(projectUuid, testSuiteIdOrArray) {
         const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
         if (submitBtn) {
             submitBtn.innerHTML = '<i class="bi bi-play-circle"></i> Đang chạy test suite...';
             submitBtn.disabled = true;
         }
-        
+
         // Show execution status with progress bar
         showTestExecutionStatus('Đang khởi động chạy test suite...');
-        
+
         // Move to step 5 (don't show loading page, use progress bar instead)
         setStep(5);
         // showReportLoading is removed - we use testExecutionStatusContainer with progress bar instead
-        
-        // First, call execute API
-        fetch(`/project/${projectUuid}/test-suite/execute/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({
-                test_suite_id: testSuiteId
-            }),
-            _timeoutMs: 30000,
-            _retries: 1
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // API trả về test_suite_report_id ngay trong data.test_suite_report_id
-                if (data.test_suite_report_id) {
-                    // Nhận được test_suite_report_id, bắt đầu polling GET_TEST_REPORT_ENDPOINT
-                    showNotification('success', 'Thành công!', 'Đã khởi động chạy test suite. Đang lấy report...');
-                    console.log('Got test_suite_report_id from execute API:', data.test_suite_report_id);
-                    // Bắt đầu polling get_test_report với test_suite_report_id (chỉ gọi GET_TEST_REPORT_ENDPOINT)
-                    pollTestReport(projectUuid, data.test_suite_report_id);
-                } else {
-                    // Nếu không có test_suite_report_id trong response
-                    showNotification('error', 'Lỗi!', 'Không nhận được test_suite_report_id từ execute API.');
-                    hideReportLoading();
-                    hideTestExecutionStatus();
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
-                    }
-                    console.error('No test_suite_report_id in execute response:', data);
-                }
-            } else {
-                showNotification('error', 'Lỗi!', data.message || 'Không thể chạy test suite.');
-                hideReportLoading();
-                hideTestExecutionStatus();
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error executing test suite:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi chạy test suite. Vui lòng thử lại.');
+
+        // Determine test suite IDs to execute
+        let testSuiteIds = [];
+        if (Array.isArray(testSuiteIdOrArray)) {
+            testSuiteIds = testSuiteIdOrArray;
+        } else if (testSuiteIdOrArray) {
+            testSuiteIds = [testSuiteIdOrArray];
+        } else {
+            // If no test suite ID provided, get from selected test cases
+            testSuiteIds = getUniqueTestSuiteIdsFromSelected();
+        }
+
+        if (testSuiteIds.length === 0) {
+            showNotification('error', 'Lỗi!', 'Không tìm thấy test suite để thực thi.');
             hideReportLoading();
             hideTestExecutionStatus();
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
             }
-        });
+            return;
+        }
+
+        console.log(`Executing ${testSuiteIds.length} test suite(s):`, testSuiteIds);
+        updateTestExecutionStatus(`Đang khởi động chạy ${testSuiteIds.length} test suite(s)...`);
+
+        // Execute test suites sequentially and collect report IDs
+        const reportIds = [];
+        let currentIndex = 0;
+
+        const executeNext = () => {
+            if (currentIndex >= testSuiteIds.length) {
+                // All suites executed, start polling all reports
+                if (reportIds.length > 0) {
+                    console.log(`All ${testSuiteIds.length} test suite(s) executed. Report IDs:`, reportIds);
+                    updateTestExecutionStatus(`Đã khởi động ${testSuiteIds.length} test suite(s). Đang chờ reports...`);
+                    pollTestReport(projectUuid, reportIds);
+                } else {
+                    showNotification('error', 'Lỗi!', 'Không nhận được report ID từ bất kỳ test suite nào.');
+                    hideReportLoading();
+                    hideTestExecutionStatus();
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+                    }
+                }
+                return;
+            }
+
+            const testSuiteId = testSuiteIds[currentIndex];
+            updateTestExecutionStatus(`Đang khởi động test suite ${currentIndex + 1}/${testSuiteIds.length}...`);
+
+            // Call execute API for this test suite
+            fetch(`/project/${projectUuid}/test-suite/execute/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({
+                    test_suite_id: testSuiteId
+                }),
+                _timeoutMs: 30000,
+                _retries: 1
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.test_suite_report_id) {
+                        reportIds.push(data.test_suite_report_id);
+                        console.log(`Test suite ${currentIndex + 1}/${testSuiteIds.length} executed. Report ID:`, data.test_suite_report_id);
+                        currentIndex++;
+                        executeNext(); // Execute next suite
+                    } else {
+                        console.error(`Failed to execute test suite ${currentIndex + 1}:`, data.message || 'No report ID');
+                        // Continue with next suite even if this one failed
+                        currentIndex++;
+                        executeNext();
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error executing test suite ${currentIndex + 1}:`, error);
+                    // Continue with next suite even if this one failed
+                    currentIndex++;
+                    executeNext();
+                });
+        };
+
+        // Start executing first suite
+        executeNext();
     }
 
 
-    function pollTestReport(projectUuid, testSuiteReportId) {
-        const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
-        let attempts = 0;
-        const pollInterval = 5000; // Poll every 5 seconds
-        const initialDelay = 10000; // Wait 10 seconds before first request
+    // Helper function to check if report has actual data
+    function hasReportData(reportData) {
+        if (!reportData || !reportData.success) return false;
         
+        // Check test_results in various possible locations
+        const responseData = reportData.response || {};
+        const dataObj = reportData.data || {};
+        
+        // Check test_results array - can be at top level of response or nested
+        let testResults = [];
+        if (responseData.test_results && Array.isArray(responseData.test_results)) {
+            testResults = responseData.test_results;
+        } else if (responseData.data && responseData.data.test_results && Array.isArray(responseData.data.test_results)) {
+            testResults = responseData.data.test_results;
+        } else if (dataObj.test_results && Array.isArray(dataObj.test_results)) {
+            testResults = dataObj.test_results;
+        } else if (Array.isArray(responseData.data)) {
+            testResults = responseData.data;
+        } else if (Array.isArray(dataObj.data)) {
+            testResults = dataObj.data;
+        }
+        
+        // Check if test_results has items
+        if (testResults.length > 0) {
+            return true;
+        }
+        
+        // Check if data is an array with items
+        const dataArray = Array.isArray(reportData.data) ? reportData.data : 
+                        Array.isArray(responseData.data) ? responseData.data : [];
+        if (dataArray.length > 0) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    function pollTestReport(projectUuid, testSuiteReportIdOrList) {
+        // Support single ID or array of IDs (poll all in parallel, but only display when all have data)
+        const reportIds = Array.isArray(testSuiteReportIdOrList)
+            ? [...testSuiteReportIdOrList]
+            : [testSuiteReportIdOrList];
+
+        // Reset aggregated report storage for this polling session
+        window.allTestResults = [];
+        window.allReportsMeta = [];
+        window.currentReportIds = reportIds.slice();
+        window.reportDataMap = {}; // Store data for each report ID: {reportId: reportData}
+
+        const maxAttempts = 60; // Poll for up to 5 minutes (60 * 5 seconds)
+        const pollInterval = 5000; // Poll every 5 seconds
+        const initialDelay = 30000; // Wait 30 seconds before first request
+
         // Ensure we're on step 5
         setStep(5);
-        // Don't show report loading page, use progress bar instead
-        // showReportLoading is removed because we already have testExecutionStatusContainer with progress bar
-        
-        console.log('Starting to poll GET_TEST_REPORT_ENDPOINT with test_suite_report_id:', testSuiteReportId);
-        console.log(`Will wait ${initialDelay/1000} seconds before first request...`);
-        
+        console.log(`Starting to poll ${reportIds.length} report(s):`, reportIds);
+        console.log(`Will wait ${initialDelay / 1000} seconds before first request...`);
+
+        let attempts = 0;
+        const reportStatusMap = {}; // Track status for each report: {reportId: {hasData: bool, attempts: number}}
+
+        // Initialize status map
+        reportIds.forEach(id => {
+            reportStatusMap[id] = { hasData: false, attempts: 0 };
+        });
+
         const poll = () => {
             attempts++;
-            
+
             if (attempts > maxAttempts) {
                 showNotification('error', 'Timeout', 'Đã hết thời gian chờ report. Vui lòng thử lại.');
                 hideReportLoading();
@@ -2178,73 +2743,112 @@
                 }
                 return;
             }
-            
-            // Update progress bar message (not loading page)
-            updateTestExecutionStatus(`Đang lấy report... (Lần thử: ${attempts}/${maxAttempts})`);
-            
-            console.log(`[${attempts}/${maxAttempts}] Calling GET_TEST_REPORT_ENDPOINT with test_suite_report_id: ${testSuiteReportId}`);
-            
-            // Chỉ gọi GET_TEST_REPORT_ENDPOINT, không gọi lại execute API
-            fetch(`/project/${projectUuid}/test-report/${testSuiteReportId}/`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                _timeoutMs: 10000,
-                _retries: 1
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log(`[${attempts}/${maxAttempts}] GET_TEST_REPORT_ENDPOINT response:`, data);
-                
-                if (data.success) {
-                    // Report is ready, display it in phase5
-                    console.log('✅ Report is ready! Displaying...');
-                    window.testReportReady = true;
-                    displayTestReport(data, testSuiteReportId);
-                    hideReportLoading();
-                    hideTestExecutionStatus();
-                    const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
+
+            // Count how many reports have data
+            const reportsWithData = Object.values(reportStatusMap).filter(status => status.hasData).length;
+            updateTestExecutionStatus(`Đang lấy reports... (${reportsWithData}/${reportIds.length} có data, Lần thử: ${attempts}/${maxAttempts})`);
+
+            // Poll all reports in parallel
+            const pollPromises = reportIds.map(reportId => {
+                // Skip if this report already has data
+                if (reportStatusMap[reportId].hasData) {
+                    return Promise.resolve({ reportId, skip: true });
+                }
+
+                reportStatusMap[reportId].attempts++;
+
+                return fetch(`/project/${projectUuid}/test-report/${reportId}/`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    _timeoutMs: 10000,
+                    _retries: 1
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        return { reportId, data };
+                    })
+                    .catch(error => {
+                        console.error(`❌ Error polling report ${reportId} (attempt ${attempts}):`, error);
+                        return { reportId, error };
+                    });
+            });
+
+            Promise.all(pollPromises).then(results => {
+                let allHaveData = true;
+                let hasNewData = false;
+
+                results.forEach(({ reportId, data, error, skip }) => {
+                    if (skip) {
+                        return; // Already has data, skip
                     }
-                } else {
-                    // Report not ready yet, continue polling
-                    if (data.message && (
-                        data.message.includes('not found') || 
-                        data.message.includes('chưa sẵn sàng') || 
-                        data.message.includes('chưa hoàn thành') || 
-                        data.message.includes('chưa có') || 
+
+                    if (error) {
+                        // Network error, continue polling
+                        return;
+                    }
+
+                    if (data.success && hasReportData(data)) {
+                        // This report has data now
+                        if (!reportStatusMap[reportId].hasData) {
+                            reportStatusMap[reportId].hasData = true;
+                            window.reportDataMap[reportId] = data;
+                            hasNewData = true;
+                            console.log(`✅ Report ${reportId} is ready with data!`);
+                        }
+                    } else if (data.success && !hasReportData(data)) {
+                        // Report API returned success but no data yet
+                        console.log(`⏳ Report ${reportId} API returned success but no data yet (attempt ${attempts})`);
+                    } else if (data.message && (
+                        data.message.includes('not found') ||
+                        data.message.includes('chưa sẵn sàng') ||
+                        data.message.includes('chưa hoàn thành') ||
+                        data.message.includes('chưa có') ||
                         data.message.includes('not ready') ||
                         data.message.includes('chưa có dữ liệu')
                     )) {
-                        // Report not ready, continue polling after 5 seconds
-                        console.log(`⏳ Report not ready yet (attempt ${attempts}), will retry in ${pollInterval}ms...`);
-                        setTimeout(poll, pollInterval);
+                        // Report not ready yet, continue polling
+                        console.log(`⏳ Report ${reportId} not ready yet (attempt ${attempts})`);
                     } else {
-                        // Some other error, stop polling
-                        console.error('❌ Error getting report:', data.message);
-                        showNotification('error', 'Lỗi!', data.message || 'Không thể lấy report.');
-                        hideReportLoading();
-                        hideTestExecutionStatus();
-                        const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
-                        if (submitBtn) {
-                            submitBtn.disabled = false;
-                            submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
-                        }
+                        // Error getting report
+                        console.error(`❌ Error getting report ${reportId}:`, data.message);
                     }
-                }
-            })
-            .catch(error => {
-                console.error(`❌ Error polling report (attempt ${attempts}):`, error);
-                // Continue polling on network errors
-                if (attempts < maxAttempts) {
-                    console.log(`🔄 Network error, will retry in ${pollInterval}ms...`);
-                    setTimeout(poll, pollInterval);
-                } else {
-                    showNotification('error', 'Lỗi!', 'Đã hết thời gian chờ report.');
+
+                    // Check if this report still doesn't have data
+                    if (!reportStatusMap[reportId].hasData) {
+                        allHaveData = false;
+                    }
+                });
+
+                // If all reports have data, display them
+                if (allHaveData && reportIds.length > 0) {
+                    console.log('✅ All reports have data! Displaying...');
+                    window.testReportReady = true;
+                    
+                    // Save report IDs to URL for reload persistence
+                    const url = new URL(window.location.href);
+                    if (reportIds.length === 1) {
+                        url.searchParams.set('report_id', reportIds[0]);
+                    } else {
+                        // For multiple reports, save as comma-separated list
+                        url.searchParams.set('report_ids', reportIds.join(','));
+                        url.searchParams.delete('report_id'); // Remove single report_id if exists
+                    }
+                    url.searchParams.set('step', '5');
+                    window.history.replaceState({}, '', url.toString());
+                    
+                    // Also save to localStorage as backup
+                    localStorage.setItem(`project_reports_${projectUuid}`, JSON.stringify(reportIds));
+                    
+                    // Display all reports (append mode)
+                    reportIds.forEach(reportId => {
+                        if (window.reportDataMap[reportId]) {
+                            displayTestReport(window.reportDataMap[reportId], reportId, true);
+                        }
+                    });
+                    
                     hideReportLoading();
                     hideTestExecutionStatus();
                     const submitBtn = document.getElementById('submitSelectedTestCasesBtn');
@@ -2252,12 +2856,15 @@
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Xác Nhận Chọn Test Cases (<span id="selectedTestCasesCount">0</span>)';
                     }
+                    showNotification('success', 'Hoàn thành!', `Đã lấy ${reportIds.length} report(s) thành công.`);
+                } else {
+                    // Continue polling
+                    setTimeout(poll, pollInterval);
                 }
             });
         };
-        
-        // Wait 10 seconds before starting first poll request
-        updateTestExecutionStatus(`Đang chờ ${initialDelay/1000} giây trước khi bắt đầu lấy report...`);
+
+        updateTestExecutionStatus(`Đang chờ ${initialDelay / 1000} giây trước khi bắt đầu lấy ${reportIds.length} report(s)...`);
         setTimeout(() => {
             console.log('Initial delay completed, starting first poll request...');
             poll();
@@ -2355,7 +2962,15 @@
         }
     }
 
-    function displayTestReport(reportData, testSuiteReportId) {
+    function displayTestReport(reportData, testSuiteReportId, append = false) {
+        // Maintain aggregated test results across multiple reports
+        if (!window.allTestResults) window.allTestResults = [];
+        if (!window.allReportsMeta) window.allReportsMeta = [];
+        if (!append) {
+            window.allTestResults = [];
+            window.allReportsMeta = [];
+        }
+
         // Hide loading, show content
         hideReportLoading();
         const contentContainer = document.getElementById('reportContentContainer');
@@ -2366,10 +2981,15 @@
         // Extract report data - format: {success: true, message: "...", data: [...]}
         const reportDataArray = reportData.data || reportData.response?.data || [];
         const result = reportData.result || reportData.response?.result || {};
-        
-        // Store report data globally for refresh
+
+        // Store report data globally for refresh/aggregate
         window.currentReportData = reportData;
         window.currentTestSuiteReportId = testSuiteReportId;
+        window.allReportsMeta.push({
+            report_id: testSuiteReportId,
+            result: result,
+            raw: reportData
+        });
 
         // Parse test results - data is an array directly
         let testResults = [];
@@ -2386,133 +3006,119 @@
         } else if (reportDataArray && Array.isArray(reportDataArray.test_results)) {
             testResults = reportDataArray.test_results;
         }
-        
+
         // Extract test_suite_report_id from first test result if available
         if (testResults.length > 0 && testResults[0].test_suite_report_id && !testSuiteReportId) {
             window.currentTestSuiteReportId = testResults[0].test_suite_report_id;
         }
 
-        console.log('Parsed test results:', testResults);
-        console.log('Total test results:', testResults.length);
+        // Aggregate
+        window.allTestResults = window.allTestResults.concat(testResults);
+        const aggregatedResults = window.allTestResults;
+        console.log('Parsed test results (this report):', testResults.length);
+        console.log('Aggregated test results:', aggregatedResults.length);
 
-        // Calculate statistics
-        totalTests = testResults.length;
-        testResults.forEach(test => {
-            const status = (test.status || '').toLowerCase();
-            if (status === 'passed' || status === 'pass') {
-                passedTests++;
-            } else if (status === 'failed' || status === 'fail') {
-                failedTests++;
-            } else {
-                pendingTests++;
+        // Build test suite name to ID mapping from allTestCases
+        const suiteNameToIdMap = {}; // {suite_name: [suite_ids]}
+        const suiteIdToNameMap = {}; // {suite_id: suite_name}
+        if (window.allTestCases && Array.isArray(window.allTestCases)) {
+            window.allTestCases.forEach(tc => {
+                if (tc.test_suite_id && tc.test_suite_name) {
+                    suiteIdToNameMap[tc.test_suite_id] = tc.test_suite_name;
+                    if (!suiteNameToIdMap[tc.test_suite_name]) {
+                        suiteNameToIdMap[tc.test_suite_name] = new Set();
+                    }
+                    suiteNameToIdMap[tc.test_suite_name].add(tc.test_suite_id);
+                }
+            });
+        }
+
+        // Extract test suite names from test results and build mapping
+        aggregatedResults.forEach(test => {
+            const testCaseObj = test.test_case || {};
+            const suiteId = testCaseObj.test_suite_id || test.test_suite_id;
+            if (suiteId) {
+                // Try to get suite name from test case object or map
+                let suiteName = testCaseObj.test_suite_name || suiteIdToNameMap[suiteId];
+                if (suiteName) {
+                    suiteIdToNameMap[suiteId] = suiteName;
+                    if (!suiteNameToIdMap[suiteName]) {
+                        suiteNameToIdMap[suiteName] = new Set();
+                    }
+                    suiteNameToIdMap[suiteName].add(suiteId);
+                }
             }
         });
 
-        // Update summary statistics
-        document.getElementById('totalTestsCount').textContent = totalTests;
-        document.getElementById('passedTestsCount').textContent = passedTests;
-        document.getElementById('failedTestsCount').textContent = failedTests;
-        document.getElementById('pendingTestsCount').textContent = pendingTests;
-
-        // Update status alert
-        const statusAlert = document.getElementById('reportStatusAlert');
-        if (statusAlert) {
-            if (result.code) {
-                const code = Array.isArray(result.code) ? result.code.join(', ') : result.code;
-                const codeClass = code === '0000' || code === '0' ? 'success' : 'danger';
-                statusAlert.className = `alert alert-${codeClass} mb-4`;
-                statusAlert.style.display = 'block';
-                document.getElementById('reportStatusTitle').textContent = `Result Code: ${code}`;
-                document.getElementById('reportStatusMessage').textContent = result.description || '';
-                statusAlert.querySelector('i').className = code === '0000' || code === '0' 
-                    ? 'bi bi-check-circle-fill me-2' 
-                    : 'bi bi-exclamation-triangle-fill me-2';
-            } else if (failedTests === 0 && totalTests > 0) {
-                statusAlert.className = 'alert alert-success mb-4';
-                statusAlert.style.display = 'block';
-                document.getElementById('reportStatusTitle').textContent = 'All Tests Passed!';
-                document.getElementById('reportStatusMessage').textContent = `Successfully executed ${totalTests} test(s).`;
-                statusAlert.querySelector('i').className = 'bi bi-check-circle-fill me-2';
-            } else if (failedTests > 0) {
-                statusAlert.className = 'alert alert-danger mb-4';
-                statusAlert.style.display = 'block';
-                document.getElementById('reportStatusTitle').textContent = 'Some Tests Failed';
-                document.getElementById('reportStatusMessage').textContent = `${failedTests} out of ${totalTests} test(s) failed.`;
-                statusAlert.querySelector('i').className = 'bi bi-exclamation-triangle-fill me-2';
-            } else {
-                statusAlert.style.display = 'none';
-            }
+        // Build test suite name filter dropdown
+        const suiteFilterSelect = document.getElementById('reportSuiteFilterSelect');
+        if (suiteFilterSelect) {
+            const seen = new Set();
+            suiteFilterSelect.innerHTML = '<option value="">All Test Suites</option>';
+            Object.keys(suiteNameToIdMap).sort().forEach(suiteName => {
+                if (seen.has(suiteName)) return;
+                seen.add(suiteName);
+                const opt = document.createElement('option');
+                opt.value = suiteName;
+                opt.textContent = suiteName;
+                suiteFilterSelect.appendChild(opt);
+            });
         }
 
-        // Populate test results table
-        const tableBody = document.getElementById('testResultsTableBody');
-        const emptyState = document.getElementById('reportEmptyState');
+        // Build filter dropdown options (Report ID)
+        const filterSelect = document.getElementById('reportFilterSelect');
+        if (filterSelect) {
+            // Keep unique report IDs
+            const seen = new Set();
+            filterSelect.innerHTML = '<option value="">All Reports</option>';
+            window.allReportsMeta.forEach(meta => {
+                if (!meta.report_id || seen.has(meta.report_id)) return;
+                seen.add(meta.report_id);
+                const opt = document.createElement('option');
+                opt.value = meta.report_id;
+                opt.textContent = meta.report_id;
+                filterSelect.appendChild(opt);
+            });
+        }
+
+        // Store suite mappings globally for filtering
+        window.suiteIdToNameMap = suiteIdToNameMap;
+        window.suiteNameToIdMap = suiteNameToIdMap;
+
+        // Apply filters if selected
+        let visibleResults = aggregatedResults;
+        const suiteFilterValue = document.getElementById('reportSuiteFilterSelect')?.value || '';
+        const filterValue = document.getElementById('reportFilterSelect')?.value || '';
         
+        if (suiteFilterValue) {
+            // Filter by test suite name
+            const suiteIds = Array.from(suiteNameToIdMap[suiteFilterValue] || []);
+            visibleResults = visibleResults.filter(r => {
+                const testCaseObj = r.test_case || {};
+                const suiteId = testCaseObj.test_suite_id || r.test_suite_id;
+                return suiteIds.includes(suiteId);
+            });
+        }
+        
+        if (filterValue) {
+            // Filter by report ID
+            visibleResults = visibleResults.filter(r => (r.test_suite_report_id || testSuiteReportId) === filterValue);
+        }
+
         // Reset sort direction when populating new data
         testCaseIdSortDirection = 'asc';
         const sortIcon = document.getElementById('testCaseIdSortIcon');
         if (sortIcon) {
             sortIcon.className = 'bi bi-arrow-down-up';
         }
-        
-        if (tableBody) {
-            tableBody.innerHTML = '';
-            
-            if (testResults.length === 0) {
-                if (emptyState) emptyState.style.display = 'block';
-            } else {
-                if (emptyState) emptyState.style.display = 'none';
-                
-                testResults.forEach((test, index) => {
-                    const status = (test.status || 'pending').toLowerCase();
-                    const statusBadge = getStatusBadge(status);
-                    const responseCode = test.response_status_code || '-';
-                    
-                    // Calculate duration from start_time and end_time
-                    let duration = '-';
-                    if (test.start_time && test.end_time) {
-                        try {
-                            const start = new Date(test.start_time);
-                            const end = new Date(test.end_time);
-                            const durationMs = end - start;
-                            duration = formatDuration(durationMs);
-                        } catch (e) {
-                            console.error('Error calculating duration:', e);
-                        }
-                    }
-                    
-                    // Format executed time (use end_time or start_time)
-                    const executedAt = test.end_time || test.start_time || '-';
-                    
-                    // Get test case info from nested test_case object
-                    const testCaseObj = test.test_case || {};
-                    const testCaseName = testCaseObj.test_case || test.test_case_name || `Test Case ${index + 1}`;
-                    const testCaseId = testCaseObj.test_case_id || testCaseObj.id || test.test_case_id || test.id || '-';
-                    
-                    // Get endpoint from test_case.api_info.url
-                    const endpoint = testCaseObj.api_info?.url || test.endpoint || test.url || 'N/A';
-                    
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td><code class="small">${testCaseId}</code></td>
-                        <td>${testCaseName}</td>
-                        <td>${statusBadge}</td>
-                        <td><span class="badge ${getStatusCodeBadgeClass(responseCode)}">${responseCode}</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="viewTestResultDetail(${index})" title="View Details">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-                
-                // Store test results globally for detail modal
-                window.testResults = testResults;
-            }
-        }
 
-        // Update report details
+        // Store aggregated test results globally for detail modal (before filtering)
+        window.testResults = aggregatedResults;
+
+        // Render table with filtered results
+        renderTestResultsTable(visibleResults);
+
+        // Update report details (show latest report id and times)
         const detailsSection = document.getElementById('reportDetailsSection');
         if (detailsSection) {
             const reportId = testSuiteReportId || (testResults.length > 0 && testResults[0].test_suite_report_id) || window.currentTestSuiteReportId;
@@ -2521,7 +3127,7 @@
                 if (reportId) {
                     document.getElementById('reportSuiteId').textContent = reportId;
                 }
-                
+
                 // Calculate total duration from first and last test
                 let totalDuration = '-';
                 if (testResults.length > 0) {
@@ -2538,28 +3144,26 @@
                         }
                     }
                 }
-                
-                document.getElementById('reportStartTime').textContent = testResults.length > 0 && testResults[0].start_time 
-                    ? formatDateTime(testResults[0].start_time) 
+
+                document.getElementById('reportStartTime').textContent = testResults.length > 0 && testResults[0].start_time
+                    ? formatDateTime(testResults[0].start_time)
                     : '-';
-                document.getElementById('reportEndTime').textContent = testResults.length > 0 && testResults[testResults.length - 1].end_time 
-                    ? formatDateTime(testResults[testResults.length - 1].end_time) 
+                document.getElementById('reportEndTime').textContent = testResults.length > 0 && testResults[testResults.length - 1].end_time
+                    ? formatDateTime(testResults[testResults.length - 1].end_time)
                     : '-';
                 document.getElementById('reportTotalDuration').textContent = totalDuration;
-                
+
                 const successRate = totalTests > 0 ? ((passedTests / totalTests) * 100).toFixed(1) : 0;
                 document.getElementById('reportSuccessRate').textContent = successRate + '%';
                 // Status shows percentage of Passed tests
                 const passedRate = parseFloat(successRate);
-                let statusBadgeClass = 'bg-warning';
-                if (passedRate == 100) {
+                let statusBadgeClass = 'bg-danger';
+                if (passedRate === 100) {
                     statusBadgeClass = 'bg-success';
-                } else if (passedRate == 0) {
-                    statusBadgeClass = 'bg-danger';
-                } else if (passedRate >= 50) {
+                } else if (passedRate >= 80) {
                     statusBadgeClass = 'bg-info';
-                } else {
-                    statusBadgeClass = 'bg-danger';
+                } else if (passedRate >= 50) {
+                    statusBadgeClass = 'bg-warning';
                 }
                 document.getElementById('reportOverallStatus').innerHTML = `<span class="badge ${statusBadgeClass}">${successRate}% Passed</span>`;
             } else {
@@ -2567,10 +3171,13 @@
             }
         }
 
-        // Update raw data
+        // Update raw data (show aggregated)
         const rawDataEl = document.getElementById('rawReportData');
         if (rawDataEl) {
-            rawDataEl.textContent = JSON.stringify(reportData, null, 2);
+            rawDataEl.textContent = JSON.stringify({
+                reports: window.allReportsMeta,
+                test_results: window.allTestResults
+            }, null, 2);
         }
 
         // Scroll to report
@@ -2580,7 +3187,7 @@
                 phase5.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }, 100);
-        
+
         showNotification('success', 'Hoàn thành!', 'Đã lấy report thành công.');
     }
 
@@ -2653,14 +3260,14 @@
         rows.sort((a, b) => {
             const aId = a.cells[0].querySelector('code')?.textContent?.trim() || '';
             const bId = b.cells[0].querySelector('code')?.textContent?.trim() || '';
-            
+
             // Try to compare as numbers if both are numeric
             const aNum = parseFloat(aId);
             const bNum = parseFloat(bId);
             if (!isNaN(aNum) && !isNaN(bNum)) {
                 return testCaseIdSortDirection === 'asc' ? aNum - bNum : bNum - aNum;
             }
-            
+
             // Otherwise compare as strings
             if (testCaseIdSortDirection === 'asc') {
                 return aId.localeCompare(bId);
@@ -2692,7 +3299,7 @@
 
         const test = window.testResults[index];
         const status = (test.status || 'pending').toLowerCase();
-        
+
         // Update modal header color based on status
         const modalHeader = document.querySelector('#testResultDetailModal .modal-header');
         if (modalHeader) {
@@ -2707,7 +3314,7 @@
                 modalHeader.classList.add('bg-warning');
             }
         }
-        
+
         // Calculate duration
         let duration = '-';
         if (test.start_time && test.end_time) {
@@ -2720,7 +3327,7 @@
                 console.error('Error calculating duration:', e);
             }
         }
-        
+
         // Get test case object
         const testCaseObj = test.test_case || {};
         const testCaseName = testCaseObj.test_case || test.test_case_name || `Test Case ${index + 1}`;
@@ -2730,7 +3337,7 @@
         const endpoint = apiInfo.url || test.endpoint || test.url || 'N/A';
         const method = apiInfo.method || 'N/A';
         const expectedOutput = testCaseObj.expected_output || {};
-        
+
         // Populate modal
         document.getElementById('resultDetailId').textContent = testCaseId;
         document.getElementById('resultDetailName').textContent = testCaseName;
@@ -2740,7 +3347,7 @@
         document.getElementById('resultDetailDuration').textContent = duration;
         document.getElementById('resultDetailStartTime').textContent = formatDateTime(test.start_time);
         document.getElementById('resultDetailExecutedAt').textContent = formatDateTime(test.end_time || test.start_time);
-        
+
         // Update additional fields if they exist in the modal
         const resultDetailMethod = document.getElementById('resultDetailMethod');
         if (resultDetailMethod) {
@@ -2752,23 +3359,23 @@
         }
         const resultDetailExpectedOutput = document.getElementById('resultDetailExpectedOutput');
         if (resultDetailExpectedOutput) {
-            resultDetailExpectedOutput.textContent = Object.keys(expectedOutput).length > 0 
-                ? JSON.stringify(expectedOutput, null, 2) 
+            resultDetailExpectedOutput.textContent = Object.keys(expectedOutput).length > 0
+                ? JSON.stringify(expectedOutput, null, 2)
                 : 'N/A';
         }
-        
+
         // Request Body
         const requestBody = test.request_body || {};
-        
+
         // Request Headers - populate into expander
         const requestHeader = test.request_header || {};
         const requestHeadersElement = document.getElementById('resultDetailRequestHeaders');
         if (requestHeadersElement) {
-            requestHeadersElement.textContent = Object.keys(requestHeader).length > 0 
-                ? JSON.stringify(requestHeader, null, 2) 
+            requestHeadersElement.textContent = Object.keys(requestHeader).length > 0
+                ? JSON.stringify(requestHeader, null, 2)
                 : '(empty)';
         }
-        
+
         // Request Body - only show body, no method/url/headers
         let requestInfo = '';
         if (Object.keys(requestBody).length > 0) {
@@ -2777,19 +3384,19 @@
             requestInfo = '(empty)';
         }
         document.getElementById('resultDetailRequest').textContent = requestInfo;
-        
+
         // Response Body
         const responseBody = test.response_body || {};
-        
+
         // Response Headers - populate into expander
         const responseHeader = test.response_header || {};
         const responseHeadersElement = document.getElementById('resultDetailResponseHeaders');
         if (responseHeadersElement) {
-            responseHeadersElement.textContent = Object.keys(responseHeader).length > 0 
-                ? JSON.stringify(responseHeader, null, 2) 
+            responseHeadersElement.textContent = Object.keys(responseHeader).length > 0
+                ? JSON.stringify(responseHeader, null, 2)
                 : '(empty)';
         }
-        
+
         // Response Body - only show body, no headers
         let responseInfo = '';
         if (Object.keys(responseBody).length > 0) {
@@ -2798,7 +3405,7 @@
             responseInfo = '(empty)';
         }
         document.getElementById('resultDetailResponse').textContent = responseInfo;
-        
+
         // Error section - show if status is failed
         const errorSection = document.getElementById('resultDetailErrorSection');
         if (status === 'failed' || status === 'fail') {
@@ -2817,6 +3424,164 @@
         modal.show();
     }
 
+    function filterReportBySuiteName(suiteName) {
+        if (!window.allTestResults || window.allTestResults.length === 0) {
+            return;
+        }
+
+        // Get suite IDs for this suite name
+        const suiteIds = suiteName && window.suiteNameToIdMap && window.suiteNameToIdMap[suiteName]
+            ? Array.from(window.suiteNameToIdMap[suiteName])
+            : null;
+
+        // Apply filters
+        let visibleResults = window.allTestResults;
+        
+        // Filter by test suite name
+        if (suiteName && suiteIds) {
+            visibleResults = visibleResults.filter(r => {
+                const testCaseObj = r.test_case || {};
+                const suiteId = testCaseObj.test_suite_id || r.test_suite_id;
+                return suiteIds.includes(suiteId);
+            });
+        }
+
+        // Also apply report ID filter if selected
+        const reportFilterValue = document.getElementById('reportFilterSelect')?.value || '';
+        if (reportFilterValue) {
+            visibleResults = visibleResults.filter(r => 
+                (r.test_suite_report_id || window.currentTestSuiteReportId) === reportFilterValue
+            );
+        }
+
+        // Re-render table with filtered results
+        renderTestResultsTable(visibleResults);
+    }
+
+    function filterReportById(reportId) {
+        if (!window.allTestResults || window.allTestResults.length === 0) {
+            return;
+        }
+
+        // Apply filters
+        let visibleResults = window.allTestResults;
+        
+        // Filter by report ID
+        if (reportId) {
+            visibleResults = visibleResults.filter(r => 
+                (r.test_suite_report_id || window.currentTestSuiteReportId) === reportId
+            );
+        }
+
+        // Also apply test suite name filter if selected
+        const suiteFilterValue = document.getElementById('reportSuiteFilterSelect')?.value || '';
+        if (suiteFilterValue && window.suiteNameToIdMap && window.suiteNameToIdMap[suiteFilterValue]) {
+            const suiteIds = Array.from(window.suiteNameToIdMap[suiteFilterValue]);
+            visibleResults = visibleResults.filter(r => {
+                const testCaseObj = r.test_case || {};
+                const suiteId = testCaseObj.test_suite_id || r.test_suite_id;
+                return suiteIds.includes(suiteId);
+            });
+        }
+
+        // Re-render table with filtered results
+        renderTestResultsTable(visibleResults);
+    }
+
+    function renderTestResultsTable(visibleResults) {
+        const tableBody = document.getElementById('testResultsTableBody');
+        const emptyState = document.getElementById('reportEmptyState');
+
+        if (!tableBody) return;
+
+        tableBody.innerHTML = '';
+
+        if (visibleResults.length === 0) {
+            if (emptyState) emptyState.style.display = 'block';
+            // Update statistics to 0
+            document.getElementById('totalTestsCount').textContent = '0';
+            document.getElementById('passedTestsCount').textContent = '0';
+            document.getElementById('failedTestsCount').textContent = '0';
+            document.getElementById('pendingTestsCount').textContent = '0';
+            return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+
+        // Calculate statistics
+        let totalTests = visibleResults.length;
+        let passedTests = 0;
+        let failedTests = 0;
+        let pendingTests = 0;
+
+        visibleResults.forEach(test => {
+            const status = (test.status || 'pending').toLowerCase();
+            if (status === 'passed' || status === 'pass') {
+                passedTests++;
+            } else if (status === 'failed' || status === 'fail') {
+                failedTests++;
+            } else {
+                pendingTests++;
+            }
+        });
+
+        // Update summary statistics
+        document.getElementById('totalTestsCount').textContent = totalTests;
+        document.getElementById('passedTestsCount').textContent = passedTests;
+        document.getElementById('failedTestsCount').textContent = failedTests;
+        document.getElementById('pendingTestsCount').textContent = pendingTests;
+
+        // Store filtered results for detail modal (use original index from allTestResults)
+        const filteredIndices = [];
+        visibleResults.forEach((test, idx) => {
+            const originalIndex = window.allTestResults.findIndex(t => t === test);
+            filteredIndices.push(originalIndex >= 0 ? originalIndex : idx);
+        });
+
+        // Render table rows
+        visibleResults.forEach((test, index) => {
+            const status = (test.status || 'pending').toLowerCase();
+            const statusBadge = getStatusBadge(status);
+            const responseCode = test.response_status_code || '-';
+
+            // Calculate duration from start_time and end_time
+            let duration = '-';
+            if (test.start_time && test.end_time) {
+                try {
+                    const start = new Date(test.start_time);
+                    const end = new Date(test.end_time);
+                    const durationMs = end - start;
+                    duration = formatDuration(durationMs);
+                } catch (e) {
+                    console.error('Error calculating duration:', e);
+                }
+            }
+
+            // Get test case info from nested test_case object
+            const testCaseObj = test.test_case || {};
+            const testCaseName = testCaseObj.test_case || test.test_case_name || `Test Case ${index + 1}`;
+            const testCaseId = testCaseObj.test_case_id || testCaseObj.id || test.test_case_id || test.id || '-';
+
+            // Get endpoint from test_case.api_info.url
+            const endpoint = testCaseObj.api_info?.url || test.endpoint || test.url || 'N/A';
+
+            const row = document.createElement('tr');
+            const originalIndex = filteredIndices[index];
+            row.innerHTML = `
+                <td><code class="small">${testCaseId}</code></td>
+                <td>${testCaseName}</td>
+                <td>${statusBadge}</td>
+                <td><span class="badge ${getStatusCodeBadgeClass(responseCode)}">${responseCode}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewTestResultDetail(${originalIndex})" title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
     function refreshReport() {
         if (!window.currentTestSuiteReportId || !window.currentProjectUuid) {
             showNotification('warning', 'Cảnh báo', 'Không có report để refresh.');
@@ -2831,7 +3596,7 @@
 
         // Don't show loading page, just show notification
         // showReportLoading is removed - we don't need loading page for refresh
-        
+
         fetch(`/project/${window.currentProjectUuid}/test-report/${window.currentTestSuiteReportId}/`, {
             method: 'GET',
             headers: {
@@ -2841,27 +3606,27 @@
             _timeoutMs: 10000,
             _retries: 1
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayTestReport(data, window.currentTestSuiteReportId);
-                showNotification('success', 'Thành công', 'Đã làm mới report.');
-            } else {
-                showNotification('error', 'Lỗi!', data.message || 'Không thể làm mới report.');
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayTestReport(data, window.currentTestSuiteReportId);
+                    showNotification('success', 'Thành công', 'Đã làm mới report.');
+                } else {
+                    showNotification('error', 'Lỗi!', data.message || 'Không thể làm mới report.');
+                    hideReportLoading();
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing report:', error);
+                showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi làm mới report.');
                 hideReportLoading();
-            }
-        })
-        .catch(error => {
-            console.error('Error refreshing report:', error);
-            showNotification('error', 'Lỗi!', 'Đã xảy ra lỗi khi làm mới report.');
-            hideReportLoading();
-        })
-        .finally(() => {
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
-            }
-        });
+            })
+            .finally(() => {
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+                }
+            });
     }
 
     function exportReport() {
@@ -2880,12 +3645,27 @@
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
+
         showNotification('success', 'Thành công', 'Đã export report.');
     }
 
-    function viewTestCaseDetails(index) {
-        const testCase = allTestCases[index];
+    function viewTestCaseDetails(index, testCaseId) {
+        // Try to find test case from filtered list first, then from all test cases
+        let testCase = null;
+        
+        if (filteredTestCases.length > 0 && index < filteredTestCases.length) {
+            testCase = filteredTestCases[index];
+        } else if (testCaseId) {
+            // Find by ID from all test cases
+            testCase = allTestCases.find(tc => {
+                const id = getTestCaseId(tc);
+                return id === testCaseId;
+            });
+        } else if (index < allTestCases.length) {
+            // Fallback to allTestCases by index
+            testCase = allTestCases[index];
+        }
+        
         if (!testCase) {
             showNotification('error', 'Lỗi', 'Không tìm thấy test case');
             return;
@@ -2897,12 +3677,12 @@
         document.getElementById('testCaseDetailEndpoint').textContent = testCase.endpoint || 'N/A';
         document.getElementById('testCaseDetailCategory').textContent = testCase.test_category || 'N/A';
         document.getElementById('testCaseDetailStatus').textContent = testCase.expected_statuscode || 'N/A';
-        
+
         // Get method from api_info.method or http_method
         const method = testCase.api_info?.method || testCase.http_method || 'N/A';
         const methodElement = document.getElementById('testCaseDetailMethod');
         methodElement.textContent = method;
-        
+
         // Set badge color based on HTTP method
         const methodUpper = method.toUpperCase();
         methodElement.classList.remove('bg-info', 'bg-primary', 'bg-success', 'bg-warning', 'bg-danger', 'bg-secondary');
@@ -2981,9 +3761,11 @@
 
         // Hide cURL section initially
         document.getElementById('curlCommandSection').style.display = 'none';
-        
-        // Store current test case index for cURL conversion
+
+        // Store current test case ID and object for cURL conversion
         window.currentTestCaseIndex = index;
+        window.currentTestCaseId = testCaseId || getTestCaseId(testCase);
+        window.currentTestCaseObject = testCase;
 
         // Show modal
         const modal = new bootstrap.Modal(document.getElementById('testCaseDetailModal'));
@@ -2994,25 +3776,44 @@
     let currentTestCaseForCurl = null;
 
     function convertToCurl() {
-        // Get current test case from modal or stored index
-        const index = window.currentTestCaseIndex;
-        if (index === undefined || !allTestCases[index]) {
+        // Get current test case from stored object, or find by ID/index
+        let testCase = window.currentTestCaseObject;
+        
+        if (!testCase) {
+            // Try to find by ID first
+            const testCaseId = window.currentTestCaseId;
+            if (testCaseId) {
+                testCase = allTestCases.find(tc => {
+                    const id = getTestCaseId(tc);
+                    return id === testCaseId;
+                });
+            }
+            
+            // Fallback to index
+            if (!testCase) {
+                const index = window.currentTestCaseIndex;
+                if (index !== undefined && index < allTestCases.length) {
+                    testCase = allTestCases[index];
+                }
+            }
+        }
+        
+        if (!testCase) {
             showNotification('error', 'Lỗi', 'Không tìm thấy test case để convert');
             return;
         }
-        
-        const testCase = allTestCases[index];
+
         currentTestCaseForCurl = testCase;
-        
+
         // Get data from test case
         let endpoint = testCase.endpoint || '';
         let method = testCase.http_method || 'GET'; // Default to GET if not specified
-        
+
         // If method is not provided, try to infer from endpoint or API name
         if (!method || method === 'N/A') {
             const apiName = (testCase.api_name || '').toLowerCase();
             const endpointLower = endpoint.toLowerCase();
-            
+
             if (apiName.includes('create') || apiName.includes('add') || endpointLower.includes('create') || endpointLower.includes('add')) {
                 method = 'POST';
             } else if (apiName.includes('update') || apiName.includes('edit') || endpointLower.includes('update') || endpointLower.includes('edit')) {
@@ -3023,16 +3824,16 @@
                 method = 'GET';
             }
         }
-        
+
         const headers = testCase.header || {};
         let requestBody = testCase.request_body || null;
-        
+
         // Get request_mapping from full_test_case_data if available (for URL placeholder replacement)
         let requestMapping = {};
         if (testCase.full_test_case_data && testCase.full_test_case_data.request_mapping) {
             requestMapping = testCase.full_test_case_data.request_mapping;
         }
-        
+
         // Replace URL placeholders (e.g., {project_id}) with values from request_mapping
         if (endpoint && endpoint !== 'N/A') {
             // Find all placeholders in URL (format: {placeholder_name})
@@ -3042,16 +3843,16 @@
             while ((match = placeholderRegex.exec(endpoint)) !== null) {
                 placeholders.push(match[1]);
             }
-            
+
             // Replace each placeholder
             placeholders.forEach(placeholderName => {
                 const placeholderValue = requestMapping[placeholderName];
-                
+
                 if (placeholderValue !== undefined && placeholderValue !== null) {
                     // Replace placeholder with actual value
                     // Handle special test values
                     let replacementValue = placeholderValue;
-                    
+
                     if (typeof replacementValue === 'string') {
                         // For special test values, use a descriptive placeholder
                         if (replacementValue === 'ABSENT' || replacementValue === 'NULL' || replacementValue === 'N/A') {
@@ -3072,27 +3873,27 @@
                         // Convert non-string to string
                         replacementValue = String(replacementValue);
                     }
-                    
+
                     // Replace all occurrences of this placeholder
                     endpoint = endpoint.replace(new RegExp(`\\{${placeholderName}\\}`, 'g'), replacementValue);
                 }
             })
         }
-        
+
         // Validate endpoint
         if (!endpoint || endpoint === 'N/A') {
             showNotification('error', 'Lỗi', 'Endpoint không hợp lệ, không thể tạo cURL command');
             return;
         }
-        
+
         // Build cURL command
         let curlCommand = 'curl';
-        
+
         // Add method
         if (method.toUpperCase() !== 'GET') {
             curlCommand += ` -X ${method.toUpperCase()}`;
         }
-        
+
         // Add headers
         let hasContentType = false;
         if (headers && typeof headers === 'object' && Object.keys(headers).length > 0) {
@@ -3118,12 +3919,12 @@
                 // If parsing fails, skip headers
             }
         }
-        
+
         // Add Content-Type header if not present and we have a body
         if (!hasContentType && requestBody && requestBody !== 'N/A' && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
             curlCommand += ` \\\n  -H "Content-Type: application/json"`;
         }
-        
+
         // Add request body for POST, PUT, PATCH methods
         if (requestBody && requestBody !== 'N/A' && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
             try {
@@ -3141,14 +3942,14 @@
                 } else {
                     bodyStr = JSON.stringify(requestBody);
                 }
-                
+
                 // Escape for shell: escape single quotes and backslashes
                 const escapedBody = bodyStr
                     .replace(/\\/g, '\\\\')  // Escape backslashes first
                     .replace(/'/g, "'\\''")  // Escape single quotes
                     .replace(/\n/g, '\\n')    // Escape newlines
                     .replace(/\r/g, '\\r');    // Escape carriage returns
-                
+
                 curlCommand += ` \\\n  -d '${escapedBody}'`;
             } catch (e) {
                 // If not JSON, treat as plain text
@@ -3160,39 +3961,39 @@
                 curlCommand += ` \\\n  -d '${escapedBody}'`;
             }
         }
-        
+
         // Add URL (must be last or properly quoted)
         // Escape special characters in URL
         const escapedUrl = endpoint.replace(/"/g, '\\"');
         curlCommand += ` \\\n  "${escapedUrl}"`;
-        
+
         // Display cURL command
         const curlElement = document.getElementById('testCaseDetailCurl');
         curlElement.textContent = curlCommand;
-        
+
         // Show cURL section
         document.getElementById('curlCommandSection').style.display = 'block';
-        
+
         // Scroll to cURL section
         setTimeout(() => {
-            document.getElementById('curlCommandSection').scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'nearest' 
+            document.getElementById('curlCommandSection').scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
             });
         }, 100);
-        
+
         showNotification('success', 'Thành công!', 'Đã convert test case sang cURL command');
     }
 
     function copyCurlCommand() {
         const curlElement = document.getElementById('testCaseDetailCurl');
         const curlCommand = curlElement.textContent;
-        
+
         if (!curlCommand || curlCommand === '-') {
             showNotification('error', 'Lỗi', 'Không có cURL command để copy');
             return;
         }
-        
+
         // Copy to clipboard
         navigator.clipboard.writeText(curlCommand).then(() => {
             // Update button to show success
@@ -3201,9 +4002,9 @@
             copyBtn.innerHTML = '<i class="bi bi-check"></i> Copied!';
             copyBtn.classList.remove('btn-outline-primary');
             copyBtn.classList.add('btn-success');
-            
+
             showNotification('success', 'Đã copy!', 'cURL command đã được copy vào clipboard');
-            
+
             // Reset button after 2 seconds
             setTimeout(() => {
                 copyBtn.innerHTML = originalHtml;
@@ -3251,6 +4052,9 @@
                     <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
                     <h5 class="mt-3 text-muted">No sections found</h5>
                     <p class="text-muted">AI processing may not have extracted any sections from the uploaded documents.</p>
+                    <button class="btn btn-sm btn-outline-secondary mt-3" onclick="loadSections()">
+                        <i class="bi bi-arrow-clockwise"></i> Thử lại
+                    </button>
                 </div>
             `;
                 }
@@ -3261,7 +4065,10 @@
             <div class="text-center py-5">
                 <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: #dc3545;"></i>
                 <h5 class="mt-3 text-muted">Error loading sections</h5>
-                <p class="text-muted">An error occurred while loading sections.</p>
+                <p class="text-muted">An error occurred while loading sections: ${error.message}</p>
+                <button class="btn btn-primary mt-3" onclick="loadSections()">
+                    <i class="bi bi-arrow-clockwise"></i> Thử lại
+                </button>
             </div>
         `;
             });
@@ -3441,7 +4248,7 @@
                             const frId = this.value;
                             const isSelected = this.checked;
                             const badge = this.closest('.card-body').querySelector('.badge');
-                            
+
                             // Update badge immediately for better UX
                             if (badge) {
                                 if (isSelected) {
@@ -3452,7 +4259,7 @@
                                     badge.textContent = 'Not Selected';
                                 }
                             }
-                            
+
                             // Save selection immediately
                             saveSingleFRSelection(frId, isSelected);
                         });
@@ -3460,14 +4267,14 @@
 
                     // Check if any FRs are already selected
                     const hasSelectedFRs = frArray.some(fr => fr.is_selected === true);
-                    
+
                     // Set flag if FRs are already selected
                     if (hasSelectedFRs) {
                         window.frSelectionsSaved = true;
                         // Cập nhật lock status cho các step
                         updateStepLocks();
                     }
-                    
+
                     // Hide the Save button since selections are saved automatically
                     document.getElementById('saveFRSelectionContainer').style.display = 'none';
                 } else {
@@ -3500,7 +4307,7 @@
             label.textContent = toggle.checked ? 'Fresh' : 'Cached';
             // Save preference to localStorage
             localStorage.setItem('fr_analyze_preference', toggle.checked);
-            
+
             // Show/hide refresh button based on toggle state
             if (refreshBtn) {
                 refreshBtn.style.display = toggle.checked ? 'inline-block' : 'none';
@@ -3537,12 +4344,10 @@
     }
 
 
-
-
     // Function to save a single FR selection immediately
     function saveSingleFRSelection(frId, isSelected) {
         console.log(`Saving FR selection: ${frId}, isSelected: ${isSelected}`);
-        
+
         fetch(`/project/{{ project.uuid }}/select-fr/`, {
             method: 'POST',
             headers: {
@@ -3569,7 +4374,7 @@
                     window.frSelectionsSaved = true;
                     // Cập nhật lock status cho các step
                     updateStepLocks();
-                    
+
                     // Ensure cached data is marked as fresh after saving selections
                     localStorage.setItem('fr_cache_fresh', Date.now().toString());
                 } else {

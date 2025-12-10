@@ -2860,13 +2860,14 @@ def generate_test_cases(request, project_uuid):
         # Prepare payload according to API specification
         payload = {
             'lang': lang,
-            'project_id': str(project.uuid)
+            'project_id': str(project.uuid),
         }
 
         headers = {
             'Content-Type': 'application/json',
             'accept': 'application/json',
-            'X-Service-Name': 'agent-service'
+            'X-Service-Name': 'agent-service',
+            'Authorization': 'Basic YWRtaW46YWRtaW4='
         }
 
         if DEBUG:
@@ -2874,7 +2875,6 @@ def generate_test_cases(request, project_uuid):
             print(f"Endpoint: {GENERATE_TEST_ENTITIES_ENDPOINT}")
             print(f"Project UUID: {project_uuid}")
             print(f"Payload: {payload}")
-            print(f"Selected FRs count: {selected_frs.count()}")
             print(f"===========================")
 
         # Call async API endpoint - it will return immediately with "Work in progress!"
@@ -2978,11 +2978,43 @@ def fetch_and_save_test_cases_from_api(project):
         
         # Get test suites
         data = response_data.get('data', {})
-        test_suites = data.get('test_suites', [])
+        all_test_suites = data.get('test_suites', [])
         
-        if not test_suites:
+        if not all_test_suites:
             # No test suites yet
             return False, None
+        
+        # Deduplicate test suites: keep only the latest one for each fr_info_id
+        # This handles cases where backend creates duplicate test suites for the same FR
+        test_suites_dict = {}  # key: fr_info_id, value: test_suite dict
+        for test_suite in all_test_suites:
+            fr_info_id = test_suite.get('fr_info_id')
+            if not fr_info_id:
+                # If no fr_info_id, use test_suite_name as key
+                fr_info_id = test_suite.get('test_suite_name', '')
+            
+            created_at = test_suite.get('created_at', '')
+            
+            # If this fr_info_id not seen before, or this one is newer, keep it
+            if fr_info_id not in test_suites_dict:
+                test_suites_dict[fr_info_id] = test_suite
+            else:
+                # Compare created_at to keep the latest one
+                existing_created_at = test_suites_dict[fr_info_id].get('created_at', '')
+                if created_at > existing_created_at:
+                    if DEBUG:
+                        print(f"Deduplicating: Keeping newer test suite for fr_info_id {fr_info_id}")
+                        print(f"  Old: {test_suites_dict[fr_info_id].get('test_suite_id')} (created: {existing_created_at})")
+                        print(f"  New: {test_suite.get('test_suite_id')} (created: {created_at})")
+                    test_suites_dict[fr_info_id] = test_suite
+        
+        test_suites = list(test_suites_dict.values())
+        
+        if DEBUG:
+            print(f"=== DEDUPLICATED TEST SUITES ===")
+            print(f"Original count: {len(all_test_suites)}")
+            print(f"After deduplication: {len(test_suites)}")
+            print(f"================================")
         
         # Delete existing test cases for this project (if regenerating)
         GeneratedTestCase.objects.filter(project=project).delete()
@@ -2996,20 +3028,98 @@ def fetch_and_save_test_cases_from_api(project):
                 continue
             
             # Get or create ProjectTestSuite and save test_suite_id from API
-            test_suite_name = test_suite.get('test_suite_name', f'Test Suite {test_suite_id}')
-            test_suite_obj, created = ProjectTestSuite.objects.get_or_create(
-                project=project,
-                api_test_suite_id=test_suite_id,
-                defaults={
-                    'test_suite_name': test_suite_name,
-                    'description': test_suite.get('description', '')
-                }
-            )
+            # Handle duplicate test suite names by using api_test_suite_id as primary identifier
+            original_test_suite_name = test_suite.get('test_suite_name', f'Test Suite {test_suite_id}')
+            test_suite_name = original_test_suite_name
             
-            # Update api_test_suite_id if it wasn't set
-            if not test_suite_obj.api_test_suite_id:
-                test_suite_obj.api_test_suite_id = test_suite_id
+            # First, try to get by api_test_suite_id (preferred method - this is the real unique identifier)
+            test_suite_obj = None
+            created = False
+            try:
+                test_suite_obj = ProjectTestSuite.objects.get(
+                    project=project,
+                    api_test_suite_id=test_suite_id
+                )
+                # Update name and description if they changed
+                if test_suite_obj.test_suite_name != test_suite_name:
+                    test_suite_obj.test_suite_name = test_suite_name
+                if test_suite_obj.description != test_suite.get('description', ''):
+                    test_suite_obj.description = test_suite.get('description', '')
                 test_suite_obj.save()
+                if DEBUG:
+                    print(f"Found existing test suite by api_test_suite_id: {test_suite_id}")
+            except ProjectTestSuite.DoesNotExist:
+                # Test suite doesn't exist with this api_test_suite_id, try to create
+                # But check if name already exists (due to unique constraint on project + test_suite_name)
+                base_name = test_suite_name
+                counter = 1
+                max_attempts = 10
+                
+                while counter <= max_attempts:
+                    try:
+                        # Check if a test suite with same name exists
+                        existing_suite = ProjectTestSuite.objects.get(
+                            project=project,
+                            test_suite_name=test_suite_name
+                        )
+                        # If exists but different api_test_suite_id, add suffix to name
+                        if existing_suite.api_test_suite_id != test_suite_id:
+                            # Add suffix with counter and first 8 chars of test_suite_id to make it unique
+                            suffix = test_suite_id[:8] if len(test_suite_id) >= 8 else test_suite_id
+                            test_suite_name = f"{base_name} [{suffix}]"
+                            if counter > 1:
+                                test_suite_name = f"{base_name} [{suffix}] ({counter})"
+                            if DEBUG:
+                                print(f"Test suite name '{base_name}' already exists with different api_test_suite_id, trying '{test_suite_name}'")
+                            counter += 1
+                        else:
+                            # Same api_test_suite_id but different name - update the existing one
+                            test_suite_obj = existing_suite
+                            test_suite_obj.test_suite_name = base_name
+                            test_suite_obj.description = test_suite.get('description', '')
+                            test_suite_obj.save()
+                            if DEBUG:
+                                print(f"Found existing test suite by name with same api_test_suite_id, updated name")
+                            break
+                    except ProjectTestSuite.DoesNotExist:
+                        # Name doesn't exist, can use this name
+                        break
+                    except ProjectTestSuite.MultipleObjectsReturned:
+                        # Multiple objects with same name (shouldn't happen but handle it)
+                        if DEBUG:
+                            print(f"Multiple test suites with name '{test_suite_name}' found, adding suffix")
+                        suffix = test_suite_id[:8] if len(test_suite_id) >= 8 else test_suite_id
+                        test_suite_name = f"{base_name} [{suffix}]"
+                        counter += 1
+                
+                # Now create with potentially modified name
+                if test_suite_obj is None:
+                    try:
+                        test_suite_obj = ProjectTestSuite.objects.create(
+                            project=project,
+                            api_test_suite_id=test_suite_id,
+                            test_suite_name=test_suite_name,
+                            description=test_suite.get('description', '')
+                        )
+                        created = True
+                        if DEBUG:
+                            print(f"Created new test suite: {test_suite_name} (api_test_suite_id: {test_suite_id})")
+                    except Exception as e:
+                        # If still fails (race condition or other error), try to get by api_test_suite_id again
+                        if DEBUG:
+                            print(f"Error creating test suite '{test_suite_name}': {e}, trying to get by api_test_suite_id")
+                        try:
+                            test_suite_obj = ProjectTestSuite.objects.get(
+                                project=project,
+                                api_test_suite_id=test_suite_id
+                            )
+                            if DEBUG:
+                                print(f"Retrieved test suite by api_test_suite_id after creation error")
+                        except ProjectTestSuite.DoesNotExist:
+                            # Last resort: skip this test suite
+                            if DEBUG:
+                                print(f"Could not create or retrieve test suite with api_test_suite_id: {test_suite_id}, skipping...")
+                            continue
             
             if DEBUG:
                 print(f"=== TEST SUITE OBJECT ===")
@@ -3254,128 +3364,159 @@ def get_test_cases(request, project_uuid):
     project = get_object_or_404(UserProject, uuid=project_uuid, user=request.user)
     
     try:
-        # Get the latest test suite for this project
-        latest_test_suite = ProjectTestSuite.objects.filter(project=project).order_by('-created_at').first()
-        
-        if not latest_test_suite or not latest_test_suite.api_test_suite_id:
-            return JsonResponse({
-                'success': False,
-                'message': 'Không tìm thấy test suite cho project này.'
-            }, status=404)
-        
-        test_suite_id = latest_test_suite.api_test_suite_id
-        
-        if DEBUG:
-            print(f"\n=== GET TEST CASES FROM API ===")
-            print(f"Project UUID: {project_uuid}")
-            print(f"Test Suite ID: {test_suite_id}")
-        
-        # Prepare headers according to API specification
+        # Always fetch all test suites from API so we can merge multiple suites
         headers = {
             'accept': 'application/json',
             'X-Service-Name': 'agent-service',
             'Authorization': 'Basic YWRtaW46YWRtaW4='
         }
-        
-        # Build API URL
-        test_cases_url = f"{GET_TEST_CASES_ENDPOINT}/{test_suite_id}"
-        
+
+        suites_url = f"{GET_TEST_SUITES_ENDPOINT}/{str(project.uuid)}"
+
         if DEBUG:
-            print(f"API URL: {test_cases_url}")
+            print(f"\n=== GET TEST CASES FROM API (MULTI-SUITE) ===")
+            print(f"Project UUID: {project_uuid}")
+            print(f"Test suites URL: {suites_url}")
             print(f"Headers: {headers}")
-        
-        # Call API
-        response = requests.get(test_cases_url, headers=headers, timeout=30, verify=False)
-        
-        if DEBUG:
-            print(f"Response Status: {response.status_code}")
-        
-        if response.status_code != 200:
+
+        suites_resp = requests.get(suites_url, headers=headers, timeout=30, verify=False)
+
+        if suites_resp.status_code != 200:
             return JsonResponse({
                 'success': False,
-                'message': f'Lỗi khi gọi API: HTTP {response.status_code}'
-            }, status=response.status_code)
-        
-        # Parse response
-        response_data = response.json()
-        
-        if DEBUG:
-            print(f"Response Data: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
-        
-        # Check result code
-        result = response_data.get('result', {})
-        code = result.get('code', [])
-        
-        if code != ['0000']:
-            description = result.get('description', 'Unknown error')
+                'message': f'Lỗi khi gọi API test suites: HTTP {suites_resp.status_code}'
+            }, status=suites_resp.status_code)
+
+        suites_data = suites_resp.json()
+        suites_result = suites_data.get('result', {})
+        suites_code = suites_result.get('code', [])
+        suites_list = suites_data.get('data', {}).get('test_suites', [])
+
+        if suites_code and suites_code != ['0000']:
             return JsonResponse({
                 'success': False,
-                'message': f'API trả về lỗi: {description}'
+                'message': f"API test suites trả về lỗi: {suites_result.get('description', 'Unknown error')}"
             }, status=400)
+
+        if DEBUG:
+            print(f"Found {len(suites_list)} test suite(s) from API")
+
+        # Deduplicate test suites: keep only the latest one for each fr_info_id
+        # This handles cases where backend creates duplicate test suites for the same FR
+        suites_dict = {}  # key: fr_info_id, value: suite dict
+        for suite in suites_list:
+            fr_info_id = suite.get('fr_info_id')
+            if not fr_info_id:
+                # If no fr_info_id, use test_suite_name as key
+                fr_info_id = suite.get('test_suite_name', '')
+            
+            created_at = suite.get('created_at', '')
+            
+            # If this fr_info_id not seen before, or this one is newer, keep it
+            if fr_info_id not in suites_dict:
+                suites_dict[fr_info_id] = suite
+            else:
+                # Compare created_at to keep the latest one
+                existing_created_at = suites_dict[fr_info_id].get('created_at', '')
+                if created_at > existing_created_at:
+                    if DEBUG:
+                        print(f"Deduplicating: Keeping newer test suite for fr_info_id {fr_info_id}")
+                        print(f"  Old: {suites_dict[fr_info_id].get('test_suite_id')} (created: {existing_created_at})")
+                        print(f"  New: {suite.get('test_suite_id')} (created: {created_at})")
+                    suites_dict[fr_info_id] = suite
         
-        # Extract test cases from response
-        data = response_data.get('data', {})
-        test_cases = data.get('test_cases', [])
+        suites_list = list(suites_dict.values())
         
         if DEBUG:
-            print(f"Found {len(test_cases)} test cases in API response")
-        
-        # Format test cases for frontend
+            print(f"After deduplication: {len(suites_list)} test suite(s)")
+
         formatted_test_cases = []
-        
-        for tc in test_cases:
-            # Extract data from API response
-            test_case_id = tc.get('test_case_id', 'N/A')
-            test_case_name = tc.get('test_case', 'N/A')
-            test_case_type = tc.get('test_case_type', 'basic_validation')
-            request_body = tc.get('request_body', {})
-            execute = tc.get('execute', False)
-            tc_id = tc.get('id', '')
-            api_info = tc.get('api_info', {})
-            expected_output = tc.get('expected_output', {})
-            
-            # Extract API info
-            api_url = api_info.get('url', 'N/A')
-            api_method = api_info.get('method', 'N/A')
-            api_headers = api_info.get('headers', {})
-            
-            # Extract expected output
-            expected_statuscode = expected_output.get('statuscode', 'N/A')
-            expected_response = expected_output.get('response_mapping', {})
-            
-            # Format category name
-            category_display = 'Basic Validation' if test_case_type == 'basic_validation' else 'Business Logic'
-            
-            # Format test case ID
-            formatted_test_case_id = f"TC-{test_case_id}" if test_case_id != 'N/A' else 'N/A'
-            
-            formatted_test_cases.append({
-                'test_case_id': formatted_test_case_id,
-                'endpoint': api_url,
-                'header': api_headers,
-                'test_case_name': test_case_name,
-                'test_category': category_display,
-                'request_body': json.dumps(request_body, indent=2, ensure_ascii=False),
-                'expected_statuscode': expected_statuscode,
-                'expected_response': json.dumps(expected_response, indent=2, ensure_ascii=False) if expected_response else 'N/A',
-                'api_name': api_url.split('/')[-1] if api_url != 'N/A' else 'N/A',  # Extract API name from URL
-                'http_method': api_method,
-                'uuid': tc_id,
-                'full_test_case_data': tc,  # Include full test case data from API
-                'is_selected': execute,  # Use execute field as selection state
-                'execute': execute
-            })
-        
+
+        # Iterate through each test suite and merge test cases
+        for suite in suites_list:
+            test_suite_id = suite.get('test_suite_id')
+            test_suite_name = suite.get('test_suite_name', '')
+
+            if not test_suite_id:
+                continue
+
+            test_cases_url = f"{GET_TEST_CASES_ENDPOINT}/{test_suite_id}"
+
+            if DEBUG:
+                print(f"\n--- Fetching test cases for suite ---")
+                print(f"Suite Name: {test_suite_name}")
+                print(f"Suite ID: {test_suite_id}")
+                print(f"URL: {test_cases_url}")
+
+            tc_resp = requests.get(test_cases_url, headers=headers, timeout=30, verify=False)
+
+            if tc_resp.status_code != 200:
+                if DEBUG:
+                    print(f"Failed to fetch test cases for suite {test_suite_id}: HTTP {tc_resp.status_code}")
+                continue
+
+            tc_data = tc_resp.json()
+            tc_result = tc_data.get('result', {})
+            tc_code = tc_result.get('code', [])
+
+            if tc_code and tc_code != ['0000']:
+                if DEBUG:
+                    print(f"API returned error for suite {test_suite_id}: {tc_result.get('description')}")
+                continue
+
+            test_cases = tc_data.get('data', {}).get('test_cases', [])
+
+            if DEBUG:
+                print(f"Suite {test_suite_name} has {len(test_cases)} test cases")
+
+            for tc in test_cases:
+                test_case_id = tc.get('test_case_id', 'N/A')
+                test_case_name = tc.get('test_case', 'N/A')
+                test_case_type = tc.get('test_case_type', 'basic_validation')
+                request_body = tc.get('request_body', {})
+                execute = tc.get('execute', False)
+                tc_id = tc.get('id', '')
+                api_info = tc.get('api_info', {})
+                expected_output = tc.get('expected_output', {})
+
+                api_url = api_info.get('url', 'N/A')
+                api_method = api_info.get('method', 'N/A')
+                api_headers = api_info.get('headers', {})
+
+                expected_statuscode = expected_output.get('statuscode', 'N/A')
+                expected_response = expected_output.get('response_mapping', {})
+
+                category_display = 'Basic Validation' if test_case_type == 'basic_validation' else 'Business Logic'
+                formatted_test_case_id = f"TC-{test_case_id}" if test_case_id != 'N/A' else 'N/A'
+
+                formatted_test_cases.append({
+                    'test_suite_id': test_suite_id,
+                    'test_suite_name': test_suite_name,
+                    'test_case_id': formatted_test_case_id,
+                    'endpoint': api_url,
+                    'header': api_headers,
+                    'test_case_name': test_case_name,
+                    'test_category': category_display,
+                    'request_body': json.dumps(request_body, indent=2, ensure_ascii=False),
+                    'expected_statuscode': expected_statuscode,
+                    'expected_response': json.dumps(expected_response, indent=2, ensure_ascii=False) if expected_response else 'N/A',
+                    'api_name': api_url.split('/')[-1] if api_url != 'N/A' else 'N/A',
+                    'http_method': api_method,
+                    'uuid': tc_id,
+                    'full_test_case_data': tc,
+                    'is_selected': execute,
+                    'execute': execute
+                })
+
         if DEBUG:
-            print(f"Formatted {len(formatted_test_cases)} test cases")
+            print(f"\nFormatted total {len(formatted_test_cases)} test cases from {len(suites_list)} suite(s)")
             print(f"===========================================\n")
-        
-        # Return as dataframe-like structure
+
         return JsonResponse({
             'success': True,
             'data': {
                 'columns': ['test_case_id', 'endpoint', 'header', 'test_case_name', 'test_category', 
-                           'request_body', 'expected_statuscode', 'expected_response'],
+                           'request_body', 'expected_statuscode', 'expected_response', 'test_suite_name'],
                 'rows': formatted_test_cases,
                 'count': len(formatted_test_cases)
             }
@@ -3557,116 +3698,102 @@ def select_test_cases(request, project_uuid):
             print(f"Selected Test Cases: {selected_test_cases}")
             print(f"Selected Count: {len(selected_test_cases)}")
         
-        # Verify: Call get_test_cases API to check if execute was actually set
-        if DEBUG:
-            print(f"\n--- Verifying Execute Status ---")
-        
+        # Verify across ALL test suites: ensure execute=True for every selected test case ID
+        verification_info = {'verified': False, 'execute_status': {}, 'all_execute_true': False}
         try:
-            # Get test suite ID for verification
-            latest_test_suite = ProjectTestSuite.objects.filter(project=project).order_by('-created_at').first()
-            if latest_test_suite and latest_test_suite.api_test_suite_id:
-                verify_headers = {
-                    'accept': 'application/json',
-                    'X-Service-Name': 'agent-service',
-                    'Authorization': 'Basic YWRtaW46YWRtaW4='
-                }
-                verify_url = f"{GET_TEST_CASES_ENDPOINT}/{latest_test_suite.api_test_suite_id}"
+            verify_headers = {
+                'accept': 'application/json',
+                'X-Service-Name': 'agent-service',
+                'Authorization': 'Basic YWRtaW46YWRtaW4='
+            }
+
+            # Get all suites for this project
+            suites_url = f"{GET_TEST_SUITES_ENDPOINT}/{str(project.uuid)}"
+            suites_resp = requests.get(suites_url, headers=verify_headers, timeout=30, verify=False)
+            all_suites = []
+            if suites_resp.status_code == 200:
+                suites_data = suites_resp.json()
+                if suites_data.get('result', {}).get('code', []) == ['0000']:
+                    all_suites = suites_data.get('data', {}).get('test_suites', [])
+            
+            # Deduplicate test suites: keep only the latest one for each fr_info_id
+            suites_dict = {}  # key: fr_info_id, value: suite dict
+            for suite in all_suites:
+                fr_info_id = suite.get('fr_info_id')
+                if not fr_info_id:
+                    # If no fr_info_id, use test_suite_name as key
+                    fr_info_id = suite.get('test_suite_name', '')
                 
-                if DEBUG:
-                    print(f"Verification URL: {verify_url}")
+                created_at = suite.get('created_at', '')
                 
-                # Wait and retry verification (backend might need time to process async update)
-                import time
-                execute_status_map = {}
-                max_retries = 5  # Try up to 5 times
-                initial_delay = 1.0  # Start with 1 second
-                max_delay = 3.0  # Max 3 seconds between retries
-                
-                for retry in range(max_retries):
-                    if retry > 0:
-                        # Exponential backoff: 1s, 2s, 3s, 3s, 3s
-                        delay = min(initial_delay * retry, max_delay)
-                        if DEBUG:
-                            print(f"  Retry {retry}/{max_retries-1}: Waiting {delay}s before checking...")
-                        time.sleep(delay)
-                    
-                    verify_response = requests.get(verify_url, headers=verify_headers, timeout=30, verify=False)
-                    
-                    if verify_response.status_code == 200:
-                        verify_data = verify_response.json()
-                        verify_result = verify_data.get('result', {})
-                        if verify_result.get('code', []) == ['0000']:
-                            verify_test_cases = verify_data.get('data', {}).get('test_cases', [])
-                            
-                            # Check execute status for selected test cases
-                            execute_status_map = {}
-                            for tc in verify_test_cases:
-                                tc_id = tc.get('id')
-                                tc_execute = tc.get('execute', False)
-                                if tc_id in selected_test_cases:
-                                    execute_status_map[tc_id] = tc_execute
-                            
-                            # Check if all selected test cases have execute=True
-                            all_execute_true = all(execute_status_map.values()) if execute_status_map else False
-                            
-                            if DEBUG:
-                                true_count = sum(1 for v in execute_status_map.values() if v is True)
-                                false_count = sum(1 for v in execute_status_map.values() if v is False)
-                                print(f"  Attempt {retry + 1}: Execute=True: {true_count}, Execute=False: {false_count}")
-                            
-                            # If all are True, we're done
-                            if all_execute_true:
-                                if DEBUG:
-                                    print(f"  ✓ All test cases have execute=True!")
-                                break
-                        else:
-                            if DEBUG:
-                                print(f"  Attempt {retry + 1}: API returned error code")
-                    else:
-                        if DEBUG:
-                            print(f"  Attempt {retry + 1}: HTTP {verify_response.status_code}")
-                
-                if DEBUG:
-                    print(f"\nVerification Results (after {max_retries} attempts):")
-                    print(f"  Total test cases checked: {len(execute_status_map)}")
-                    true_count = sum(1 for v in execute_status_map.values() if v is True)
-                    false_count = sum(1 for v in execute_status_map.values() if v is False)
-                    print(f"  Execute=True: {true_count}")
-                    print(f"  Execute=False: {false_count}")
-                    
-                    if false_count > 0:
-                        print(f"  ⚠ WARNING: {false_count} test case(s) still have execute=False!")
-                        print(f"  This might indicate:")
-                        print(f"    1. Backend API needs more time to process (async)")
-                        print(f"    2. Backend API has a bug")
-                        print(f"    3. Payload format might be incorrect")
-                        for tc_id, exec_status in execute_status_map.items():
-                            if not exec_status:
-                                print(f"    - {tc_id}: execute={exec_status}")
-                
-                # Prepare verification info for response
-                if execute_status_map:
-                    verification_info = {
-                        'verified': True,
-                        'execute_true_count': sum(1 for v in execute_status_map.values() if v is True),
-                        'execute_false_count': sum(1 for v in execute_status_map.values() if v is False),
-                        'execute_status': execute_status_map,
-                        'all_execute_true': all(execute_status_map.values())
-                    }
+                # If this fr_info_id not seen before, or this one is newer, keep it
+                if fr_info_id not in suites_dict:
+                    suites_dict[fr_info_id] = suite
                 else:
-                    verification_info = {
-                        'verified': False,
-                        'error': 'Failed to verify: Could not retrieve test cases'
-                    }
-                    if DEBUG:
-                        print(f"Verification failed: Could not retrieve test cases")
+                    # Compare created_at to keep the latest one
+                    existing_created_at = suites_dict[fr_info_id].get('created_at', '')
+                    if created_at > existing_created_at:
+                        if DEBUG:
+                            print(f"Deduplicating in select_test_cases: Keeping newer test suite for fr_info_id {fr_info_id}")
+                        suites_dict[fr_info_id] = suite
+            
+            suites = list(suites_dict.values())
+            
+            if DEBUG:
+                print(f"After deduplication in select_test_cases: {len(suites)} test suite(s) (from {len(all_suites)} original)")
+
+            # Map of test_case_id -> execute status aggregated
+            execute_status_map = {}
+
+            # Collect selected IDs set for quick lookup
+            selected_ids_set = set(selected_test_cases)
+
+            # Iterate all suites and fetch cases
+            for suite in suites:
+                suite_id = suite.get('test_suite_id')
+                if not suite_id:
+                    continue
+                verify_url = f"{GET_TEST_CASES_ENDPOINT}/{suite_id}"
+                if DEBUG:
+                    print(f"Verifying suite {suite_id} ({suite.get('test_suite_name','')}) with URL: {verify_url}")
+
+                # Retry a few times for each suite
+                import time
+                max_retries = 3
+                delay = 1.0
+                for attempt in range(max_retries):
+                    resp = requests.get(verify_url, headers=verify_headers, timeout=30, verify=False)
+                    if resp.status_code == 200:
+                        resp_data = resp.json()
+                        if resp_data.get('result', {}).get('code', []) == ['0000']:
+                            cases = resp_data.get('data', {}).get('test_cases', [])
+                            for tc in cases:
+                                tc_id = tc.get('id')
+                                if tc_id in selected_ids_set:
+                                    execute_status_map[tc_id] = tc.get('execute', False)
+                            break
+                    time.sleep(delay)
+                    delay = min(delay + 1.0, 3.0)
+
+            # Build verification summary
+            if execute_status_map:
+                true_count = sum(1 for v in execute_status_map.values() if v is True)
+                false_count = sum(1 for v in execute_status_map.values() if v is False)
+                verification_info = {
+                    'verified': True,
+                    'execute_true_count': true_count,
+                    'execute_false_count': false_count,
+                    'execute_status': execute_status_map,
+                    'all_execute_true': false_count == 0 and len(execute_status_map) == len(selected_ids_set)
+                }
+                if DEBUG:
+                    print(f"Verification summary: true={true_count}, false={false_count}, total_selected={len(selected_ids_set)}")
             else:
                 verification_info = {
                     'verified': False,
-                    'error': 'No test suite found for verification'
+                    'error': 'Could not verify execute status from API',
+                    'execute_status': {}
                 }
-                if DEBUG:
-                    print(f"Verification skipped: No test suite found")
         except Exception as verify_error:
             verification_info = {
                 'verified': False,
@@ -3688,7 +3815,7 @@ def select_test_cases(request, project_uuid):
             'message': f'Đã chọn {len(selected_test_cases)} test case(s) thành công.',
             'selected_count': len(selected_test_cases),
             'selected_test_cases': selected_test_cases,
-            'verification': verification_info if 'verification_info' in locals() else {'verified': False, 'error': 'Verification not performed'},
+            'verification': verification_info,
             'response': response_data
         })
         
@@ -4131,6 +4258,3 @@ def get_test_report(request, project_uuid, test_suite_report_id):
             'success': False,
             'message': f'Unexpected error: {str(e)}'
         }, status=500)
-
-
-

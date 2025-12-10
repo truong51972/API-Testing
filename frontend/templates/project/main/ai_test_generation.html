@@ -57,6 +57,34 @@
                 </button> -->
             </div>
         </div>
+        <!-- Filter by Test Suite and Endpoint -->
+        <div class="mb-3">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="testSuiteFilter" class="form-label mb-0" style="font-weight: 500;">
+                        <i class="bi bi-folder"></i> Lọc theo Test Suite:
+                    </label>
+                    <select class="form-select form-select-sm" id="testSuiteFilter" onchange="filterTestCasesBySuite(this.value)" style="max-width: 100%;">
+                        <option value="">Tất cả Test Suites</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="endpointFilter" class="form-label mb-0" style="font-weight: 500;">
+                        <i class="bi bi-funnel"></i> Lọc theo Endpoint:
+                    </label>
+                    <select class="form-select form-select-sm" id="endpointFilter" onchange="filterTestCasesByEndpoint(this.value)" style="max-width: 100%;">
+                        <option value="">Tất cả Endpoints</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+            </div>
+            <div class="mt-2">
+                <span class="badge bg-secondary" id="filteredTestCasesCount" style="display: none;">
+                    <i class="bi bi-info-circle"></i> Đang hiển thị: <span id="filteredCount">0</span> / <span id="totalCount">0</span> test cases
+                </span>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table table-hover table-striped table-bordered" id="testCasesTable">
                 <thead class="table-info">
