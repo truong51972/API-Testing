@@ -39,10 +39,12 @@ class DocumentCollector(BaseAgentService):
         all_docs_toc = state.extra_parameters["all_docs_toc"]
         self.set_system_lang(lang)
 
-        input_data = f"* **Function Name**: '{current_fr}'\n{all_docs_toc}"
-
+        input_data = (
+            f"<Target Function>'{current_fr}'</Target Function>\n{all_docs_toc}"
+        )
+        logging.debug(f"Document Collector Input Data: \n{input_data}")
         response = self.run(human=input_data).content
-
+        logging.debug(f"Document Collector Raw Response: \n{response}")
         json_parser = JsonOutputParser()
         response = json_parser.parse(response)
 
@@ -92,6 +94,7 @@ class DocumentCollector(BaseAgentService):
             current_fr_id
         ] = collected_documents
         logging.info("Document collection completed!")
+        logging.debug(f"Collected Documents: \n{collected_documents}")
         return state
 
 
