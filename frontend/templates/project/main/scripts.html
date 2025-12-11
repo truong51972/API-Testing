@@ -353,12 +353,20 @@
         const params = new URLSearchParams(window.location.search);
         const stepParam = params.get('step');
         const reportId = params.get('report_id');
+        const reportIds = params.get('report_ids');
 
-        // Nếu có step param trong URL, sử dụng nó (cho deep linking)
-        // Nếu không, sử dụng currentStep từ localStorage (đã được restore ở trên)
+        // Nếu có report_id trong URL, tự động set step về 5 (Report step)
         let stepToSet = currentStep; // currentStep đã được restore từ localStorage ở IIFE
 
-        if (stepParam) {
+        if (reportId || reportIds) {
+            // Khi có report_id, luôn chuyển về step 5 (Report)
+            stepToSet = 5;
+            // Lưu vào localStorage để lần sau reload sẽ dùng step này
+            localStorage.setItem(`project_step_${projectUuid}`, '5');
+            // Cập nhật currentStep để đồng bộ
+            currentStep = 5;
+        } else if (stepParam) {
+            // Nếu có step param trong URL, sử dụng nó (cho deep linking)
             const stepNum = parseInt(stepParam, 10);
             if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= totalSteps) {
                 stepToSet = stepNum;
@@ -389,11 +397,20 @@
             });
         });
 
-        // Cập nhật lock status ban đầu
+        // Check if report_id(s) is in URL query params and auto-load report(s)
+        // Nếu có report_id, đảm bảo step được set về 5 trước khi load report
+        if (reportId || reportIds) {
+            // Đảm bảo step được set về 5 ngay lập tức (không chờ delay)
+            if (stepToSet !== 5) {
+                setStep(5);
+            }
+            // Set testReportReady flag để unlock step 5
+            window.testReportReady = true;
+        }
+
+        // Cập nhật lock status ban đầu (sau khi đã set testReportReady nếu có report_id)
         updateStepLocks();
 
-        // Check if report_id(s) is in URL query params and auto-load report(s)
-        const reportIds = params.get('report_ids');
         if (reportId) {
             // Single report ID (legacy support)
             setTimeout(() => {
@@ -414,6 +431,8 @@
                 try {
                     const reportIdArray = JSON.parse(savedReports);
                     if (Array.isArray(reportIdArray) && reportIdArray.length > 0) {
+                        // Nếu load từ localStorage, cũng set step về 5
+                        setStep(5);
                         setTimeout(() => {
                             loadMultipleReports(projectUuid, reportIdArray);
                         }, 500);
@@ -424,24 +443,27 @@
             }
         }
 
-        // Auto-load data for specific steps
-        if (stepToSet === 2) {
-            // If on step 2, check if we need to start AI processing or FR extraction
-            // This will be handled by startAIProcessing or checkAIStatusLoop
-        } else if (stepToSet === 3) {
-            // Load sections for step 3
-            setTimeout(() => {
-                if (typeof loadSections === 'function') {
-                    loadSections();
-                }
-            }, 300);
-        } else if (stepToSet === 4 && !reportId) {
-            // If restoring to step 4, automatically load test cases if they exist
-            setTimeout(() => {
-                if (typeof startTestCaseGeneration === 'function') {
-                    startTestCaseGeneration(projectUuid);
-                }
-            }, 500);
+        // Auto-load data for specific steps (chỉ khi không có report_id)
+        // Nếu có report_id, đã set step về 5 và sẽ load report, không cần load data cho các step khác
+        if (!reportId && !reportIds) {
+            if (stepToSet === 2) {
+                // If on step 2, check if we need to start AI processing or FR extraction
+                // This will be handled by startAIProcessing or checkAIStatusLoop
+            } else if (stepToSet === 3) {
+                // Load sections for step 3
+                setTimeout(() => {
+                    if (typeof loadSections === 'function') {
+                        loadSections();
+                    }
+                }, 300);
+            } else if (stepToSet === 4) {
+                // If restoring to step 4, automatically load test cases if they exist
+                setTimeout(() => {
+                    if (typeof startTestCaseGeneration === 'function') {
+                        startTestCaseGeneration(projectUuid);
+                    }
+                }, 500);
+            }
         }
     });
 
@@ -710,9 +732,16 @@
             return window.frSelectionsSaved || false;
         }
 
-        // Step 5: unlock nếu đã hoàn thành step 4 (đã chọn test cases)
+        // Step 5: unlock nếu:
+        // - Đã hoàn thành step 4 (đã chọn test cases) HOẶC
+        // - Có report_id trong URL (đang xem report) HOẶC
+        // - Report đã sẵn sàng (testReportReady)
         if (stepNumber === 5) {
-            return window.testCasesSelected || false;
+            // Check if there's a report_id in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasReportId = urlParams.has('report_id') || urlParams.has('report_ids');
+            
+            return window.testCasesSelected || hasReportId || window.testReportReady || false;
         }
 
         return false;
@@ -2981,6 +3010,10 @@
         // Extract report data - format: {success: true, message: "...", data: [...]}
         const reportDataArray = reportData.data || reportData.response?.data || [];
         const result = reportData.result || reportData.response?.result || {};
+        
+        // Get test suite name and ID from response (from Django database)
+        const reportTestSuiteName = reportData.test_suite_name || reportData.response?.test_suite_name;
+        const reportTestSuiteId = reportData.test_suite_id || reportData.response?.test_suite_id;
 
         // Store report data globally for refresh/aggregate
         window.currentReportData = reportData;
@@ -2988,7 +3021,9 @@
         window.allReportsMeta.push({
             report_id: testSuiteReportId,
             result: result,
-            raw: reportData
+            raw: reportData,
+            test_suite_name: reportTestSuiteName,
+            test_suite_id: reportTestSuiteId
         });
 
         // Parse test results - data is an array directly
@@ -3021,6 +3056,34 @@
         // Build test suite name to ID mapping from allTestCases
         const suiteNameToIdMap = {}; // {suite_name: [suite_ids]}
         const suiteIdToNameMap = {}; // {suite_id: suite_name}
+        
+        // Priority 1: Add test suite names from ALL reports in allReportsMeta (not just current report)
+        // This ensures we capture all test suites from multiple reports
+        if (window.allReportsMeta && Array.isArray(window.allReportsMeta)) {
+            window.allReportsMeta.forEach(meta => {
+                if (meta.test_suite_name && meta.test_suite_id) {
+                    suiteIdToNameMap[meta.test_suite_id] = meta.test_suite_name;
+                    if (!suiteNameToIdMap[meta.test_suite_name]) {
+                        suiteNameToIdMap[meta.test_suite_name] = new Set();
+                    }
+                    suiteNameToIdMap[meta.test_suite_name].add(meta.test_suite_id);
+                    console.log(`Added test suite from report meta: ${meta.test_suite_name} (${meta.test_suite_id})`);
+                }
+            });
+        }
+        
+        // Priority 1.5: Add test suite name from current report response (from Django database)
+        // This handles the case where report is just being loaded
+        if (reportTestSuiteName && reportTestSuiteId) {
+            suiteIdToNameMap[reportTestSuiteId] = reportTestSuiteName;
+            if (!suiteNameToIdMap[reportTestSuiteName]) {
+                suiteNameToIdMap[reportTestSuiteName] = new Set();
+            }
+            suiteNameToIdMap[reportTestSuiteName].add(reportTestSuiteId);
+            console.log(`Added test suite from current report response: ${reportTestSuiteName} (${reportTestSuiteId})`);
+        }
+        
+        // Priority 2: Add from allTestCases (this should have all test suites in the project)
         if (window.allTestCases && Array.isArray(window.allTestCases)) {
             window.allTestCases.forEach(tc => {
                 if (tc.test_suite_id && tc.test_suite_name) {
@@ -3031,38 +3094,163 @@
                     suiteNameToIdMap[tc.test_suite_name].add(tc.test_suite_id);
                 }
             });
+            console.log(`Added ${Object.keys(suiteIdToNameMap).length} test suites from allTestCases`);
         }
 
         // Extract test suite names from test results and build mapping
         aggregatedResults.forEach(test => {
             const testCaseObj = test.test_case || {};
-            const suiteId = testCaseObj.test_suite_id || test.test_suite_id;
-            if (suiteId) {
-                // Try to get suite name from test case object or map
-                let suiteName = testCaseObj.test_suite_name || suiteIdToNameMap[suiteId];
-                if (suiteName) {
-                    suiteIdToNameMap[suiteId] = suiteName;
-                    if (!suiteNameToIdMap[suiteName]) {
-                        suiteNameToIdMap[suiteName] = new Set();
+            // Try multiple ways to get suite ID
+            let suiteId = testCaseObj.test_suite_id || test.test_suite_id || test.test_suite?.id;
+            
+            // Try multiple ways to get suite name
+            let suiteName = testCaseObj.test_suite_name 
+                || test.test_suite_name 
+                || test.test_suite?.name 
+                || test.test_suite?.test_suite_name;
+            
+            // Priority 1: If we have suite ID, try to get name from the pre-built map
+            // (from report response or allTestCases)
+            if (suiteId && !suiteName && suiteIdToNameMap[suiteId]) {
+                suiteName = suiteIdToNameMap[suiteId];
+            }
+            
+            // Priority 1.5: If we still don't have suiteName but have reportTestSuiteId matching, use report name
+            // ONLY if the suiteId matches or if we have no suiteId at all (fallback)
+            // This ensures we don't force all test results to use the same test suite name
+            if (!suiteName && reportTestSuiteId && reportTestSuiteName) {
+                // Only use report name if suiteId matches OR if we have no suiteId (true fallback)
+                if (suiteId === reportTestSuiteId) {
+                    suiteName = reportTestSuiteName;
+                } else if (!suiteId) {
+                    // Only use as fallback if we truly have no suiteId
+                    // But first check if we can find suiteId from test result structure
+                    suiteName = reportTestSuiteName;
+                    suiteId = reportTestSuiteId;
+                }
+            }
+            
+            // Priority 2: If we have suite ID but no name, try to get from test_suite object
+            if (suiteId && !suiteName && test.test_suite) {
+                suiteName = test.test_suite.name || test.test_suite.test_suite_name || test.test_suite.title;
+            }
+            
+            // Priority 3: Try to find test case in window.allTestCases by test_case_id
+            if ((!suiteId || !suiteName) && window.allTestCases && Array.isArray(window.allTestCases)) {
+                const testCaseId = test.test_case_id || testCaseObj.id || testCaseObj.test_case_id;
+                if (testCaseId) {
+                    // Try multiple matching strategies
+                    const matchingTestCase = window.allTestCases.find(tc => {
+                        // Match by UUID (most common)
+                        if (tc.uuid === testCaseId) return true;
+                        // Match by id
+                        if (tc.id === testCaseId) return true;
+                        // Match by test_case_id (formatted)
+                        if (tc.test_case_id === testCaseId) return true;
+                        // Match by full_test_case_data.id
+                        if (tc.full_test_case_data && tc.full_test_case_data.id === testCaseId) return true;
+                        // Match by removing "TC-" prefix if present
+                        const cleanId = testCaseId.replace(/^TC-/, '');
+                        if (tc.uuid === cleanId || tc.id === cleanId) return true;
+                        return false;
+                    });
+                    if (matchingTestCase) {
+                        if (!suiteId && matchingTestCase.test_suite_id) {
+                            suiteId = matchingTestCase.test_suite_id;
+                        }
+                        if (!suiteName && matchingTestCase.test_suite_name) {
+                            suiteName = matchingTestCase.test_suite_name;
+                        }
+                        // Also check if we now have suiteId and can get name from map
+                        if (suiteId && !suiteName && suiteIdToNameMap[suiteId]) {
+                            suiteName = suiteIdToNameMap[suiteId];
+                        }
                     }
+                }
+            }
+            
+            // Priority 4: If we have suiteId but still no name, try one more time from map
+            // (in case allTestCases was updated after initial mapping)
+            if (suiteId && !suiteName && suiteIdToNameMap[suiteId]) {
+                suiteName = suiteIdToNameMap[suiteId];
+            }
+            
+            // Priority 5: If we still don't have a name but have suiteId, 
+            // try to find any test case with this suiteId in allTestCases
+            if (suiteId && !suiteName && window.allTestCases && Array.isArray(window.allTestCases)) {
+                const anyTestCaseWithSuite = window.allTestCases.find(tc => tc.test_suite_id === suiteId);
+                if (anyTestCaseWithSuite && anyTestCaseWithSuite.test_suite_name) {
+                    suiteName = anyTestCaseWithSuite.test_suite_name;
+                }
+            }
+            
+            // Priority 6: If we still don't have suiteName but have reportTestSuiteName,
+            // use it as fallback ONLY if we have no suiteId at all
+            // This prevents forcing all test results to use the same test suite name
+            // when they might belong to different test suites
+            if (!suiteName && !suiteId && reportTestSuiteName) {
+                // Only use as absolute last resort when we have no suite info at all
+                suiteName = reportTestSuiteName;
+                if (reportTestSuiteId) {
+                    suiteId = reportTestSuiteId;
+                }
+            }
+            
+            // Only skip if we absolutely cannot find a name
+            // This ensures we only show meaningful names to users
+            if (!suiteName) {
+                // Skip this entry - we need a real name, not just an ID
+                return;
+            }
+            
+            // Add to map if we have a valid suite name
+            if (suiteName) {
+                if (suiteId) {
+                    suiteIdToNameMap[suiteId] = suiteName;
+                }
+                if (!suiteNameToIdMap[suiteName]) {
+                    suiteNameToIdMap[suiteName] = new Set();
+                }
+                if (suiteId) {
                     suiteNameToIdMap[suiteName].add(suiteId);
                 }
             }
         });
+        
+        // Debug logging
+        console.log('=== Test Suite Mapping Debug ===');
+        console.log('Suite name to ID map:', suiteNameToIdMap);
+        console.log('Suite ID to name map:', suiteIdToNameMap);
+        console.log('Number of unique test suites found:', Object.keys(suiteNameToIdMap).length);
+        console.log('Test suites found:', Object.keys(suiteNameToIdMap));
+        console.log('Total aggregated test results:', aggregatedResults.length);
+        if (Object.keys(suiteNameToIdMap).length === 0 && aggregatedResults.length > 0) {
+            console.warn('No test suite names found in results. Sample result structure:', aggregatedResults[0]);
+        }
+        console.log('=== End Test Suite Mapping Debug ===');
 
         // Build test suite name filter dropdown
         const suiteFilterSelect = document.getElementById('reportSuiteFilterSelect');
         if (suiteFilterSelect) {
             const seen = new Set();
             suiteFilterSelect.innerHTML = '<option value="">All Test Suites</option>';
-            Object.keys(suiteNameToIdMap).sort().forEach(suiteName => {
-                if (seen.has(suiteName)) return;
-                seen.add(suiteName);
-                const opt = document.createElement('option');
-                opt.value = suiteName;
-                opt.textContent = suiteName;
-                suiteFilterSelect.appendChild(opt);
-            });
+            
+            const suiteNames = Object.keys(suiteNameToIdMap).filter(name => name && name.trim() !== '');
+            if (suiteNames.length > 0) {
+                suiteNames.sort().forEach(suiteName => {
+                    if (seen.has(suiteName)) return;
+                    seen.add(suiteName);
+                    const opt = document.createElement('option');
+                    opt.value = suiteName;
+                    opt.textContent = suiteName;
+                    suiteFilterSelect.appendChild(opt);
+                });
+                console.log(`Populated dropdown with ${suiteNames.length} test suite(s)`);
+            } else {
+                console.warn('No test suite names found to populate dropdown');
+            }
+        } else {
+            console.error('reportSuiteFilterSelect element not found');
         }
 
         // Build filter dropdown options (Report ID)
@@ -3425,7 +3613,11 @@
     }
 
     function filterReportBySuiteName(suiteName) {
-        if (!window.allTestResults || window.allTestResults.length === 0) {
+        // Use window.testResults if available, otherwise use window.allTestResults
+        const allResults = window.testResults || window.allTestResults || [];
+        
+        if (!allResults || allResults.length === 0) {
+            console.warn('No test results available for filtering');
             return;
         }
 
@@ -3434,14 +3626,14 @@
             ? Array.from(window.suiteNameToIdMap[suiteName])
             : null;
 
-        // Apply filters
-        let visibleResults = window.allTestResults;
+        // Apply filters - start with all results
+        let visibleResults = allResults;
         
-        // Filter by test suite name
-        if (suiteName && suiteIds) {
+        // Filter by test suite name (only if suiteName is provided and not empty)
+        if (suiteName && suiteIds && suiteIds.length > 0) {
             visibleResults = visibleResults.filter(r => {
                 const testCaseObj = r.test_case || {};
-                const suiteId = testCaseObj.test_suite_id || r.test_suite_id;
+                const suiteId = testCaseObj.test_suite_id || r.test_suite_id || r.test_suite?.id;
                 return suiteIds.includes(suiteId);
             });
         }

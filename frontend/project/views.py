@@ -60,12 +60,12 @@ def debug_print(message):
         logger.debug(message)
         print(message, flush=True)
         sys.stdout.flush()
+
 MINIO_ENDPOINT = "minio-api.truong51972.id.vn"
 MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
 MINIO_BUCKET_NAME = "apit-project"
 MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
-# MINIO_BASE_URL = "https://minio-api.truong51972.id.vn"
 
 AGENT_API_BASE_URL = "https://api-t.truong51972.id.vn/"
 DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/docs-preprocessing"
@@ -4234,13 +4234,45 @@ def get_test_report(request, project_uuid, test_suite_report_id):
             print(f"================================")
         
         if success:
-            return JsonResponse({
+            # Try to get test suite name from Django database
+            test_suite_name = None
+            test_suite_id = None
+            try:
+                report_obj = TestSuiteReport.objects.filter(
+                    test_suite_report_id=test_suite_report_id,
+                    project=project
+                ).first()
+                if report_obj and report_obj.test_suite:
+                    test_suite_name = report_obj.test_suite.test_suite_name
+                    test_suite_id = report_obj.test_suite.api_test_suite_id or str(report_obj.test_suite.uuid)
+                elif report_obj and report_obj.api_test_suite_id:
+                    # If test_suite FK is null but we have api_test_suite_id, try to find it
+                    test_suite_obj = ProjectTestSuite.objects.filter(
+                        project=project,
+                        api_test_suite_id=report_obj.api_test_suite_id
+                    ).first()
+                    if test_suite_obj:
+                        test_suite_name = test_suite_obj.test_suite_name
+                        test_suite_id = report_obj.api_test_suite_id
+            except Exception as e:
+                if DEBUG:
+                    print(f"Error getting test suite name from DB: {e}")
+            
+            response_data_to_return = {
                 'success': True,
                 'message': 'Đã lấy report thành công.',
                 'data': response_data.get('data', {}),
                 'result': response_data.get('result', {}),
                 'response': response_data
-            })
+            }
+            
+            # Add test suite info if available
+            if test_suite_name:
+                response_data_to_return['test_suite_name'] = test_suite_name
+            if test_suite_id:
+                response_data_to_return['test_suite_id'] = test_suite_id
+            
+            return JsonResponse(response_data_to_return)
         else:
             return JsonResponse({
                 'success': False,
