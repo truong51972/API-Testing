@@ -414,8 +414,7 @@
                   <div>
                     <h6 class="mb-0 text-truncate">
                       <a href="{% url 'project_detail_by_uuid' project_uuid=document.project.uuid %}" class="text-body">
-                        {{ document.original_filename|default:document.file.name|default:document.link|truncatechars:25
-                        }}
+                        {{ document.display_name|truncatechars:25 }}
                       </a>
                     </h6>
                     <small class="text-truncate text-body">

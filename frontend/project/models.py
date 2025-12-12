@@ -54,6 +54,38 @@ class ProjectDocument(models.Model):
 
     def __str__(self):
         return self.file.name if self.file else self.link
+    
+    @property
+    def display_name(self):
+        """Trả về tên hiển thị của document"""
+        import os
+        from urllib.parse import urlparse
+        
+        # Ưu tiên original_filename
+        if self.original_filename:
+            return self.original_filename
+        
+        # Nếu có file, lấy tên file từ đường dẫn
+        if self.file and self.file.name:
+            return os.path.basename(self.file.name)
+        
+        # Nếu có link, lấy tên từ URL
+        if self.link:
+            parsed_url = urlparse(self.link)
+            path = parsed_url.path
+            if path:
+                filename = os.path.basename(path)
+                if filename:
+                    return filename
+            # Nếu không có tên file trong path, trả về domain hoặc link ngắn
+            return parsed_url.netloc or self.link[:50]
+        
+        # Nếu có file_id, sử dụng nó
+        if self.file_id:
+            return self.file_id
+        
+        # Mặc định
+        return "Untitled Document"
 
 class DocumentSection(models.Model):
     """Model để lưu các sections được AI extract từ document"""
