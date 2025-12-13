@@ -72,9 +72,7 @@ MINIO_ACCESS_KEY = "minioadmin"
 MINIO_SECRET_KEY = "minioadmin"
 MINIO_BUCKET_NAME = "apit-project"
 
-AGENT_API_BASE_URL = os.getenv(
-    "AGENT_API_BASE_URL", "https://agent-api.truong51972.id.vn/"
-)
+AGENT_API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "https://api-t.truong51972.id.vn/")
 
 DOCS_PREPROCESSING_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/docs-preprocessing"
 SELECT_FR_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/select-fr-info"
