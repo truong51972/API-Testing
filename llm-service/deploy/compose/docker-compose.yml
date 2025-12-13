@@ -37,40 +37,13 @@ services:
       - "8001:8000"
     volumes:
       - ./models:/root/.cache/huggingface/hub/
-    # command: >
-    #   --model unsloth/Qwen2.5-3B-Instruct-bnb-4bit
-    #   --dtype bfloat16
-    #   --max-model-len 32768
-    #   --gpu-memory-utilization 0.6
-    #   --quantization bitsandbytes
-    #   --load-format bitsandbytes
-    #   --enable-lora
-    #   --max-lora-rank 64
-    #   --lora-modules vllm-QC-AI=Namtran0912/Qwen2.5-3B-Instruct-lora-adapter-v3
-    # command: >
-    #   --model unsloth/Llama-3.2-3B-Instruct
-    #   --dtype bfloat16
-    #   --max-model-len 32768
-    #   --gpu-memory-utilization 0.9
-    #   --quantization bitsandbytes
-    #   --load-format bitsandbytes
-    #   --enable-lora
-    #   --max-lora-rank 64
-    #   --lora-modules vllm-QC-AI=Namtran0912/Meta-Llama-3.2-3B-Instruct-lora-adapter-v4
-    # command: >
-    #   --model unsloth/Llama-3.2-3B-Instruct
-    #   --dtype bfloat16
-    #   --max-model-len 32768
-    #   --gpu-memory-utilization 0.9
-    #   --enable-lora
-    #   --max-lora-rank 64
-    #   --lora-modules vllm-QC-AI=Namtran0912/Meta-Llama-3.2-3B-Instruct-lora-adapter-v4
     command: >
-      --model Qwen/Qwen2.5-3B-Instruct-AWQ
-      --quantization awq_marlin
+      --model unsloth/Qwen2.5-3B-Instruct-bnb-4bit
       --dtype bfloat16
       --max-model-len 32768
       --gpu-memory-utilization 0.6
+      --quantization bitsandbytes
+      --load-format bitsandbytes
       --enable-lora
       --max-lora-rank 64
       --lora-modules vllm-QC-AI=Namtran0912/Qwen2.5-3B-Instruct-lora-adapter-v4

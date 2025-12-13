@@ -13,7 +13,7 @@ from .document.document_fr_to_content_repository import (
     DocumentFRToContentRepository,
 )
 
-from .test_entity.test_case_repository import TestCaseRepository, ApiInfoModel
+from .test_entity.test_case_repository import TestCaseRepository
 from .test_entity.test_suite_repository import TestSuiteRepository
 from .test_entity.test_case_report_repository import TestCaseReportRepository
 from .test_entity.test_suite_report_repository import TestSuiteReportRepository

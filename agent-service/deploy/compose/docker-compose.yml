@@ -5,6 +5,7 @@ services:
     volumes:
       - backend_data:/backend_data
       - ./env/:/backend_data/env/
+      - ./logs/:/backend_data/logs/
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-backend_database}
       - POSTGRES_USER=${POSTGRES_USER:-admin}

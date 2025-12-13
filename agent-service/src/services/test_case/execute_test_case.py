@@ -5,6 +5,7 @@ import string
 
 import requests
 from sqlmodel import Session
+
 from src import repositories
 from src.settings import get_db_engine, get_now_vn
 
@@ -80,12 +81,7 @@ def execute_test_case(
     test_case: repositories.TestCaseRepository,
     test_suite_id: str,
 ) -> repositories.TestCaseReportRepository:
-
-    print(test_case.model_dump())
-
     url = test_case.api_info.get("url")
-    if not url.endswith("/"):
-        url += "/"
 
     method = test_case.api_info.get("method", "GET").upper()
     headers = test_case.api_info.get("headers", {})
@@ -105,6 +101,8 @@ def execute_test_case(
             response = requests.put(url, headers=headers, json=request_body)
         elif method == "DELETE":
             response = requests.delete(url, headers=headers, json=request_body)
+        elif method == "PATCH":
+            response = requests.patch(url, headers=headers, json=request_body)
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
         ended_time = get_now_vn()
@@ -131,11 +129,18 @@ def execute_test_case(
         )
 
     except Exception as e:
-        execution_result = {
-            "status": "error",
-            "error_message": str(e),
-        }
-
+        execution_result = repositories.TestCaseReportRepository(
+            test_suite_report_id=test_suite_id,
+            test_case_id=test_case.id,
+            status=f"error: {str(e)}",
+            start_time=get_now_vn(),
+            end_time=get_now_vn(),
+            request_body=clean_request_body(test_case.request_body),
+            request_header=test_case.api_info.get("headers", {}),
+            response_body={},
+            response_header={},
+            response_status_code=0,
+        )
     return execution_result
 
 

@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional, Any
+from typing import Annotated, Any, List, Optional
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -52,8 +52,6 @@ class DocsPreProcessingStateModel(BaseModel):
                 "doc_url": "https://example.com/document.pdf",
                 "lang": "en",
                 "project_id": "00000000-0000-0000-0000-000000000000",
-                "doc_name": "Sample Document",
-                "lang": "en",
             }
         }
     )

@@ -1,36 +1,16 @@
-import uuid
-from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, Session, SQLModel, select
+from sqlmodel import Session, select
 
 from src import repositories
-from src.settings import get_db_engine, get_now_vn
+from src.models import TestSuiteReportModel
+from src.settings import get_db_engine
 
 
-class TestSuiteReportRepository(SQLModel, table=True):
+class TestSuiteReportRepository(TestSuiteReportModel, table=True):
     """Repository for Test Suite operations."""
 
     __tablename__ = "test_suite_report"
-
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Test Suite Report ID, must be unique.",
-        max_length=64,
-        primary_key=True,
-    )
-
-    test_suite_id: str = Field(
-        description="Test Suite ID, must be unique.",
-        max_length=64,
-        foreign_key="test_suite.test_suite_id",
-        # unique=True,
-    )
-
-    created_at: datetime = Field(
-        default_factory=get_now_vn,
-        description="Creation timestamp",
-    )
 
     @classmethod
     def get_all_by_project_id(

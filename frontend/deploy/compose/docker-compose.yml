@@ -3,6 +3,7 @@ services:
     image: postgres:17
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: on-failure:5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-frontend}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -20,6 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: django-dev-server
+    restart: on-failure:5
     depends_on:
       db:
         condition: service_healthy

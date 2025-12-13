@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src import repositories
-from src.models import StandardOutputModel
+from src.models import ProjectModel, StandardOutputModel
 
 router = APIRouter(prefix="/projects", tags=["Project"])
 
@@ -11,12 +11,9 @@ class CreateProjectResponseModel(BaseModel):
     project_id: str
 
 
-@router.put("/")
-def create_project(
-    project: repositories.ProjectRepository,
-) -> StandardOutputModel:
-
-    project = project.create()
+@router.put("/", response_model=StandardOutputModel)
+def create_project(project: ProjectModel):
+    project = repositories.ProjectRepository(**project.model_dump()).create()
 
     response = StandardOutputModel(
         result={

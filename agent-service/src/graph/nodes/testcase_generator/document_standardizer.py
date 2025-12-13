@@ -1,12 +1,50 @@
 # src.graph.nodes.testcase_generator.document_standardizer
+import json
 import logging
+import re
 from typing import Optional
 
 from pydantic import validate_call
 
+from src import models
 from src.base.service.base_agent_service import BaseAgentService
 from src.enums.enums import LanguageEnum
 from src.models import TestcasesGenStateModel
+
+
+def extract_api_info(text: str):
+    """
+    Extract HTTP Method, Endpoint, and Request Headers from standardized document text.
+    Returns: dict with keys "method", "endpoint", "headers"
+    """
+
+    # Patterns
+    method_pattern = r"\*\*HTTP Method:\*\*\s*`?([A-Z]+)`?"
+    endpoint_pattern = r"\*\*Endpoint:\*\*\s*`?([^\n`]+)`?"
+
+    # Cố gắng bắt cả endpoint dạng URL lẫn path
+    url_pattern = r"(https?://[^\s`]+|/[a-zA-Z0-9\-_/.]+)"
+    headers_pattern = r"\*\*Request Headers:\*\*\s*```json\s*(\{.*?\})\s*```"
+
+    method_match = re.search(method_pattern, text)
+    endpoint_match = re.search(endpoint_pattern, text)
+    if not endpoint_match:
+        endpoint_match = re.search(url_pattern, text)
+    headers_match = re.search(headers_pattern, text, re.DOTALL)
+
+    method = method_match.group(1) if method_match else None
+    endpoint = endpoint_match.group(1) if endpoint_match else None
+    headers = {}
+    if headers_match:
+        try:
+            headers = json.loads(headers_match.group(1))
+        except Exception as e:
+            logging.warning(f"Error parsing headers JSON: {e}")
+
+    logging.info(
+        f"Extracted API Info - Method: {method}, Endpoint: {endpoint}, Headers: {headers}"
+    )
+    return models.ApiInfoModel(method=method, url=endpoint, headers=headers)
 
 
 class DocumentStandardizer(BaseAgentService):
@@ -35,13 +73,31 @@ class DocumentStandardizer(BaseAgentService):
         lang = state.lang
         self.set_system_lang(lang)
 
-        standardized_documents = self.run(
-            human=collected_documents[current_fr_id]
-        ).content
+        no_cache = False
+        retry_count = 0
+        while True:
+            standardized_documents = self.run(
+                human=f"<Raw Data>{collected_documents[current_fr_id]}</Raw Data>",
+                no_cache=no_cache,
+            ).content
+
+            try:
+                api_info = extract_api_info(standardized_documents)
+                break
+            except Exception as e:
+                no_cache = True
+                retry_count += 1
+
+                if retry_count > 3:
+                    raise e
+
+                logging.warning(f"API info extraction error: {e}. Retrying...")
+                continue
 
         state.extra_parameters["standardized_documents"][
             current_fr_id
         ] = standardized_documents
+        state.test_case_infos.setdefault(current_fr_id, {})["api_info"] = api_info
         logging.info("Document standardization completed!")
         return state
 

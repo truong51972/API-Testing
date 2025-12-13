@@ -1,58 +1,13 @@
-import uuid
-from datetime import datetime
 from typing import Optional
 
-from pydantic import (
-    ConfigDict,
-)
-from sqlmodel import Field, Session, SQLModel, select
+from sqlmodel import Session, select
 
+from src.models.project.project_model import ProjectModel
 from src.settings import get_db_engine, get_now_vn
 
 
-class ProjectRepository(SQLModel, table=True):
+class ProjectRepository(ProjectModel, table=True):
     __tablename__ = "project"
-
-    project_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        primary_key=True,
-        description="Project ID, must be unique.",
-    )
-
-    user_id: str = Field(
-        description="User ID associated with the project.",
-    )
-
-    project_name: str = Field(
-        description="Name of the project",
-        max_length=256,
-    )
-
-    description: str = Field(
-        default_factory=str,
-        description="Description of the project",
-        max_length=512,
-    )
-
-    created_at: datetime = Field(
-        default_factory=get_now_vn,
-        description="Creation timestamp",
-    )
-
-    updated_at: datetime = Field(
-        default_factory=get_now_vn,
-        description="Last update timestamp",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "user_id": "0",
-                "project_name": "My Project",
-                "description": "This is a sample project description.",
-            }
-        }
-    )
 
     def create(self):
         """

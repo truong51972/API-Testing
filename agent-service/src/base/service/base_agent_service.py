@@ -156,9 +156,11 @@ class BaseAgentService(BaseModel):
         return response
 
     @validate_call
-    def run(self, human: str, chat_history: List[AnyMessage] = []) -> AIMessage:
+    def run(
+        self, human: str, chat_history: List[AnyMessage] = [], no_cache: bool = False
+    ) -> AIMessage:
         messages = self._get_messages(human, chat_history)
-        response = self._run(messages)
+        response = self._run(messages, no_cache=no_cache)
 
         return response
 

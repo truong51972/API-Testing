@@ -20,7 +20,8 @@ VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def get_now_vn():
-    return datetime.now(VN_TIMEZONE).isoformat(timespec="milliseconds")
+    now_vn = datetime.now(VN_TIMEZONE)
+    return now_vn.replace(tzinfo=None)
 
 
 # Custom formatter cho múi giờ Việt Nam

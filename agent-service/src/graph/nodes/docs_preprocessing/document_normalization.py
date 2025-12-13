@@ -17,9 +17,9 @@ class DocumentNormalizationNode:
         cleaned_data = text_preprocessing.remove_extra_whitespace(
             cleaned_data, ignore_code_blocks=True
         )
-        cleaned_data = text_preprocessing.remove_repeated_punctuation(
-            cleaned_data, ignore_code_blocks=True
-        )
+        # cleaned_data = text_preprocessing.remove_repeated_punctuation(
+        #     cleaned_data, ignore_code_blocks=True
+        # )
         cleaned_data = text_preprocessing.extract_link_text(cleaned_data)
         cleaned_data = text_preprocessing.remove_extra_newlines(
             cleaned_data, ignore_code_blocks=True

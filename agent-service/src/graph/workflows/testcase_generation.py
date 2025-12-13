@@ -54,10 +54,10 @@ class TestCaseGenerationWorkflow(BaseModel):
             "testcase_generator",
             nodes.TestCaseGenerator(),
         )
-        self.workflow.add_node(
-            "api_info_collector",
-            nodes.APIInfoCollector(),
-        )
+        # self.workflow.add_node(
+        #     "api_info_collector",
+        #     nodes.APIInfoCollector(),
+        # )
 
     def _setup_edges(self):
         """Configure all edges and entry point"""
@@ -69,8 +69,9 @@ class TestCaseGenerationWorkflow(BaseModel):
             {"completed": END, "in_progress": "document_collector"},
         )
         self.workflow.add_edge("document_collector", "document_standardizer")
-        self.workflow.add_edge("document_standardizer", "api_info_collector")
-        self.workflow.add_edge("api_info_collector", "testcase_generator")
+        # self.workflow.add_edge("document_standardizer", "api_info_collector")
+        # self.workflow.add_edge("api_info_collector", "testcase_generator")
+        self.workflow.add_edge("document_standardizer", "testcase_generator")
         self.workflow.add_edge("testcase_generator", "testcase_generator_job")
 
     def get_graph(self):
