@@ -80,7 +80,7 @@ class DocumentStandardizer(BaseAgentService):
                 human=f"<Raw Data>{collected_documents[current_fr_id]}</Raw Data>",
                 no_cache=no_cache,
             ).content
-
+            logging.debug(f"Standardized Documents: \n{standardized_documents}")
             try:
                 api_info = extract_api_info(standardized_documents)
                 break

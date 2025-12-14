@@ -51,6 +51,9 @@ MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1/")
+VLLM_API_KEY = os.getenv("VLLM_API_KEY", "NONE")
+
 EMBEDDING_DIM = 3072
 
 
