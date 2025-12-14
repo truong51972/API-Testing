@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 
 from src import models, repositories
@@ -9,11 +9,15 @@ router = APIRouter(prefix="/test-entities", tags=["Test Entities"])
 
 @router.post("/generate")
 def docs_preprocessing(
-    item: models.TestcasesGenStateModel,
+    item: models.TestcasesGenStateModel, background_tasks: BackgroundTasks
 ) -> models.StandardOutputModel:
     workflow = TestCaseGenerationWorkflow()
 
-    workflow.invoke(item)
+    background_tasks.add_task(
+        workflow.invoke,
+        input_data=item,
+    )
+
     return {
         "result": {"code": ["0000"], "description": "Work in progress!"},
         "data": {},
