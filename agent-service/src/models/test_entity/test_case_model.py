@@ -23,8 +23,6 @@ class ApiInfoModel(SQLModel):
         if not result:
             raise ValueError(f"Invalid URL format: {value}")
 
-        if not value.endswith("/"):
-            value += "/"
         return value
 
     @field_validator("method")
