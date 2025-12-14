@@ -1,5 +1,4 @@
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
@@ -95,6 +94,7 @@ class BaseAgentService(BaseModel):
             _model_params["openai_api_key"] = VLLM_API_KEY
 
             _model_params["timeout"] = 900
+            _model_params["streaming"] = True  # Enable streaming for VLLM
 
             # VLLM does not support top_k
             del _model_params["top_k"]
