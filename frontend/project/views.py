@@ -25,11 +25,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from minio import Minio
 
 # Local imports
 from main.decorators import set_test_suites_show
 from main.models import TestSuiteReport, UserActivity
-from minio import Minio
 from test_suite.models import ProjectTestSuite
 from testcase_history.models import TestCaseHistory
 
@@ -97,9 +97,9 @@ PREPROCESSED_DOCUMENTS_ALL_ENDPOINT = (
 PREPROCESSED_DOCUMENTS_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/document/delete/"
 
 # Project API endpoints
-PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/"
+PROJECT_CREATE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects"
 PROJECT_ALL_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/all"
-PROJECT_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects/"
+PROJECT_DELETE_ENDPOINT = f"{AGENT_API_BASE_URL}api/v1/projects"
 
 # API Status Configuration
 API_STATUS_CACHE_TIMEOUT = 60  # seconds - Cache for 30 seconds as requested

@@ -24,3 +24,25 @@ def check_length(value: str, max_length: int, field_name: str) -> None:
             code=["1001"],
             description=f"{field_name} must be at most {max_length} characters long.",
         )
+
+
+def check_str_num(
+    value: str, gt: int = None, lt: int = None, field_name: str = ""
+) -> None:
+    try:
+        num = int(value)
+    except ValueError:
+        raise ApiValidationException(
+            code=["1001"],
+            description=f"{field_name} must be a number.",
+        )
+    if gt is not None and num <= gt:
+        raise ApiValidationException(
+            code=["1001"],
+            description=f"{field_name} must be greater than {gt}.",
+        )
+    if lt is not None and num >= lt:
+        raise ApiValidationException(
+            code=["1001"],
+            description=f"{field_name} must be less than {lt}.",
+        )
