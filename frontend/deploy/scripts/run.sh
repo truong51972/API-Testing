@@ -28,6 +28,9 @@ if [ "$TAG" == "dev" ] && [ -f "$OVERRIDE_FILE" ]; then
 elif [ "$TAG" == "stop" ]; then
     echo "Stop server"
     docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_ROOT" down
+elif [ "$TAG" == "build" ]; then
+    echo "Build images"
+    docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_ROOT" build
 else
     echo "Run server"
     docker compose -f "$COMPOSE_FILE" --project-directory "$PROJECT_ROOT" up -d
