@@ -25,11 +25,11 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from minio import Minio
 
 # Local imports
 from main.decorators import set_test_suites_show
 from main.models import TestSuiteReport, UserActivity
+from minio import Minio
 from test_suite.models import ProjectTestSuite
 from testcase_history.models import TestCaseHistory
 
@@ -792,7 +792,11 @@ def project_list(request):
         user_projects_endpoint = f"{PROJECT_ALL_ENDPOINT}"
 
         # Prepare request body for POST request
-        request_body = {"user_id": str(request.user.id), "page_no": 0, "page_size": 0}
+        request_body = {
+            "user_id": str(request.user.id),
+            "page_no": "1",
+            "page_size": "20",
+        }
 
         # Use retry mechanism for API calls with POST method
         success, api_response, error_msg = call_api_with_retry(
