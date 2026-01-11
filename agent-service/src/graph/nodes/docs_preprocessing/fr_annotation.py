@@ -29,9 +29,8 @@ class FrAnnotationNode(BaseAgentService):
         LanguageEnum.EN: "src/graph/nodes/docs_preprocessing/prompts/fr_annotation_en.txt",
     }
 
-    @cache_func_wrapper
     def call_agent(self, human: str, messages: list[AIMessage] = []) -> AIMessage:
-        response = self.run(human, messages)
+        response = self.run(human, messages, no_cache=True)
         return response
 
     def analyze_tocs_documents(

@@ -1,6 +1,4 @@
 # src.graph.nodes.text_extractor.text_extractor
-import logging
-
 from docling.datamodel.accelerator_options import (
     AcceleratorDevice,
     AcceleratorOptions,
@@ -18,6 +16,7 @@ from src.base.service.base_agent_service import BaseAgentService
 from src.common.common import get_percent_space
 from src.enums.enums import LanguageEnum
 from src.models import DocsPreProcessingStateModel
+from src.settings import logger
 
 
 class TextExtractorNode(BaseAgentService):
@@ -94,7 +93,7 @@ class TextExtractorNode(BaseAgentService):
         text, doc_name = self.__extract(doc_url)
 
         if get_percent_space(text) >= 35:
-            logging.warning(
+            logger.warning(
                 "High whitespace percentage detected! Applying text correction."
             )
             text = self.__fix_orc_split_text(text, lang)
@@ -103,6 +102,8 @@ class TextExtractorNode(BaseAgentService):
         state.last_extra_parameter = "extracted_text"
         state.doc_name = doc_name if not state.doc_name else state.doc_name
 
+        logger.info(f"Text extraction completed for document '{state.doc_name}'")
+        logger.debug(f"Extracted Text: \n{text}")
         return state
 
 

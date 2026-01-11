@@ -5,6 +5,7 @@ from pydantic import validate_call
 
 from src.common.preprocessing import section_preprocessing, text_preprocessing
 from src.models import DocsPreProcessingStateModel
+from src.settings import logger
 
 
 class DocumentNormalizationNode:
@@ -17,9 +18,9 @@ class DocumentNormalizationNode:
         cleaned_data = text_preprocessing.remove_extra_whitespace(
             cleaned_data, ignore_code_blocks=True
         )
-        cleaned_data = text_preprocessing.remove_repeated_punctuation(
-            cleaned_data, ignore_code_blocks=True
-        )
+        # cleaned_data = text_preprocessing.remove_repeated_punctuation(
+        #     cleaned_data, ignore_code_blocks=True
+        # )
         cleaned_data = text_preprocessing.extract_link_text(cleaned_data)
         cleaned_data = text_preprocessing.remove_extra_newlines(
             cleaned_data, ignore_code_blocks=True
@@ -30,4 +31,6 @@ class DocumentNormalizationNode:
         state.extra_parameters["normalized_text"] = cleaned_data
         state.last_extra_parameter = "normalized_text"
 
+        logger.info("Document normalization completed!")
+        logger.debug(f"Normalized Text: \n{cleaned_data}")
         return state

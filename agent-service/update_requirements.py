@@ -36,7 +36,7 @@ def upgrade_packages_in_file(tag_old_version=False):
         lines = f.readlines()
 
         for i, line in enumerate(lines):
-            if not line.strip() or line.startswith("#"):
+            if not line.strip() or line.startswith("#") or line.endswith("NO-UPDATE"):
                 new_requirements += line
                 continue
 

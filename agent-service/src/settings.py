@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import langchain
 import nltk
 import redis
 from dotenv import load_dotenv
@@ -18,9 +19,12 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 # Múi giờ Việt Nam
 VN_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 
+langchain.debug = True
+
 
 def get_now_vn():
-    return datetime.now(VN_TIMEZONE).isoformat(timespec="milliseconds")
+    now_vn = datetime.now(VN_TIMEZONE)
+    return now_vn.replace(tzinfo=None)
 
 
 # Custom formatter cho múi giờ Việt Nam
@@ -49,6 +53,9 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1/")
+VLLM_API_KEY = os.getenv("VLLM_API_KEY", "NONE")
 
 EMBEDDING_DIM = 3072
 
@@ -113,6 +120,7 @@ RUNTIME_DATA_DIR.mkdir(exist_ok=True)
 # --- Logging ---
 LOG_DIR = Path(__file__).parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
+logger = logging.getLogger("app")
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -124,7 +132,7 @@ LOGGING_CONFIG = {
         },
         "detailed": {
             "()": VietnamTimeFormatter,
-            "format": "%(asctime)s | %(levelname)-8s | %(name)-5s | %(module)s.%(funcName)s:%(lineno)d | %(message)s",
+            "format": f"{'='*60}\nTime: %(asctime)s\nLevel: %(levelname)-8s\nLogger Name: %(name)-5s\nModule: %(module)s.%(funcName)s:%(lineno)d\n{'='*60}\n%(message)s\n\n",
         },
         "json": {
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
@@ -138,11 +146,29 @@ LOGGING_CONFIG = {
             "formatter": "standard",
             "stream": "ext://sys.stdout",
         },
-        "file": {
+        "info_file": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "INFO",
             "formatter": "detailed",
-            "filename": str(LOG_DIR / "app.log"),
+            "filename": str(LOG_DIR / "info.log"),
+            "maxBytes": 10485760,
+            "backupCount": 5,
+            "encoding": "utf8",
+        },
+        "access_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "INFO",
+            "formatter": "detailed",
+            "filename": str(LOG_DIR / "access.log"),
+            "maxBytes": 10485760,
+            "backupCount": 5,
+            "encoding": "utf8",
+        },
+        "debug_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "DEBUG",
+            "formatter": "detailed",
+            "filename": str(LOG_DIR / "debug.log"),
             "maxBytes": 10485760,
             "backupCount": 5,
             "encoding": "utf8",
@@ -158,28 +184,33 @@ LOGGING_CONFIG = {
         },
     },
     "root": {
-        "level": "DEBUG" if DEBUG else "INFO",
-        "handlers": ["console", "file"],
+        "level": "DEBUG",
+        "handlers": ["console"],
     },
     "loggers": {
+        "app": {
+            "level": "DEBUG",
+            "handlers": ["console", "info_file", "debug_file", "error_file"],
+            "propagate": False,
+        },
         "uvicorn": {
             "level": "INFO",
-            "handlers": ["console", "file"],
+            "handlers": ["console", "info_file"],
             "propagate": False,
         },
         "uvicorn.access": {
             "level": "INFO",
-            "handlers": ["console"],
+            "handlers": ["console", "access_file"],
+            "propagate": False,
+        },
+        "uvicorn.debug": {
+            "level": "DEBUG",
+            "handlers": ["console", "debug_file"],
             "propagate": False,
         },
         "uvicorn.error": {
             "level": "ERROR",
             "handlers": ["console", "error_file"],
-            "propagate": False,
-        },
-        "redis": {
-            "level": "WARNING",
-            "handlers": ["console", "file"],
             "propagate": False,
         },
     },

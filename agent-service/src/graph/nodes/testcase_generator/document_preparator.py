@@ -1,12 +1,10 @@
 # src.graph.nodes.testcase_generator.document_preparator
-import logging
-
 from pydantic import BaseModel, validate_call
 from sqlmodel import Session
 
 from src import repositories
 from src.models import TestcasesGenStateModel
-from src.settings import get_db_engine
+from src.settings import get_db_engine, logger
 
 
 class DocumentPreparator(BaseModel):
@@ -25,15 +23,19 @@ class DocumentPreparator(BaseModel):
             project_id=project_id,
             session=session,
         )
-        all_docs_toc = "* **Table of Contents (ToC):**\n\n"
+        all_docs_toc = ""
 
         for doc_metadata in docs_metadata:
-            all_docs_toc += f"Document Name: {doc_metadata.doc_name}\n{doc_metadata.table_of_contents}\n\n"
+            all_docs_toc += f"<Document: {doc_metadata.doc_name}>"
+            all_docs_toc += f"\n{doc_metadata.table_of_contents}\n"
+            all_docs_toc += f"</Document: {doc_metadata.doc_name}>\n"
 
         state.extra_parameters["all_docs_toc"] = all_docs_toc
         state.extra_parameters["all_fr_infos"] = all_fr_infos
 
-        logging.info("Preparing documents completed!")
+        logger.info("Preparing documents completed!")
+        logger.debug(f"All Docs ToC: \n{all_docs_toc}")
+        logger.debug(f"All FR Infos: \n{all_fr_infos}")
         return state
 
 

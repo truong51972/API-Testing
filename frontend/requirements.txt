@@ -15,3 +15,5 @@ tzdata==2025.2
 urllib3==2.5.0
 minio
 six==1.16.0
+
+dj-database-url # for parsing database URLs in Django settings

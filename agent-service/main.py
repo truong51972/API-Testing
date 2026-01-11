@@ -3,10 +3,12 @@ import secrets
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from src import settings
+from src import exception, settings
 from src.api.routers import all_routers
+from src.models.api.standard_output import StandardOutputModel
 
 settings.setup(verbose=True)
 
@@ -79,6 +81,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(exception.ApiValidationException)
+async def custom_validation_handler(
+    request: Request, exc: exception.ApiValidationException
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=StandardOutputModel(
+            result={
+                "code": exc.code,
+                "description": exc.description,
+            },
+            data={},
+        ).model_dump(),
+    )
+
 
 # 5. Routers
 for router in all_routers:

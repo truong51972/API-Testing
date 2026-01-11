@@ -1,4 +1,6 @@
 docling==2.61.2
+onnxruntime==1.23.2
+easyocr #NO-UPDATE
 
 unstructured==0.18.20
 networkx==3.5

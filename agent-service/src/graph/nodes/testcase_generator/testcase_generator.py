@@ -1,6 +1,4 @@
 # src.graph.nodes.testcase_generator.testcase_generator
-import json
-import logging
 from typing import Any, Dict
 
 from langchain_core.output_parsers import JsonOutputParser
@@ -10,6 +8,7 @@ from src import repositories
 from src.base.service.base_agent_service import BaseAgentService
 from src.enums.enums import LanguageEnum
 from src.models import TestcasesGenStateModel
+from src.settings import logger
 
 
 class TestCaseGenerator(BaseAgentService):
@@ -49,14 +48,43 @@ class TestCaseGenerator(BaseAgentService):
         ]
         self.set_system_lang(lang)
 
-        generated_testcases = self.run(human=standardized_documents).content
+        no_cache = False
+        retry_count = 0
+        while True:
+            generated_testcases = self.run(
+                human=standardized_documents, no_cache=no_cache
+            ).content
 
-        generated_testcases = self.extract_clean_json_from_text(generated_testcases)
-        request_body = generated_testcases.get("request_body", {})
-        testcases = generated_testcases.get("testcases", {})
+            logger.debug(f"Generated Testcases Raw Output: \n{generated_testcases}")
 
-        basic_validation_cases = testcases.get("basic_validation", [])
-        business_logic_cases = testcases.get("business_logic", [])
+            try:
+                generated_testcases = self.extract_clean_json_from_text(
+                    generated_testcases
+                )
+                request_body = generated_testcases.get("request_body", None)
+                testcases = generated_testcases.get("testcases", None)
+                if request_body is None or testcases is None:
+                    raise ValueError(
+                        "Generated testcases missing 'request_body' or 'testcases'"
+                    )
+                basic_validation_cases = testcases.get("basic_validation", None)
+                business_logic_cases = testcases.get("business_logic", None)
+
+                if basic_validation_cases is None or business_logic_cases is None:
+                    raise ValueError(
+                        "Generated testcases missing 'basic_validation' or 'business_logic' cases"
+                    )
+
+                break
+            except Exception as e:
+                no_cache = True
+                retry_count += 1
+
+                if retry_count > 3:
+                    raise e
+
+                logger.warning(f"Test case generation error: {e}. Retrying...")
+                continue
 
         test_suite = repositories.TestSuiteRepository(
             fr_info_id=current_fr.fr_info_id,
@@ -104,7 +132,7 @@ class TestCaseGenerator(BaseAgentService):
             "test_cases": testcases,
         }
 
-        logging.info(
+        logger.info(
             f"Generated test cases for FR group: {current_fr.get_fr_group_name()}, total test cases: {len(testcases)}"
         )
         return state

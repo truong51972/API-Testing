@@ -8,7 +8,7 @@ bind = "0.0.0.0:8000"  # Bind address and port
 # If GUNICORN_WORKERS is set to "max", use (CPU cores * 2) + 1.
 # Otherwise, use the value from the environment variable or default to 1.
 if os.getenv("GUNICORN_WORKERS") == "max":
-    workers = multiprocessing.cpu_count() * 2 + 1
+    workers = multiprocessing.cpu_count()
 else:
     try:
         workers = int(os.getenv("GUNICORN_WORKERS"))
@@ -19,7 +19,7 @@ else:
 # If GUNICORN_THREADS is set to "max", use (CPU cores * 2) + 1.
 # Otherwise, use the value from the environment variable or default to 2.
 if os.getenv("GUNICORN_THREADS") == "max":
-    threads = multiprocessing.cpu_count() * 2 + 1
+    threads = 2
 else:
     try:
         threads = int(os.getenv("GUNICORN_THREADS"))
@@ -44,7 +44,7 @@ worker_connections = 1000
 # Logging configuration.
 accesslog = "-"  # Log access to stdout
 errorlog = "-"  # Log errors to stdout
-loglevel = "info"  # Logging level
+loglevel = "debug"  # Logging level
 
 # Monitoring (uncomment to enable statsd).
 # statsd_host = 'localhost:8125'

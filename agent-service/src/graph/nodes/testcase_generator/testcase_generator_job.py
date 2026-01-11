@@ -1,13 +1,11 @@
 # src.graph.nodes.testcase_generator.testcase_generator
-import logging
 from typing import Any, Dict
 
 from pydantic import BaseModel, validate_call
-from sqlmodel import Session, select
+from sqlmodel import Session
 
-from src import repositories
 from src.models import TestcasesGenStateModel
-from src.settings import get_db_engine
+from src.settings import get_db_engine, logger
 
 
 class TestcaseGeneratorJob(BaseModel):
@@ -15,16 +13,15 @@ class TestcaseGeneratorJob(BaseModel):
     def __call__(self, state: TestcasesGenStateModel) -> Dict[str, Any]:
         all_fr_infos = state.extra_parameters["all_fr_infos"]
         current_fr_index = state.extra_parameters.get("current_fr_index", -1)
-        test_case_infos = state.extra_parameters.get("test_case_infos", {})
 
         if current_fr_index < len(all_fr_infos) - 1:
             current_fr_index += 1
-            logging.info(
+            logger.info(
                 f"Current FR group to process: {current_fr_index}/{len(all_fr_infos)}"
             )
             state.extra_parameters["progress"] = "in_progress"
         else:
-            logging.info("All FR groups have been processed. Job completed.")
+            logger.info("All FR groups have been processed. Job completed.")
 
             with Session(get_db_engine()) as session:
                 for _, test_entities in state.test_case_infos.items():

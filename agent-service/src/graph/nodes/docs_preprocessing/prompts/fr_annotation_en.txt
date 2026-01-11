@@ -42,6 +42,7 @@ u-fr-003: Forgot Password
 - If there are multiple unique FRs, each unique FR is grouped separately and numbered continuously.
 - Ensure only functional requirements are extracted.
 - Only return results in the correct format, do not explain the rules again.
+- FRs can be different among those titles, but the content inside is similar, so them must be in a same group.
 
 **Input data:**
 {input}

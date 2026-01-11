@@ -42,6 +42,7 @@ u-fr-003: Forgot Password
 - Nếu nhiều FR unique, mỗi FR unique được nhóm riêng và đánh số liên tục.
 - Đảm bảo chỉ lấy các requirement là functional requirement.
 - Chỉ trả về kết quả đúng format, không giải thích lại quy tắc.
+- Các FR có thể khác nhau về title nhưng nội dung bên trong giống nhau thì các FR đó phải cùng chung 1 nhóm.
 
 **Dữ liệu input:**
 {input}

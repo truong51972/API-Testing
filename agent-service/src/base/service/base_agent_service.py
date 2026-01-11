@@ -1,5 +1,4 @@
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union
 
@@ -15,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator, validate_call
 from src.cache import cache_func_wrapper
 from src.common.common import split_by_size
 from src.enums.enums import LanguageEnum, ModelTypeEnum
-from src.settings import ENVIRONMENT, OLLAMA_BASE_URL
+from src.settings import ENVIRONMENT, OLLAMA_BASE_URL, VLLM_API_KEY, VLLM_BASE_URL
 
 
 class BaseAgentService(BaseModel):
@@ -91,11 +90,11 @@ class BaseAgentService(BaseModel):
         elif model_type == "vllm":
             _model_params = model_params.copy()
 
-            _model_params["base_url"] = os.getenv(
-                "VLLM_BASE_URL", "http://localhost:8000/v1/"
-            )
-            _model_params["openai_api_key"] = "EMPTY"
+            _model_params["base_url"] = VLLM_BASE_URL
+            _model_params["openai_api_key"] = VLLM_API_KEY
+
             _model_params["timeout"] = 900
+            _model_params["streaming"] = True  # Enable streaming for VLLM
 
             # VLLM does not support top_k
             del _model_params["top_k"]
@@ -156,9 +155,11 @@ class BaseAgentService(BaseModel):
         return response
 
     @validate_call
-    def run(self, human: str, chat_history: List[AnyMessage] = []) -> AIMessage:
+    def run(
+        self, human: str, chat_history: List[AnyMessage] = [], no_cache: bool = False
+    ) -> AIMessage:
         messages = self._get_messages(human, chat_history)
-        response = self._run(messages)
+        response = self._run(messages, no_cache=no_cache)
 
         return response
 

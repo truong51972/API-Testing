@@ -10,3 +10,4 @@ langgraph==1.0.4
 langgraph-cli[inmem]==0.4.7
 
 langsmith==0.4.48
+predibase #NO-UPDATE

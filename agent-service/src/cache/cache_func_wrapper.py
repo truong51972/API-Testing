@@ -38,22 +38,26 @@ def cache_func_wrapper(func=None, *, ex=3600):
     def decorator(inner_func):
         @wraps(inner_func)
         def wrapper(*args, **kwargs):
+            # Check for no_cache flag in kwargs
+            no_cache = kwargs.pop("no_cache", False)
             # Get Redis client instance
             redis_client = get_redis_client()
             # Generate cache key for current function and arguments
             cache_key = __make_cache_key(inner_func, args, kwargs)
-            # Try to get cached result from Redis
-            cached_result = redis_client.get(cache_key)
-            if cached_result is not None:
-                logging.info(f"Cache hit for key: {cache_key}")
-                # Return cached result if available
-                return pickle.loads(cached_result)
+            if not no_cache:
+                # Try to get cached result from Redis
+                cached_result = redis_client.get(cache_key)
+                if cached_result is not None:
+                    logging.info(f"Cache hit for key: {cache_key}")
+                    # Return cached result if available
+                    return pickle.loads(cached_result)
 
             # Call the original function if cache miss
             result = inner_func(*args, **kwargs)
 
-            # Store result in Redis with expiration time
-            redis_client.set(cache_key, pickle.dumps(result), ex=ex)
+            if not no_cache:
+                # Store result in Redis with expiration time
+                redis_client.set(cache_key, pickle.dumps(result), ex=ex)
             return result
 
         return wrapper

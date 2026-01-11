@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src import repositories
-from src.models import StandardOutputModel
+from src.models import ProjectModel, StandardOutputModel
+from src.types import project as project_types
 
 router = APIRouter(prefix="/projects", tags=["Project"])
 
@@ -11,12 +12,9 @@ class CreateProjectResponseModel(BaseModel):
     project_id: str
 
 
-@router.put("/")
-def create_project(
-    project: repositories.ProjectRepository,
-) -> StandardOutputModel:
-
-    project = project.create()
+@router.put("", response_model=StandardOutputModel)
+def create_project(project: ProjectModel):
+    project = repositories.ProjectRepository(**project.model_dump()).create()
 
     response = StandardOutputModel(
         result={
@@ -30,8 +28,8 @@ def create_project(
 
 class GetAllProjectsResponseModel(BaseModel):
     user_id: str
-    page_no: int
-    page_size: int
+    page_no: project_types.PageNo
+    page_size: project_types.PageSize
 
 
 @router.post("/all")
@@ -54,7 +52,7 @@ class DeleteProjectResponseModel(BaseModel):
     project_id: str
 
 
-@router.delete("/")
+@router.delete("")
 def delete_project(items: DeleteProjectResponseModel) -> StandardOutputModel:
     if repositories.ProjectRepository.delete_by_id(items.project_id):
         response = StandardOutputModel(

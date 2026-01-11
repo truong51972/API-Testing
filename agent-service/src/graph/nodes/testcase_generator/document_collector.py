@@ -1,5 +1,4 @@
 # src.graph.nodes.testcase_generator.document_collector
-import logging
 from typing import Any, Dict, Optional
 
 from langchain_core.output_parsers import JsonOutputParser
@@ -11,14 +10,12 @@ from src.base.service.base_agent_service import BaseAgentService
 from src.enums.enums import LanguageEnum
 from src.graph.tools.document.document_search import search_documents
 from src.models import TestcasesGenStateModel
-from src.settings import get_db_engine
+from src.settings import get_db_engine, logger
 
 
 class DocumentCollector(BaseAgentService):
     llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0
-
-    llm_top_p: Optional[float] = 0.1
 
     llm_thinking_budget: Optional[int] = -1
 
@@ -39,10 +36,12 @@ class DocumentCollector(BaseAgentService):
         all_docs_toc = state.extra_parameters["all_docs_toc"]
         self.set_system_lang(lang)
 
-        input_data = f"* **Function Name**: '{current_fr}'\n{all_docs_toc}"
-
+        input_data = (
+            f"<Target Function>'{current_fr}'</Target Function>\n{all_docs_toc}"
+        )
+        logger.debug(f"Document Collector Input Data: \n{input_data}")
         response = self.run(human=input_data).content
-
+        logger.debug(f"Document Collector Raw Response: \n{response}")
         json_parser = JsonOutputParser()
         response = json_parser.parse(response)
 
@@ -72,7 +71,7 @@ class DocumentCollector(BaseAgentService):
                         session=session,
                     )
                     if not content:
-                        logging.warning(
+                        logger.warning(
                             f"Heading '{heading}' not found in document '{doc_name}'! Searching by vector!"
                         )
                         content = search_documents(
@@ -91,7 +90,8 @@ class DocumentCollector(BaseAgentService):
         state.extra_parameters["collected_documents"][
             current_fr_id
         ] = collected_documents
-        logging.info("Document collection completed!")
+        logger.info("Document collection completed!")
+        logger.debug(f"Collected Documents: \n{collected_documents}")
         return state
 
 
